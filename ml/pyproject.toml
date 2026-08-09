@@ -1,0 +1,28 @@
+[project]
+name = "coc-base-analyzer-ml"
+version = "0.1.0"
+description = "ML package for CoC Base Analyzer — Phase 0 feasibility"
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+    "yolov5>=7.0.0",
+    "torch>=2.0.0",
+    "torchvision>=0.15.0",
+    "huggingface_hub>=0.20.0",
+    "opencv-python>=4.8.0",
+    "pandas>=2.0.0",
+    "jupyter>=1.0.0",
+    "matplotlib>=3.7.0",
+    "Pillow>=10.0.0",
+    "datasets>=2.14.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "ipykernel>=6.25.0",
+    "nbconvert>=7.0.0",
+]
+
+[build-system]
+requires = ["setuptools>=68.0"]
+build-backend = "setuptools.build_meta"

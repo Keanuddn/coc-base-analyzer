@@ -1,0 +1,2 @@
+image_path,th_level,model_detections,detected_classes,detection_scores,correct,false_positives,false_negatives,notes,evaluated_at,run_timestamp
+,,,,,,,,smoke_test_blocked: huggingface.co unreachable (DNS/network). Re-run ml/scripts/phase0_smoke_test.py locally with network access.,,2026-08-09T21:45:00+00:00

@@ -94,7 +94,17 @@ ml/.venv/bin/python ml/scripts/phase0_smoke_test.py
 
 ### Zusammenfassung
 
-Phase 0-Infrastruktur ist vollständig eingerichtet (Notebook, Smoke-Test-Skript, Regression-Set-Struktur, CSV-Export). Der eigentliche Modell-Test konnte in dieser Umgebung **nicht abgeschlossen** werden, weil Hugging Face nicht erreichbar war. Die Bewertung basiert daher auf Model Card / Dataset-Metadaten plus dem fehlgeschlagenen Smoke Test.
+Phase 0-Infrastruktur ist vollständig eingerichtet (Notebook, Smoke-Test-Skript, Regression-Set-Struktur, CSV-Export). Der Smoke Test wurde **lokal mit Netzwerk erfolgreich ausgeführt** (2026-08-09 UTC): Modell `keremberke/yolov5m-clash-of-clans` lädt und Inference läuft (PyTorch 2.6+ erfordert `weights_only=False` beim Laden des YOLOv5-Checkpoints — im Skript abgedeckt).
+
+| Aspekt | Ergebnis |
+|--------|----------|
+| Modell-Laden | Erfolgreich (HF-Weights) |
+| Regression-Set | Leer — keine CoC-Screenshots unter `ml/tests/regression_set/` |
+| HF-Beispielbild | Download fehlgeschlagen: Dataset-Skripte von Hugging Face nicht mehr unterstützt |
+| Fallback-Inferenz | `yolov5/data/images/zidane.jpg` — **0 Detections**, Klassen `[]` (kein CoC-Inhalt; bestätigt nur Pipeline) |
+| CSV | `ml/notebooks/phase0_results.csv` aktualisiert (`smoke_test_only`) |
+
+Für aussagekräftige Detections CoC-Basis-Screenshots ins Regression-Set legen und den Smoke Test erneut ausführen.
 
 ### Erwartete Eignung (basierend auf Model Card)
 
@@ -113,11 +123,11 @@ Phase 0-Infrastruktur ist vollständig eingerichtet (Notebook, Smoke-Test-Skript
    ```
    Gegner-Basis-Screenshots (Scouting-Ansicht), verschiedene TH-Levels.
 
-2. **Smoke Test lokal ausführen** (Netzwerk erforderlich):
+2. **Smoke Test erneut ausführen**, sobald Regression-Set-Bilder vorliegen:
    ```bash
    ml/.venv/bin/python ml/scripts/phase0_smoke_test.py
    ```
-   Oder Notebook `ml/notebooks/phase0_feasibility_check.ipynb` öffnen.
+   (Initialer Lauf ohne CoC-Bilder: Modell OK, 0 Detections auf YOLOv5-Fallback.)
 
 3. **Manuelle Evaluation** im Notebook: pro Bild `correct`, `false_positives`, `false_negatives` eintragen.
 
@@ -127,7 +137,7 @@ Phase 0-Infrastruktur ist vollständig eingerichtet (Notebook, Smoke-Test-Skript
 |-------|-------|
 | `ml/notebooks/phase0_feasibility_check.ipynb` | Interaktiver Machbarkeits-Check |
 | `ml/scripts/phase0_smoke_test.py` | Headless Smoke Test |
-| `ml/notebooks/phase0_results.csv` | Strukturierte Ergebnisse (aktuell: Netzwerk-Block dokumentiert) |
+| `ml/notebooks/phase0_results.csv` | Strukturierte Ergebnisse (Smoke Test 2026-08-09: Fallback-Bild, 0 Detections) |
 | `ml/tests/regression_set/th{10-18}/` | Regression-Set-Ordner (leer, bereit für Screenshots) |
 
 ### Empfehlung für Phase 1

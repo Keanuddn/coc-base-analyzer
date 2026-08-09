@@ -42,9 +42,22 @@ def infer_th_level(path: Path) -> str:
 
 
 def load_model():
+    import torch
     import yolov5
 
-    model = yolov5.load(MODEL_ID)
+    # Trusted HF checkpoint; PyTorch 2.6+ defaults weights_only=True which breaks YOLOv5 pickles.
+    _torch_load = torch.load
+
+    def _load_weights(*args, **kwargs):
+        if kwargs.get("weights_only") is None:
+            kwargs["weights_only"] = False
+        return _torch_load(*args, **kwargs)
+
+    torch.load = _load_weights
+    try:
+        model = yolov5.load(MODEL_ID)
+    finally:
+        torch.load = _torch_load
     model.conf = 0.25
     model.iou = 0.45
     model.max_det = 1000

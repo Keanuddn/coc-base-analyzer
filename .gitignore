@@ -1,0 +1,36 @@
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+*.egg-info/
+
+# Node
+node_modules/
+.next/
+dist/
+build/
+
+# ML
+*.pt
+*.pth
+*.onnx
+runs/
+wandb/
+datasets/raw/
+datasets/processed/
+!datasets/processed/.gitkeep
+
+# Env / Secrets
+.env
+.env.local
+.env.*.local
+*.pem
+credentials.json
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log

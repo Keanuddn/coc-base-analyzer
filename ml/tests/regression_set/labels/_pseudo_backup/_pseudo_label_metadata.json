@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-08-10T16:49:37Z",
+  "generated_at": "2026-08-10T16:48:50Z",
   "model": "keremberke/yolov5m-clash-of-clans",
   "conf": 0.35,
   "iou": 0.45,
@@ -70,37 +70,37 @@
       "deprecated_removed": 0,
       "source_image": "_extras/war_base_illyrian_god.png"
     },
-    "th15/war_base_cocbase_wizztower_ring.png": {
+    "_rejected/th15/war_base_cocbase_wizztower_ring.png": {
       "pseudo_label": true,
-      "label_file": "labels/th15/war_base_cocbase_wizztower_ring.txt",
+      "label_file": "labels/_rejected/th15/war_base_cocbase_wizztower_ring.txt",
       "detection_count": 43,
       "raw_detection_count": 43,
       "deprecated_removed": 0,
-      "source_image": "th15/war_base_cocbase_wizztower_ring.png"
+      "source_image": "_rejected/th15/war_base_cocbase_wizztower_ring.png"
     },
-    "th15/war_base_illyrian_god.png": {
+    "_rejected/th15/war_base_illyrian_god.png": {
       "pseudo_label": true,
-      "label_file": "labels/th15/war_base_illyrian_god.txt",
+      "label_file": "labels/_rejected/th15/war_base_illyrian_god.txt",
       "detection_count": 22,
       "raw_detection_count": 22,
       "deprecated_removed": 0,
-      "source_image": "th15/war_base_illyrian_god.png"
+      "source_image": "_rejected/th15/war_base_illyrian_god.png"
     },
-    "th16/war_base_cocbase_sakura_scenery.png": {
+    "_rejected/th16/war_base_cocbase_sakura_scenery.png": {
       "pseudo_label": true,
-      "label_file": "labels/th16/war_base_cocbase_sakura_scenery.txt",
+      "label_file": "labels/_rejected/th16/war_base_cocbase_sakura_scenery.txt",
       "detection_count": 24,
       "raw_detection_count": 24,
       "deprecated_removed": 0,
-      "source_image": "th16/war_base_cocbase_sakura_scenery.png"
+      "source_image": "_rejected/th16/war_base_cocbase_sakura_scenery.png"
     },
-    "th16/war_base_cocbase_volcanic_warmap.png": {
+    "_rejected/th16/war_base_cocbase_volcanic_warmap.png": {
       "pseudo_label": true,
-      "label_file": "labels/th16/war_base_cocbase_volcanic_warmap.txt",
+      "label_file": "labels/_rejected/th16/war_base_cocbase_volcanic_warmap.txt",
       "detection_count": 26,
       "raw_detection_count": 26,
       "deprecated_removed": 0,
-      "source_image": "th16/war_base_cocbase_volcanic_warmap.png"
+      "source_image": "_rejected/th16/war_base_cocbase_volcanic_warmap.png"
     }
   }
 }

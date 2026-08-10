@@ -13,6 +13,8 @@ from dataset.build_dataset import (
     assign_splits,
     build_yolo_dataset,
     infer_town_hall_level,
+    remap_active_class_indices,
+    resolve_regression_label_path,
     write_data_yaml,
 )
 from dataset.dedup import deduplicate_registry_entries
@@ -154,6 +156,69 @@ class TestWriteDataYaml:
         payload = yaml.safe_load(path.read_text(encoding="utf-8"))
         assert payload["names"][0] == "ad"
         assert payload["names"][12] == "th13"
+
+
+class TestManualLabels:
+    def test_resolve_manual_label_path(self, tmp_path: Path) -> None:
+        regression = tmp_path / "regression"
+        img = regression / "th15" / "war_base.png"
+        lbl = regression / "labels" / "th15" / "war_base.txt"
+        img.parent.mkdir(parents=True)
+        lbl.parent.mkdir(parents=True)
+        img.write_bytes(b"fake")
+        lbl.write_text("3 0.5 0.5 0.2 0.2\n", encoding="utf-8")
+
+        path, notes = resolve_regression_label_path(
+            img,
+            regression,
+            include_pseudo_labels=False,
+            manual_labels_only=True,
+            pseudo_labels_dir=regression / "labels",
+        )
+        assert path == lbl
+        assert "manual_label" in notes
+        assert "pseudo_label" not in notes
+
+    def test_remap_active_class_indices(self) -> None:
+        active = ["ad", "canon", "mortar"]
+        lines = ["1 0.5 0.5 0.2 0.2", "2 0.4 0.4 0.1 0.1"]
+        remapped = remap_active_class_indices(lines, active)
+        assert remapped[0].startswith("3 ")  # canon
+        assert remapped[1].startswith("8 ")  # mortar (model index, skips hero pads)
+
+    def test_manual_labels_only_in_dataset(self, synthetic_demo_dir: Path, tmp_path: Path) -> None:
+        from PIL import Image
+
+        regression = tmp_path / "regression"
+        img_dir = regression / "th15"
+        lbl_dir = regression / "labels" / "th15"
+        img_dir.mkdir(parents=True)
+        lbl_dir.mkdir(parents=True)
+        Image.new("RGB", (64, 64), color=(80, 120, 70)).save(img_dir / "war_base_manual.png")
+
+        manual_lbl = lbl_dir / "war_base_manual.txt"
+        manual_lbl.write_text("3 0.5 0.5 0.2 0.2\n", encoding="utf-8")
+
+        output = tmp_path / "yolo_manual"
+        config = BuildDatasetConfig(
+            output_dir=output,
+            include_demo=True,
+            include_regression=True,
+            manual_labels_only=True,
+            demo_dir=synthetic_demo_dir,
+            regression_dir=regression,
+            render_synthetic_variants=False,
+            seed=3,
+        )
+        result = build_yolo_dataset(config)
+        report = json.loads(result.report_path.read_text(encoding="utf-8"))
+        assert report["totals"]["real"] == 1
+        assert report["totals"]["labeled"] >= 2
+
+        real_labels = list(output.rglob("real_war_base_manual_*.txt"))
+        assert real_labels
+        # active index 3 in classes.txt is "canon" → model index 3
+        assert real_labels[0].read_text(encoding="utf-8").startswith("3 ")
 
 
 class TestRegistryDedupIntegration:

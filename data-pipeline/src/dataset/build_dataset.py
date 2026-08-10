@@ -29,6 +29,7 @@ REPO_ROOT = PIPELINE_ROOT.parent
 DEFAULT_DEMO_DIR = PIPELINE_ROOT / "datasets" / "processed" / "demo"
 DEFAULT_REGRESSION_DIR = REPO_ROOT / "ml" / "tests" / "regression_set"
 DEFAULT_PSEUDO_LABELS_DIR = DEFAULT_REGRESSION_DIR / "labels"
+DEFAULT_CLASSES_FILE = DEFAULT_REGRESSION_DIR / "classes.txt"
 DEFAULT_OUTPUT = PIPELINE_ROOT / "datasets" / "processed" / "yolo_v1"
 
 IMAGE_SUFFIXES = {".png", ".jpg", ".jpeg", ".webp"}
@@ -60,6 +61,7 @@ class BuildDatasetConfig:
     include_demo: bool = False
     include_regression: bool = False
     include_pseudo_labels: bool = False
+    manual_labels_only: bool = False
     user_screenshots_dir: Path | None = None
     demo_dir: Path = DEFAULT_DEMO_DIR
     regression_dir: Path = DEFAULT_REGRESSION_DIR
@@ -178,6 +180,34 @@ def _load_approved_reviews(path: Path | None) -> set[str] | None:
     }
 
 
+def _load_active_class_names(classes_file: Path = DEFAULT_CLASSES_FILE) -> list[str]:
+    """Load active class names from regression-set classes.txt (labelImg predefined list)."""
+    if classes_file.is_file():
+        return [
+            line.strip()
+            for line in classes_file.read_text(encoding="utf-8").splitlines()
+            if line.strip()
+        ]
+    return [name for name in YOLO_CLASS_NAMES if name not in {"kingpad", "queenpad", "rcpad", "wardenpad"}]
+
+
+def remap_active_class_indices(lines: list[str], active_names: list[str]) -> list[str]:
+    """Map labelImg active-class indices (0..len(active)-1) to keremberke model indices."""
+    remapped: list[str] = []
+    for line in lines:
+        parts = line.strip().split()
+        if len(parts) < 5:
+            continue
+        active_idx = int(parts[0])
+        if active_idx < 0 or active_idx >= len(active_names):
+            logger.warning("Skipping label line with out-of-range class index %d: %s", active_idx, line)
+            continue
+        model_idx = YOLO_CLASS_NAMES.index(active_names[active_idx])
+        parts[0] = str(model_idx)
+        remapped.append(" ".join(parts))
+    return remapped
+
+
 def _load_pseudo_label_index(pseudo_labels_dir: Path) -> dict[str, bool]:
     """Load pseudo-label metadata index (image rel path → pseudo_label flag)."""
     meta_path = pseudo_labels_dir / "_pseudo_label_metadata.json"
@@ -195,15 +225,19 @@ def resolve_regression_label_path(
     regression_dir: Path,
     *,
     include_pseudo_labels: bool,
+    manual_labels_only: bool,
     pseudo_labels_dir: Path,
 ) -> tuple[Path | None, list[str]]:
-    """Resolve YOLO label sidecar: alongside image, or under labels/ if pseudo-labels enabled."""
+    """Resolve YOLO label sidecar: alongside image, or under labels/ for manual/pseudo labels."""
     notes: list[str] = []
     sidecar = image_path.with_suffix(".txt")
     if sidecar.is_file():
+        if manual_labels_only:
+            notes.append("manual_label")
         return sidecar, notes
 
-    if not include_pseudo_labels:
+    use_labels_dir = include_pseudo_labels or manual_labels_only
+    if not use_labels_dir:
         notes.append("manual_labeling_required")
         return None, notes
 
@@ -213,11 +247,14 @@ def resolve_regression_label_path(
         notes.append("manual_labeling_required")
         return None, notes
 
-    pseudo_path = pseudo_labels_dir / rel.with_suffix(".txt")
-    if pseudo_path.is_file():
-        notes.append("pseudo_label")
-        notes.append("manual_review_recommended")
-        return pseudo_path, notes
+    labels_path = pseudo_labels_dir / rel.with_suffix(".txt")
+    if labels_path.is_file():
+        if manual_labels_only:
+            notes.append("manual_label")
+        else:
+            notes.append("pseudo_label")
+            notes.append("manual_review_recommended")
+        return labels_path, notes
 
     notes.append("manual_labeling_required")
     return None, notes
@@ -228,7 +265,7 @@ def collect_real_samples(config: BuildDatasetConfig) -> list[DatasetSample]:
     samples: list[DatasetSample] = []
     pseudo_index = (
         _load_pseudo_label_index(config.pseudo_labels_dir)
-        if config.include_pseudo_labels
+        if config.include_pseudo_labels and not config.manual_labels_only
         else {}
     )
 
@@ -251,7 +288,8 @@ def collect_real_samples(config: BuildDatasetConfig) -> list[DatasetSample]:
                 image_path,
                 config.regression_dir,
                 include_pseudo_labels=config.include_pseudo_labels,
-                pseudo_labels_dir=config.pseudo_labels_dir,
+                manual_labels_only=config.manual_labels_only,
+                pseudo_labels_dir=config.regression_dir / "labels",
             )
             has_labels = label_path is not None
             if has_labels:
@@ -350,7 +388,13 @@ def _safe_stem(path: Path, origin: OriginName, index: int) -> str:
     return f"{origin}_{stem}_{index:04d}"
 
 
-def materialize_yolo_dataset(samples: list[DatasetSample], output_dir: Path) -> dict[str, Any]:
+def materialize_yolo_dataset(
+    samples: list[DatasetSample],
+    output_dir: Path,
+    *,
+    remap_manual_labels: bool = False,
+    active_class_names: list[str] | None = None,
+) -> dict[str, Any]:
     """Copy images and labels into YOLO directory layout."""
     output_dir.mkdir(parents=True, exist_ok=True)
 
@@ -373,7 +417,13 @@ def materialize_yolo_dataset(samples: list[DatasetSample], output_dir: Path) -> 
             dest_lbl = lbl_dir / f"{stem}.txt"
             shutil.copy2(sample.source_path, dest_img)
             if sample.label_path and sample.label_path.is_file():
-                shutil.copy2(sample.label_path, dest_lbl)
+                if remap_manual_labels and "manual_label" in sample.notes:
+                    lines = sample.label_path.read_text(encoding="utf-8").splitlines()
+                    active_names = active_class_names or _load_active_class_names()
+                    remapped = remap_active_class_indices(lines, active_names)
+                    dest_lbl.write_text("\n".join(remapped) + ("\n" if remapped else ""), encoding="utf-8")
+                else:
+                    shutil.copy2(sample.label_path, dest_lbl)
             copied.append(
                 {
                     "stem": stem,
@@ -487,6 +537,7 @@ def build_summary(samples: list[DatasetSample], materialized: dict[str, Any]) ->
         "materialized_files": materialized,
         "labeling_todo": [
             "Label real screenshots in ml/tests/regression_set/ (YOLO .txt sidecars)",
+            "Manual labeling guide: ml/docs/MANUAL_LABELING.md (labelImg + classes.txt)",
             "Pseudo-labels: ml/src/pseudo_label.py → ml/tests/regression_set/labels/ (review manually)",
         ],
     }
@@ -565,7 +616,13 @@ def build_yolo_dataset(config: BuildDatasetConfig) -> BuildDatasetResult:
     )
 
     config.output_dir.mkdir(parents=True, exist_ok=True)
-    materialized = materialize_yolo_dataset(samples, config.output_dir)
+    active_names = _load_active_class_names() if config.manual_labels_only else None
+    materialized = materialize_yolo_dataset(
+        samples,
+        config.output_dir,
+        remap_manual_labels=config.manual_labels_only,
+        active_class_names=active_names,
+    )
     data_yaml_path = write_data_yaml(config.output_dir)
     summary = build_summary(samples, materialized)
     report_path, _ = write_dataset_report(config.output_dir, summary)
@@ -602,6 +659,14 @@ def main(argv: list[str] | None = None) -> int:
         "--include-pseudo-labels",
         action="store_true",
         help="Use pseudo-labels from ml/tests/regression_set/labels/ for real images",
+    )
+    parser.add_argument(
+        "--manual-labels-only",
+        action="store_true",
+        help=(
+            "Use only existing manual .txt labels under regression_set/labels/ "
+            "(ignore pseudo-label metadata; remap active class indices from classes.txt)"
+        ),
     )
     parser.add_argument(
         "--user-screenshots",
@@ -652,6 +717,8 @@ def main(argv: list[str] | None = None) -> int:
 
     if not args.include_demo and not args.include_regression and not args.user_screenshots:
         parser.error("Specify at least one of --include-demo, --include-regression, --user-screenshots")
+    if args.manual_labels_only and args.include_pseudo_labels:
+        parser.error("Use either --manual-labels-only or --include-pseudo-labels, not both")
 
     config = BuildDatasetConfig(
         output_dir=args.output,
@@ -662,6 +729,7 @@ def main(argv: list[str] | None = None) -> int:
         include_demo=args.include_demo,
         include_regression=args.include_regression,
         include_pseudo_labels=args.include_pseudo_labels,
+        manual_labels_only=args.manual_labels_only,
         user_screenshots_dir=args.user_screenshots,
         demo_dir=args.demo_dir,
         regression_dir=args.regression_dir,

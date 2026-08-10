@@ -1,0 +1,12 @@
+ad
+airsweeper
+bombtower
+canon
+clancastle
+eagle
+inferno
+mortar
+scattershot
+th13
+wizztower
+xbow

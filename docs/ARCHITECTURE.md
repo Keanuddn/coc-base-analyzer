@@ -188,3 +188,87 @@ Nutzer-Ziel: je 2 Screenshots pro Rathaus-Level 15–18 (8 Bilder gesamt).
 - Für TH14+ ist **Fine-Tuning mit eigenem Datensatz** erforderlich — **durch TH15-Test bestätigt**
 - Neue Klassen für TH14–18-Gebäude müssen zum Label-Set hinzugefügt werden
 - Regression Set (20–30 Bilder) als kontinuierlicher Qualitäts-Check beibehalten
+
+---
+
+## Phase 2: Pseudo-Labels, Fine-Tuning, Inferenz
+
+### Ziel
+
+Erweiterung der CV-Pipeline um Pseudo-Labeling, YOLO-Fine-Tuning (Ultralytics YOLOv8), Single-Image-Inferenz und Regression-Checks gegen die keremberke-Baseline.
+
+### Komponenten
+
+| Datei | Zweck |
+|-------|-------|
+| `ml/src/pseudo_label.py` | Keremberke-Modell → YOLO `.txt` für Regression-Screenshots |
+| `ml/configs/th_classes.yaml` | Versionierte Klassenliste (16 aktiv + TH14+ Platzhalter) |
+| `ml/configs/train_config.yaml` | Epochen, Batch, Pfade, Smoke-Test-Overrides |
+| `ml/src/train.py` | Ultralytics Fine-Tuning (`yolov8n.pt` → eigenes Dataset) |
+| `ml/src/infer.py` | Screenshot → JSON (Gebäude + Confidence) |
+| `ml/src/regression_check.py` | Baseline vs. fine-tuned auf Regression-Set |
+| `ml/src/base_classifier.py` | Stub: TH-Schätzung aus Gebäudeverteilung |
+| `ml/src/trap_heuristics.py` | Stub: Fallen-Wahrscheinlichkeit (Disclaimer) |
+
+### Pseudo-Labels
+
+```bash
+cd coc-base-analyzer/ml
+.venv/bin/python src/pseudo_label.py
+```
+
+- Output: `ml/tests/regression_set/labels/<rel_path>.txt`
+- Metadaten: `labels/_pseudo_label_metadata.json` mit `"pseudo_label": true`
+- **Manuelle Review erforderlich** — erwartete Fehler: FP auf TH14+, fehlende Monolith/Spell Tower
+
+### Dataset mit Pseudo-Labels
+
+```bash
+cd data-pipeline
+.venv/bin/python -m dataset.build_dataset \
+  --output datasets/processed/yolo_v1 \
+  --include-demo --include-regression --include-pseudo-labels
+```
+
+### Training
+
+**Smoke Test (CPU, 2 Epochen):**
+```bash
+cd ml && .venv/bin/python src/train.py --smoke-test
+```
+
+**Volles Training (Colab/GPU empfohlen):**
+```bash
+cd ml && .venv/bin/python src/train.py
+```
+
+Weights landen in `ml/runs/coc_yolo_v1/` (gitignored `*.pt`).
+
+### Inferenz
+
+```bash
+cd ml
+.venv/bin/python src/infer.py tests/regression_set/th15/war_base_illyrian_god.png
+.venv/bin/python src/infer.py --baseline tests/regression_set/th15/war_base_illyrian_god.png
+```
+
+### Regression Check
+
+```bash
+cd ml
+.venv/bin/python src/regression_check.py --baseline-only
+.venv/bin/python src/regression_check.py
+```
+
+Report: `ml/tests/regression_check_report.json`
+
+### PyTorch 2.6+ Workaround
+
+Keremberke YOLOv5-Checkpoints erfordern `weights_only=False` beim `torch.load` — implementiert in `ml/src/model_utils.py`.
+
+### Einschränkungen Phase 2
+
+- Pseudo-Labels sind **Rauschen**, kein Ground Truth
+- TH14–18-Klassen sind Platzhalter in `th_classes.yaml`, noch nicht im Modell-Head
+- CPU-Training: nur Smoke Test; volles Fine-Tuning auf GPU/Colab
+

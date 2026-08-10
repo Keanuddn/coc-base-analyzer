@@ -1,0 +1,38 @@
+# YOLO fine-tuning configuration (Phase 2).
+# Paths are relative to repo root unless absolute.
+
+model:
+  # Ultralytics backbone for fine-tuning (keremberke weights are YOLOv5 — used for pseudo-labels only).
+  base: yolov8n.pt
+  # Alternative for Colab/GPU: yolo11n.pt
+
+data:
+  dataset_yaml: data-pipeline/datasets/processed/yolo_v1/data.yaml
+
+training:
+  epochs: 50
+  batch: 16
+  imgsz: 640
+  patience: 10
+  device: auto          # cuda if available, else cpu
+  workers: 4
+  project: ml/runs
+  name: coc_yolo_v1
+  seed: 42
+
+  # Smoke test overrides (used when --smoke-test flag is passed).
+  smoke_test:
+    epochs: 2
+    batch: 4
+    imgsz: 640
+
+inference:
+  conf: 0.25
+  iou: 0.45
+  max_det: 1000
+
+pseudo_label:
+  model: keremberke/yolov5m-clash-of-clans
+  conf: 0.25
+  iou: 0.45
+  imgsz: 640

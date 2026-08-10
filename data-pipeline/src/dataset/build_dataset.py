@@ -28,6 +28,7 @@ REPO_ROOT = PIPELINE_ROOT.parent
 
 DEFAULT_DEMO_DIR = PIPELINE_ROOT / "datasets" / "processed" / "demo"
 DEFAULT_REGRESSION_DIR = REPO_ROOT / "ml" / "tests" / "regression_set"
+DEFAULT_PSEUDO_LABELS_DIR = DEFAULT_REGRESSION_DIR / "labels"
 DEFAULT_OUTPUT = PIPELINE_ROOT / "datasets" / "processed" / "yolo_v1"
 
 IMAGE_SUFFIXES = {".png", ".jpg", ".jpeg", ".webp"}
@@ -58,9 +59,11 @@ class BuildDatasetConfig:
     seed: int = 42
     include_demo: bool = False
     include_regression: bool = False
+    include_pseudo_labels: bool = False
     user_screenshots_dir: Path | None = None
     demo_dir: Path = DEFAULT_DEMO_DIR
     regression_dir: Path = DEFAULT_REGRESSION_DIR
+    pseudo_labels_dir: Path = DEFAULT_PSEUDO_LABELS_DIR
     synthetic_variant_count: int = 8
     render_synthetic_variants: bool = True
 
@@ -162,26 +165,88 @@ def collect_synthetic_samples(config: BuildDatasetConfig) -> list[DatasetSample]
     return samples
 
 
+def _load_pseudo_label_index(pseudo_labels_dir: Path) -> dict[str, bool]:
+    """Load pseudo-label metadata index (image rel path → pseudo_label flag)."""
+    meta_path = pseudo_labels_dir / "_pseudo_label_metadata.json"
+    if not meta_path.is_file():
+        return {}
+    payload = json.loads(meta_path.read_text(encoding="utf-8"))
+    return {
+        key: bool(entry.get("pseudo_label"))
+        for key, entry in payload.get("labels", {}).items()
+    }
+
+
+def resolve_regression_label_path(
+    image_path: Path,
+    regression_dir: Path,
+    *,
+    include_pseudo_labels: bool,
+    pseudo_labels_dir: Path,
+) -> tuple[Path | None, list[str]]:
+    """Resolve YOLO label sidecar: alongside image, or under labels/ if pseudo-labels enabled."""
+    notes: list[str] = []
+    sidecar = image_path.with_suffix(".txt")
+    if sidecar.is_file():
+        return sidecar, notes
+
+    if not include_pseudo_labels:
+        notes.append("manual_labeling_required")
+        return None, notes
+
+    try:
+        rel = image_path.relative_to(regression_dir)
+    except ValueError:
+        notes.append("manual_labeling_required")
+        return None, notes
+
+    pseudo_path = pseudo_labels_dir / rel.with_suffix(".txt")
+    if pseudo_path.is_file():
+        notes.append("pseudo_label")
+        notes.append("manual_review_recommended")
+        return pseudo_path, notes
+
+    notes.append("manual_labeling_required")
+    return None, notes
+
+
 def collect_real_samples(config: BuildDatasetConfig) -> list[DatasetSample]:
     """Collect regression-set and optional user screenshots (typically unlabeled)."""
     samples: list[DatasetSample] = []
+    pseudo_index = (
+        _load_pseudo_label_index(config.pseudo_labels_dir)
+        if config.include_pseudo_labels
+        else {}
+    )
 
     if config.include_regression and config.regression_dir.is_dir():
         for image_path in sorted(config.regression_dir.rglob("*")):
             if image_path.suffix.lower() not in IMAGE_SUFFIXES:
                 continue
-            label_path = image_path.with_suffix(".txt")
-            has_labels = label_path.is_file()
-            notes: list[str] = []
-            if not has_labels:
-                notes.append("manual_labeling_required")
+            if "labels" in image_path.parts and image_path.parent.name == "labels":
+                continue
+            label_path, notes = resolve_regression_label_path(
+                image_path,
+                config.regression_dir,
+                include_pseudo_labels=config.include_pseudo_labels,
+                pseudo_labels_dir=config.pseudo_labels_dir,
+            )
+            has_labels = label_path is not None
+            if has_labels:
+                try:
+                    rel_key = str(image_path.relative_to(config.regression_dir))
+                    if pseudo_index.get(rel_key):
+                        if "pseudo_label" not in notes:
+                            notes.append("pseudo_label")
+                except ValueError:
+                    pass
             samples.append(
                 DatasetSample(
                     source_path=image_path,
                     origin="real",
                     town_hall_level=infer_town_hall_level(image_path),
                     has_labels=has_labels,
-                    label_path=label_path if has_labels else None,
+                    label_path=label_path,
                     notes=notes,
                 )
             )
@@ -400,7 +465,7 @@ def build_summary(samples: list[DatasetSample], materialized: dict[str, Any]) ->
         "materialized_files": materialized,
         "labeling_todo": [
             "Label real screenshots in ml/tests/regression_set/ (YOLO .txt sidecars)",
-            "Optional: pseudo-label with keremberke/yolov5m-clash-of-clans (review manually)",
+            "Pseudo-labels: ml/src/pseudo_label.py → ml/tests/regression_set/labels/ (review manually)",
         ],
     }
 
@@ -512,6 +577,11 @@ def main(argv: list[str] | None = None) -> int:
         help="Include real screenshots from ml/tests/regression_set/",
     )
     parser.add_argument(
+        "--include-pseudo-labels",
+        action="store_true",
+        help="Use pseudo-labels from ml/tests/regression_set/labels/ for real images",
+    )
+    parser.add_argument(
         "--user-screenshots",
         type=Path,
         default=None,
@@ -563,9 +633,11 @@ def main(argv: list[str] | None = None) -> int:
         seed=args.seed,
         include_demo=args.include_demo,
         include_regression=args.include_regression,
+        include_pseudo_labels=args.include_pseudo_labels,
         user_screenshots_dir=args.user_screenshots,
         demo_dir=args.demo_dir,
         regression_dir=args.regression_dir,
+        pseudo_labels_dir=args.regression_dir / "labels",
         synthetic_variant_count=args.synthetic_variants,
         render_synthetic_variants=not args.no_render_variants,
     )

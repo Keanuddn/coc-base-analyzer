@@ -1,0 +1,38 @@
+# Versioned class list for CoC Base Analyzer YOLO training.
+# v1: keremberke/yolov5m-clash-of-clans baseline (16 classes) + TH14+ placeholders.
+version: 1
+source_model: keremberke/yolov5m-clash-of-clans
+
+# Active classes used in current training (indices 0..15 match keremberke).
+classes:
+  - ad
+  - airsweeper
+  - bombtower
+  - canon
+  - clancastle
+  - eagle
+  - inferno
+  - kingpad
+  - mortar
+  - queenpad
+  - rcpad
+  - scattershot
+  - th13
+  - wardenpad
+  - wizztower
+  - xbow
+
+# Placeholders for future manual labeling / fine-tuning rounds (not yet in model head).
+placeholders:
+  - monolith      # TH14+
+  - spelltower    # TH15+
+  - th14
+  - th15
+  - th16
+  - th17
+  - th18
+
+notes: |
+  The keremberke model only knows the 16 active classes above.
+  TH14–TH18 town halls are visually distinct but share the th13 class slot in baseline weights.
+  Monolith and Spell Tower require new labels before they can be trained.

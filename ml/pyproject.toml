@@ -6,6 +6,8 @@ readme = "README.md"
 requires-python = ">=3.10"
 dependencies = [
     "yolov5>=7.0.0",
+    "ultralytics>=8.0.0",
+    "pyyaml>=6.0",
     "torch>=2.0.0",
     "torchvision>=0.15.0",
     "huggingface_hub>=0.20.0",

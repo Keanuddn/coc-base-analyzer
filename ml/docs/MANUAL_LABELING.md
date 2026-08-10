@@ -2,31 +2,53 @@
 
 Kurzanleitung zum manuellen Annotieren der 4 Kern-War-Bases (TH15/TH16) mit **labelImg** im YOLO-Format.
 
-## Voraussetzungen
+## Python 3.14 / macOS
 
-```bash
-# Option A: pip
-pip install labelImg
+Das `labelImg`-PyPI-Paket mit **PyQt5** stürzt unter **Python 3.14** beim Start ab:
 
-# Option B: Homebrew (macOS)
-brew install labelimg
+```text
+TypeError: setValue(self, a0: int): argument 1 has unexpected type 'float'
 ```
 
-## labelImg starten
+**Lösung:** labelImg in einem **eigenen Python-3.12-venv** ausführen (nicht `ml/.venv`).
+
+| Option | Status |
+|--------|--------|
+| Homebrew `brew install labelimg` | Nicht verfügbar (kein Formula/Cask) |
+| **Dediziertes Python-3.12-venv** | **Empfohlen — getestet** |
+| Gradio-App (Fallback) | Noch nicht nötig, wenn Option B läuft |
+
+## labelImg starten (empfohlen)
+
+Einmalig (falls noch kein `.venv-labelimg` existiert — das Skript legt es an):
 
 ```bash
-cd coc-base-analyzer/ml/tests/regression_set
-
-# Bilder öffnen (TH15 oder TH16)
-labelImg th15/ th15/
+brew install python@3.12   # falls python3.12 fehlt
+cd coc-base-analyzer/ml
+./scripts/run_labelimg.sh th15
 # oder
-labelImg th16/ th16/
+./scripts/run_labelimg.sh th16
 ```
+
+Manuell (gleiche Umgebung):
+
+```bash
+brew install python@3.12
+python3.12 -m venv ml/.venv-labelimg
+ml/.venv-labelimg/bin/pip install setuptools labelImg PyQt5 lxml
+
+cd ml/tests/regression_set
+../../.venv-labelimg/bin/labelImg th15/ labels/th15/
+# oder
+../../.venv-labelimg/bin/labelImg th16/ labels/th16/
+```
+
+> `setuptools` liefert `distutils`, das labelImg 1.8.6 noch importiert.
 
 In labelImg:
 
-1. **Open Dir** → `th15/` oder `th16/` (Bildverzeichnis)
-2. **Change Save Dir** → `labels/th15/` bzw. `labels/th16/` (Labels landen spiegelbildlich unter `labels/`)
+1. **Open Dir** → `th15/` oder `th16/` (wird oft schon per CLI gesetzt)
+2. **Change Save Dir** → `labels/th15/` bzw. `labels/th16/`
 3. **Format** → **YOLO** (nicht PascalVOC)
 4. **View → Auto Save mode** aktivieren (optional, spart Ctrl+S)
 5. **Predefined classes** laden: `classes.txt` (im Regression-Set-Root)

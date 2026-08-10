@@ -101,7 +101,7 @@ Phase 0-Infrastruktur ist vollständig eingerichtet (Notebook, Smoke-Test-Skript
 | Aspekt | Ergebnis |
 |--------|----------|
 | Modell-Laden | Erfolgreich (HF-Weights) |
-| Regression-Set | 2 TH15-Screenshots unter `ml/tests/regression_set/th15/` |
+| Regression-Set | 2/8 Zielbilder (TH15 vollständig; TH16–TH18 ausstehend) — siehe Inventar unten |
 | Inferenz | 32–33 Detections pro Bild, Confidence 0.25–0.90 |
 | Annotierte Outputs | `ml/notebooks/phase0_output/*_annotated.jpg` |
 | CSV | `ml/notebooks/phase0_results.csv` mit manueller Evaluation |
@@ -139,14 +139,14 @@ Phase 0-Infrastruktur ist vollständig eingerichtet (Notebook, Smoke-Test-Skript
 | Pipeline funktioniert (Modell laden, Inferenz, CSV) | ✅ |
 | Detections auf echten CoC-Screenshots | ✅ (32–33 pro Bild) |
 | Brauchbare Baseline für TH15 | ⚠️ Teilweise — nur Grundverteidigungen |
-| Regression-Set ausreichend (20–30 Bilder) | ❌ Nur 2 Bilder |
+| Regression-Set TH15–TH18 (2 je Level) | ⚠️ 2/8 — TH15 ✅, TH16–TH18 ❌ |
 | TH15-Neubauten abgedeckt | ❌ |
 
 **Empfehlung:** Phase 0 ist **teilweise abgeschlossen** — genug für Go zu Phase 1 (Datensatz-Aufbau + Fine-Tuning), aber Regression-Set sollte auf 20–30 Bilder erweitert werden.
 
 ### Offene Punkte
 
-1. **Regression-Set erweitern** auf 20–30 Screenshots (`ml/tests/regression_set/th{10-18}/`), inkl. TH13-Basen als Baseline-Vergleich
+1. **Regression-Set vervollständigen:** TH16–TH18 je 2 War-Base-Screenshots nachreichen (TH15 ✅); langfristig auf 20–30 Bilder (`ml/tests/regression_set/th{10-18}/`), inkl. TH13-Basen als Baseline-Vergleich
 2. **Neue Klassen** für Phase 1: `monolith`, `spelltower`, `th14`–`th18`, ggf. `archertower`
 3. **OpenCV 5.0-Kompatibilität** in Visualisierung (PIL-Fallback oder Pin auf OpenCV 4.x)
 
@@ -158,7 +158,26 @@ Phase 0-Infrastruktur ist vollständig eingerichtet (Notebook, Smoke-Test-Skript
 | `ml/scripts/phase0_smoke_test.py` | Headless Smoke Test |
 | `ml/notebooks/phase0_results.csv` | Strukturierte Ergebnisse (2 TH15-Bilder evaluiert) |
 | `ml/notebooks/phase0_output/` | Annotierte Bounding-Box-Bilder |
-| `ml/tests/regression_set/th15/` | 2 TH15-Screenshots (War + Progress Base) |
+| `ml/tests/regression_set/` | Regression-Set-Inventar (README) |
+| `ml/tests/regression_set/th15/` | 2 TH15-Screenshots (War + Progress Base) ✅ |
+| `ml/tests/regression_set/th16/` | 0/2 — README mit fehlenden Slots |
+| `ml/tests/regression_set/th17/` | 0/2 — README mit fehlenden Slots |
+| `ml/tests/regression_set/th18/` | 0/2 — README mit fehlenden Slots |
+
+### Regression-Set-Inventar (TH15–TH18, Stand 2026-08-10)
+
+Nutzer-Ziel: je 2 Screenshots pro Rathaus-Level 15–18 (8 Bilder gesamt).
+
+| TH | Anzahl | Dateien | Klassifikation | Status |
+|----|--------|---------|----------------|--------|
+| TH15 | 2/2 | `war_base_illyrian_god.png`, `progress_base_drachen_meddler.png` | Beide TH15 (purple/gold Magic-Theme, Monolith, Spell Towers) | ✅ |
+| TH16 | 0/2 | — | — | ❌ fehlt |
+| TH17 | 0/2 | — | — | ❌ fehlt |
+| TH18 | 0/2 | — | — | ❌ fehlt |
+
+**Asset-Eingang 2026-08-10:** 8 neue Screenshots angekündigt; im Workspace nur 2 Dateien gefunden (byte-identische Duplikate der bestehenden TH15-Bilder). TH16–TH18 müssen nachgereicht werden.
+
+**Smoke Test (2026-08-10):** 2 Bilder getestet — je 32–33 Detections, Modell lädt erfolgreich.
 
 ### Empfehlung für Phase 1
 

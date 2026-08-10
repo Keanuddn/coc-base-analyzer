@@ -1,0 +1,324 @@
+{
+  "generated_at": "2026-08-10T16:19:47Z",
+  "regression_dir": "ml/tests/regression_set",
+  "images_tested": 11,
+  "baseline_model": "keremberke/yolov5m-clash-of-clans",
+  "fine_tuned_weights": "ml/runs/coc_yolo_v1_smoke/weights/best.pt",
+  "totals": {
+    "baseline_detections": 418,
+    "fine_tuned_detections": 0
+  },
+  "per_image": [
+    {
+      "image": "ml/tests/regression_set/_extras/progress_base_drachen_meddler.png",
+      "baseline": {
+        "detection_count": 32,
+        "class_counts": {
+          "ad": 5,
+          "wizztower": 6,
+          "canon": 11,
+          "mortar": 5,
+          "bombtower": 2,
+          "xbow": 2,
+          "eagle": 1
+        },
+        "mean_confidence": 0.5789,
+        "min_confidence": 0.2523,
+        "max_confidence": 0.8992
+      },
+      "fine_tuned": {
+        "detection_count": 0,
+        "class_counts": {},
+        "mean_confidence": 0.0,
+        "min_confidence": 0.0,
+        "max_confidence": 0.0
+      },
+      "fine_tuned_weights": "ml/runs/coc_yolo_v1_smoke/weights/best.pt",
+      "delta_detections": -32
+    },
+    {
+      "image": "ml/tests/regression_set/_extras/th13_war_arena_coclayout.png",
+      "baseline": {
+        "detection_count": 27,
+        "class_counts": {
+          "canon": 7,
+          "scattershot": 7,
+          "mortar": 5,
+          "xbow": 2,
+          "airsweeper": 2,
+          "ad": 1,
+          "clancastle": 2,
+          "th13": 1
+        },
+        "mean_confidence": 0.5223,
+        "min_confidence": 0.2625,
+        "max_confidence": 0.9103
+      },
+      "fine_tuned": {
+        "detection_count": 0,
+        "class_counts": {},
+        "mean_confidence": 0.0,
+        "min_confidence": 0.0,
+        "max_confidence": 0.0
+      },
+      "fine_tuned_weights": "ml/runs/coc_yolo_v1_smoke/weights/best.pt",
+      "delta_detections": -27
+    },
+    {
+      "image": "ml/tests/regression_set/_extras/th15_eagle_compartment_cocbase_007.png",
+      "baseline": {
+        "detection_count": 53,
+        "class_counts": {
+          "ad": 6,
+          "canon": 13,
+          "scattershot": 3,
+          "mortar": 5,
+          "xbow": 3,
+          "clancastle": 5,
+          "eagle": 5,
+          "bombtower": 2,
+          "inferno": 1,
+          "airsweeper": 5,
+          "wizztower": 3,
+          "wardenpad": 1,
+          "queenpad": 1
+        },
+        "mean_confidence": 0.5795,
+        "min_confidence": 0.2512,
+        "max_confidence": 0.9297
+      },
+      "fine_tuned": {
+        "detection_count": 0,
+        "class_counts": {},
+        "mean_confidence": 0.0,
+        "min_confidence": 0.0,
+        "max_confidence": 0.0
+      },
+      "fine_tuned_weights": "ml/runs/coc_yolo_v1_smoke/weights/best.pt",
+      "delta_detections": -53
+    },
+    {
+      "image": "ml/tests/regression_set/_extras/th15_purple_magic_cocbase_008.png",
+      "baseline": {
+        "detection_count": 38,
+        "class_counts": {
+          "canon": 21,
+          "xbow": 6,
+          "th13": 1,
+          "airsweeper": 2,
+          "mortar": 1,
+          "clancastle": 3,
+          "scattershot": 2,
+          "ad": 2
+        },
+        "mean_confidence": 0.5444,
+        "min_confidence": 0.2632,
+        "max_confidence": 0.9246
+      },
+      "fine_tuned": {
+        "detection_count": 0,
+        "class_counts": {},
+        "mean_confidence": 0.0,
+        "min_confidence": 0.0,
+        "max_confidence": 0.0
+      },
+      "fine_tuned_weights": "ml/runs/coc_yolo_v1_smoke/weights/best.pt",
+      "delta_detections": -38
+    },
+    {
+      "image": "ml/tests/regression_set/_extras/th15_scattershot_spread_005.png",
+      "baseline": {
+        "detection_count": 46,
+        "class_counts": {
+          "canon": 14,
+          "scattershot": 4,
+          "ad": 9,
+          "clancastle": 6,
+          "airsweeper": 4,
+          "eagle": 3,
+          "mortar": 3,
+          "inferno": 1,
+          "bombtower": 2
+        },
+        "mean_confidence": 0.613,
+        "min_confidence": 0.2704,
+        "max_confidence": 0.9178
+      },
+      "fine_tuned": {
+        "detection_count": 0,
+        "class_counts": {},
+        "mean_confidence": 0.0,
+        "min_confidence": 0.0,
+        "max_confidence": 0.0
+      },
+      "fine_tuned_weights": "ml/runs/coc_yolo_v1_smoke/weights/best.pt",
+      "delta_detections": -46
+    },
+    {
+      "image": "ml/tests/regression_set/_extras/th15_war_shadow_scenery_cocbase.png",
+      "baseline": {
+        "detection_count": 44,
+        "class_counts": {
+          "mortar": 3,
+          "canon": 12,
+          "wizztower": 3,
+          "ad": 4,
+          "clancastle": 7,
+          "airsweeper": 5,
+          "xbow": 6,
+          "inferno": 2,
+          "scattershot": 1,
+          "bombtower": 1
+        },
+        "mean_confidence": 0.5872,
+        "min_confidence": 0.2518,
+        "max_confidence": 0.9258
+      },
+      "fine_tuned": {
+        "detection_count": 0,
+        "class_counts": {},
+        "mean_confidence": 0.0,
+        "min_confidence": 0.0,
+        "max_confidence": 0.0
+      },
+      "fine_tuned_weights": "ml/runs/coc_yolo_v1_smoke/weights/best.pt",
+      "delta_detections": -44
+    },
+    {
+      "image": "ml/tests/regression_set/_extras/war_base_illyrian_god.png",
+      "baseline": {
+        "detection_count": 33,
+        "class_counts": {
+          "canon": 16,
+          "mortar": 12,
+          "inferno": 2,
+          "airsweeper": 1,
+          "ad": 1,
+          "wizztower": 1
+        },
+        "mean_confidence": 0.4893,
+        "min_confidence": 0.2505,
+        "max_confidence": 0.8998
+      },
+      "fine_tuned": {
+        "detection_count": 0,
+        "class_counts": {},
+        "mean_confidence": 0.0,
+        "min_confidence": 0.0,
+        "max_confidence": 0.0
+      },
+      "fine_tuned_weights": "ml/runs/coc_yolo_v1_smoke/weights/best.pt",
+      "delta_detections": -33
+    },
+    {
+      "image": "ml/tests/regression_set/th15/war_base_cocbase_wizztower_ring.png",
+      "baseline": {
+        "detection_count": 52,
+        "class_counts": {
+          "wizztower": 8,
+          "canon": 17,
+          "ad": 7,
+          "mortar": 8,
+          "inferno": 3,
+          "airsweeper": 3,
+          "bombtower": 4,
+          "th13": 1,
+          "clancastle": 1
+        },
+        "mean_confidence": 0.5632,
+        "min_confidence": 0.2597,
+        "max_confidence": 0.9236
+      },
+      "fine_tuned": {
+        "detection_count": 0,
+        "class_counts": {},
+        "mean_confidence": 0.0,
+        "min_confidence": 0.0,
+        "max_confidence": 0.0
+      },
+      "fine_tuned_weights": "ml/runs/coc_yolo_v1_smoke/weights/best.pt",
+      "delta_detections": -52
+    },
+    {
+      "image": "ml/tests/regression_set/th15/war_base_illyrian_god.png",
+      "baseline": {
+        "detection_count": 33,
+        "class_counts": {
+          "canon": 16,
+          "mortar": 12,
+          "inferno": 2,
+          "airsweeper": 1,
+          "ad": 1,
+          "wizztower": 1
+        },
+        "mean_confidence": 0.4893,
+        "min_confidence": 0.2505,
+        "max_confidence": 0.8998
+      },
+      "fine_tuned": {
+        "detection_count": 0,
+        "class_counts": {},
+        "mean_confidence": 0.0,
+        "min_confidence": 0.0,
+        "max_confidence": 0.0
+      },
+      "fine_tuned_weights": "ml/runs/coc_yolo_v1_smoke/weights/best.pt",
+      "delta_detections": -33
+    },
+    {
+      "image": "ml/tests/regression_set/th16/war_base_cocbase_sakura_scenery.png",
+      "baseline": {
+        "detection_count": 27,
+        "class_counts": {
+          "ad": 11,
+          "wizztower": 1,
+          "mortar": 3,
+          "canon": 8,
+          "airsweeper": 2,
+          "inferno": 2
+        },
+        "mean_confidence": 0.5922,
+        "min_confidence": 0.257,
+        "max_confidence": 0.9197
+      },
+      "fine_tuned": {
+        "detection_count": 0,
+        "class_counts": {},
+        "mean_confidence": 0.0,
+        "min_confidence": 0.0,
+        "max_confidence": 0.0
+      },
+      "fine_tuned_weights": "ml/runs/coc_yolo_v1_smoke/weights/best.pt",
+      "delta_detections": -27
+    },
+    {
+      "image": "ml/tests/regression_set/th16/war_base_cocbase_volcanic_warmap.png",
+      "baseline": {
+        "detection_count": 33,
+        "class_counts": {
+          "canon": 17,
+          "ad": 5,
+          "inferno": 3,
+          "airsweeper": 2,
+          "mortar": 2,
+          "bombtower": 1,
+          "wardenpad": 1,
+          "queenpad": 2
+        },
+        "mean_confidence": 0.6306,
+        "min_confidence": 0.2546,
+        "max_confidence": 0.8899
+      },
+      "fine_tuned": {
+        "detection_count": 0,
+        "class_counts": {},
+        "mean_confidence": 0.0,
+        "min_confidence": 0.0,
+        "max_confidence": 0.0
+      },
+      "fine_tuned_weights": "ml/runs/coc_yolo_v1_smoke/weights/best.pt",
+      "delta_detections": -33
+    }
+  ],
+  "notes": "Detection count deltas are indicative only — pseudo-labels and baseline both have high FP/FN rates on TH14+. Manual review required."
+}

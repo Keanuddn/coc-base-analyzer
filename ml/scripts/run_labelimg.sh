@@ -24,5 +24,8 @@ if [[ ! -x "$VENV/bin/labelImg" ]]; then
   "$VENV/bin/pip" install -q --upgrade pip setuptools labelImg PyQt5 lxml
 fi
 
+# PyQt5 on Python 3.12+ rejects float in QAbstractSlider.setValue (scroll/zoom crash).
+"$PYTHON312" "$ML_ROOT/scripts/patch_labelimg.py" "$VENV"
+
 cd "$REGRESSION"
 exec "$VENV/bin/labelImg" "$TH/" "labels/$TH/"

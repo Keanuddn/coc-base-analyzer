@@ -4,23 +4,21 @@ Kurzanleitung zum manuellen Annotieren der 4 Kern-War-Bases (TH15/TH16) mit **la
 
 ## Python 3.14 / macOS
 
-Das `labelImg`-PyPI-Paket mit **PyQt5** stürzt unter **Python 3.14** beim Start ab:
+Das `labelImg`-PyPI-Paket mit **PyQt5** stürzt unter **Python 3.14** (und beim Scrollen/Zoomen auch unter 3.12) ab:
 
 ```text
 TypeError: setValue(self, a0: int): argument 1 has unexpected type 'float'
 ```
 
-**Lösung:** labelImg in einem **eigenen Python-3.12-venv** ausführen (nicht `ml/.venv`).
+**Lösung:** labelImg in einem **eigenen Python-3.12-venv** ausführen (nicht `ml/.venv`). Das Startskript wendet automatisch einen Patch an (`scripts/patch_labelimg.py`), der `setValue`-Aufrufe auf `int()` castet (Scroll-/Zoom-Crash).
 
 | Option | Status |
 |--------|--------|
 | Homebrew `brew install labelimg` | Nicht verfügbar (kein Formula/Cask) |
-| **Dediziertes Python-3.12-venv** | **Empfohlen — getestet** |
-| Gradio-App (Fallback) | Noch nicht nötig, wenn Option B läuft |
+| **Dediziertes Python-3.12-venv + Auto-Patch** | **Empfohlen — getestet** |
+| Gradio-App (Fallback) | Nur nötig, falls Patch fehlschlägt |
 
 ## labelImg starten (empfohlen)
-
-Einmalig (falls noch kein `.venv-labelimg` existiert — das Skript legt es an):
 
 ```bash
 brew install python@3.12   # falls python3.12 fehlt
@@ -29,6 +27,8 @@ cd coc-base-analyzer/ml
 # oder
 ./scripts/run_labelimg.sh th16
 ```
+
+Beim ersten Start legt das Skript `.venv-labelimg` an, installiert labelImg/PyQt5 und patcht die `setValue`-Float-Bugs. Bei jedem weiteren Start wird der Patch idempotent geprüft.
 
 Manuell (gleiche Umgebung):
 

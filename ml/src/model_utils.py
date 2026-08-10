@@ -13,6 +13,26 @@ CONFIG_DIR = ML_ROOT / "configs"
 DEFAULT_MODEL_ID = "keremberke/yolov5m-clash-of-clans"
 
 
+def _patch_huggingface_hub_for_yolov5() -> None:
+    """yolov5 imports huggingface_hub.utils._errors (removed in hub 1.0+)."""
+    import sys
+    import types
+
+    if "huggingface_hub.utils._errors" in sys.modules:
+        return
+    try:
+        import huggingface_hub.utils._errors  # noqa: F401
+        return
+    except ModuleNotFoundError:
+        pass
+
+    from huggingface_hub.errors import RepositoryNotFoundError
+
+    mod = types.ModuleType("huggingface_hub.utils._errors")
+    mod.RepositoryNotFoundError = RepositoryNotFoundError
+    sys.modules["huggingface_hub.utils._errors"] = mod
+
+
 def load_class_config(config_path: Path | None = None) -> dict[str, Any]:
     path = config_path or (CONFIG_DIR / "th_classes.yaml")
     with path.open(encoding="utf-8") as fh:
@@ -32,6 +52,7 @@ def load_keremberke_yolov5(
     max_det: int = 1000,
 ):
     """Load keremberke YOLOv5 with PyTorch 2.6+ weights_only workaround."""
+    _patch_huggingface_hub_for_yolov5()
     import torch
     import yolov5
 

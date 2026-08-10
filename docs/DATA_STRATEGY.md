@@ -1,6 +1,6 @@
 # Datenstrategie
 
-> Phase 1a — Link Harvesting (aktiv). Rendering (1c) und Dataset Assembly (1d) folgen.
+> Phase 1a/1b abgeschlossen. Phase 1c (synthetisches Rendering) implementiert. Dataset Assembly (1d) folgt.
 
 ## Übersicht Phase 1
 
@@ -8,7 +8,7 @@
 |-----------|------|--------|
 | **1a** | Base-Links harvesten (YouTube, Community-Sites) | ✅ Scaffold |
 | **1b** | `link.clashofclans.com` dekodieren | ✅ Structural |
-| **1c** | Basis rendern (ohne Supercell-Assets) | 🔲 Geplant |
+| **1c** | Basis rendern (ClashKing-Sprites + Domain Randomization) | ✅ Prototype |
 | **1d** | Datensatz assemblieren + Supabase persistieren | 🔲 Geplant |
 
 ## Link Harvesting (1a)
@@ -158,15 +158,81 @@ MonsieurSingh/ClashofClans_auto_loot (TH15/TH16). Siehe
 Für `building_type, level, x, y, rotation, traps` aus Links:
 
 1. **Nicht möglich** ohne Supercell-HMAC-Key oder In-Game-Capture
-2. **Alternative Phase 1c:** Layout-Screenshots rendern (Preview-URLs aus Harvest)
-3. **Optional:** Nutzer liefert 1–2 Links + In-Game-Screenshot-Paar zur
-   Validierung des Rendering-Pfads
+2. **Alternative:** Preview-Bilder parsen oder Community-Layout-Dateien importieren (siehe Phase 1c)
+3. **Optional:** Nutzer liefert 1–2 Links + In-Game-Screenshot-Paar zur Validierung
+
+## Synthetic Rendering (1c)
+
+OpenLayout-Links liefern **keine Gebäude-Koordinaten**. Phase 1c rendert stattdessen
+synthetische Trainingsbilder aus expliziten `BuildingPlacement`-Listen — perfekte YOLO-Labels
+aus den Compositing-Koordinaten (Sim-to-Real für Fine-Tuning).
+
+### Sprite-Quelle
+
+| Item | Pfad / Quelle |
+|------|----------------|
+| Atlas | [ClashKingAssets](https://github.com/ClashKingInc/ClashKingAssets) → `clashking/home-village/` |
+| Download | `data-pipeline/src/renderer/sprites/download_clashking_sprites.sh` (472 WebP, gitignored) |
+| Mapping | `building_type_map.yaml` — ML-Aliase (`canon`, `ad`, …) → ClashKing-Slugs |
+| Lizenz | Supercell IP; Nutzer-Verantwortung — siehe `docs/SPRITE_SOURCES.md` |
+
+Pfad-Template: `clashking/home-village/{slug}/level_{level}.webp`
+
+### Render-Pipeline
+
+```
+BuildingPlacement[]  →  IsometricRenderer  →  PNG + YOLO .txt (sidecar)
+                              ↑
+                    DomainRandomization (Helligkeit, Kontrast, Position, Hintergrund)
+```
+
+| Modul | Zweck |
+|-------|-------|
+| `renderer/isometric_renderer.py` | PIL-Compositing auf 44×44-Kachelgitter (isometrisch) |
+| `renderer/domain_randomization.py` | Trainings-Diversität (Lighting/Position/Background-Jitter) |
+| `renderer/demo_render.py` | CLI-Demo mit hardcodierten Test-Placements (ohne dekodierte Links) |
+
+**Demo ausführen:**
+
+```bash
+cd data-pipeline
+python -m renderer.demo_render
+# → datasets/processed/demo/sample_base.png + sample_base.txt
+```
+
+Fehlende Sprites: Warning + Magenta-Placeholder (Demo) bzw. Skip (Tests ohne Placeholder).
+
+### Sim-to-Real-Strategie
+
+1. **Synthetisch (1c):** ClashKing-Isometric-Sprites + Domain Randomization → großer,
+   perfekt gelabelter Trainingspool für TH13–18-Verteidigungen (Monolith, Spell Tower, …).
+2. **Real (Regression):** Echte Scouting-Screenshots in `ml/tests/regression_set/` als
+   Validierung und Misch-Training.
+3. **Domain Gap:** Synthetische Editor-Ansicht ≠ In-Game-Scouting (Zoom, UI, Schatten).
+   Domain Randomization + Fine-Tuning auf echten Bildern schließen die Lücke schrittweise.
+4. **YOLO-Gap:** Keremberke-Modell kennt nur `th13`, nicht TH14–18 / Monolith / Spell Tower —
+   neue Klassen beim Fine-Tuning ergänzen; Sprites sind bereits vorhanden.
+
+### Geometrie-Quellen für volle synthetische Datensätze (Future Work)
+
+Ein **vollständiger synthetischer Datensatz** aus geharvesteten Links braucht Layout-Geometrie
+aus einer dieser Quellen (keine ist in 1b aus Links dekodierbar):
+
+| Quelle | Beschreibung | Status |
+|--------|--------------|--------|
+| Preview-Image-Parsing | `preview_image_url` aus Harvester → Gebäude-Positionen extrahieren | 🔲 Geplant |
+| Community-Layout-Dateien | `.json` / `.csv` von Layout-Portalen (nschmeller/clash-bases-Katalog) | 🔲 Optional |
+| Manueller Import | `BuildingPlacement`-Listen pro Base | 🔲 Dev/Test |
+| In-Game-Capture | Screenshot + manuelles Labeling | 🔲 Validierung |
+
+Bis Geometrie verfügbar ist, liefert `demo_render.py` und manuelle Placements den Render-Pfad.
 
 ### Nächste Schritte
 
-1. Phase 1c: Basis aus Preview-Bildern / SVG-Overlays rendern
-2. Harvester-Lauf mit `YOUTUBE_API_KEY` → Registry füllen → Batch-Decode
-3. Supabase-Persist (`decode_status`: `success` | `failed` | `partial`)
+1. **Phase 1d:** `build_dataset.py` — Registry + Placements → Batch-Render → Train/Val-Split
+2. **Preview-Parsing:** Layout-Geometrie aus Harvester-Vorschaubildern (oder Community-Files)
+3. Harvester-Lauf → Batch-Decode → Supabase-Persist (`decode_status`)
+4. Sim-to-Real-Vergleich: synthetisches Render vs. `ml/tests/regression_set/th15/`
 
 ## Supabase (1d)
 

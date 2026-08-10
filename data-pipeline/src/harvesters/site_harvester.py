@@ -169,6 +169,10 @@ class SiteHarvester:
         async with httpx.AsyncClient(headers=headers, timeout=30.0, follow_redirects=True) as client:
             robots = RobotsChecker(self.user_agent, client)
             for url in seed_urls:
+                domain = urlparse(url).netloc.lower()
+                if self.blocked_store.is_blocked(domain):
+                    logger.info("Skipping blocked domain: %s", domain)
+                    continue
                 total_new += await self._crawl_page(url, client, robots)
         return total_new
 

@@ -2,7 +2,8 @@
 
 **Status:** 2/2 War Bases ✅
 
-| Datei | Quelle | Basistyp | Klassifikation |
-|-------|--------|----------|----------------|
-| `war_base_001.png` | CocBase.Net (16.47.17) | War Base | TH16 — red/gold, volcanic War Map |
-| `war_base_002.png` | CocBase.Net (16.47.51) | War Base | TH16 — red/gold, Zen/Sakura Scenery |
+| Datei | Quelle | Klassifikation |
+|-------|--------|----------------|
+| `war_base_cocbase_volcanic_warmap.png` | CocBase.Net (`16.47.17`) | TH16 — red/gold volcanic War Map |
+| `war_base_cocbase_sakura_scenery.png` | CocBase.Net (`16.47.51`) | TH16 — red/gold, Sakura scenery |
+

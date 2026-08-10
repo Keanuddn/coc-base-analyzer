@@ -101,7 +101,7 @@ Phase 0-Infrastruktur ist vollständig eingerichtet (Notebook, Smoke-Test-Skript
 | Aspekt | Ergebnis |
 |--------|----------|
 | Modell-Laden | Erfolgreich (HF-Weights) |
-| Regression-Set | 4/8 Zielbilder (TH15+TH16 ✅; TH17–TH18 ausstehend) + 2 TH13-Baseline — siehe Inventar |
+| Regression-Set | 4/8 Zielbilder (TH15+TH16 ✅; TH17–TH18 ausstehend) — siehe Inventar |
 | Inferenz | 27–53 Detections pro Bild (TH13 am besten), Confidence 0.25–0.93 |
 | Annotierte Outputs | `ml/notebooks/phase0_output/*_annotated.jpg` |
 | CSV | `ml/notebooks/phase0_results.csv` (6 Bilder, Smoke Test 2026-08-10) |
@@ -156,12 +156,12 @@ Phase 0-Infrastruktur ist vollständig eingerichtet (Notebook, Smoke-Test-Skript
 |-------|-------|
 | `ml/notebooks/phase0_feasibility_check.ipynb` | Interaktiver Machbarkeits-Check |
 | `ml/scripts/phase0_smoke_test.py` | Headless Smoke Test |
-| `ml/notebooks/phase0_results.csv` | Strukturierte Ergebnisse (6 Bilder: TH13×2, TH15×2, TH16×2) |
+| `ml/notebooks/phase0_results.csv` | Strukturierte Ergebnisse (4 Kernbilder: TH15×2, TH16×2; Extras optional) |
 | `ml/notebooks/phase0_output/` | Annotierte Bounding-Box-Bilder |
 | `ml/tests/regression_set/` | Regression-Set-Inventar (README) |
-| `ml/tests/regression_set/th13/` | 2 TH13 War Bases (Bonus-Baseline) ✅ |
+| `ml/tests/regression_set/th13/` | leer (keine verifizierten TH13-Screenshots) |
 | `ml/tests/regression_set/th15/` | 2 TH15 War Bases ✅ |
-| `ml/tests/regression_set/_extras/` | 5 Reserve-Bilder (Progress Base, CocBase-Extras, TH13) |
+| `ml/tests/regression_set/_extras/` | Reserve-Layouts (Progress Base + CocBase-Extras) |
 | `ml/tests/regression_set/th16/` | 2 TH16 War Bases ✅ |
 | `ml/tests/regression_set/th17/` | 0/2 — README mit fehlenden Slots |
 | `ml/tests/regression_set/th18/` | 0/2 — README mit fehlenden Slots |

@@ -1,0 +1,11 @@
+# Blocked domains registry
+# Domains are added automatically when robots.txt disallows crawling,
+# or when manually blocked for other policy reasons.
+#
+# Schema:
+#   domain:     hostname (no scheme/path)
+#   reason:     human-readable explanation
+#   blocked_at: ISO-8601 UTC timestamp
+#   user_agent: crawler user-agent string used during the check
+
+domains: []

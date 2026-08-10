@@ -39,9 +39,56 @@ def load_class_config(config_path: Path | None = None) -> dict[str, Any]:
         return yaml.safe_load(fh)
 
 
-def active_class_names(config_path: Path | None = None) -> list[str]:
+def model_class_names(config_path: Path | None = None) -> list[str]:
+    """All keremberke model class names (indices 0..15 fixed)."""
     cfg = load_class_config(config_path)
+    if "model_classes" in cfg:
+        return list(cfg["model_classes"])
     return list(cfg["classes"])
+
+
+def active_class_names(config_path: Path | None = None) -> list[str]:
+    """Classes still useful for detection / training (excludes deprecated hero pads)."""
+    cfg = load_class_config(config_path)
+    if "active_classes" in cfg:
+        return list(cfg["active_classes"])
+    deprecated = set(deprecated_class_names(config_path))
+    return [name for name in model_class_names(config_path) if name not in deprecated]
+
+
+def deprecated_class_names(config_path: Path | None = None) -> list[str]:
+    cfg = load_class_config(config_path)
+    return list(cfg.get("deprecated_classes", []))
+
+
+def deprecated_class_indices(config_path: Path | None = None) -> set[int]:
+    model_names = model_class_names(config_path)
+    deprecated = set(deprecated_class_names(config_path))
+    return {idx for idx, name in enumerate(model_names) if name in deprecated}
+
+
+def filter_deprecated_yolo_lines(
+    lines: list[str],
+    *,
+    include_deprecated: bool = False,
+    config_path: Path | None = None,
+) -> tuple[list[str], int]:
+    """Drop label lines whose class index is deprecated. Returns (filtered_lines, removed_count)."""
+    if include_deprecated:
+        return lines, 0
+    deprecated = deprecated_class_indices(config_path)
+    kept: list[str] = []
+    removed = 0
+    for line in lines:
+        parts = line.strip().split()
+        if len(parts) < 5:
+            continue
+        cls_idx = int(parts[0])
+        if cls_idx in deprecated:
+            removed += 1
+            continue
+        kept.append(line)
+    return kept, removed
 
 
 def load_keremberke_yolov5(

@@ -5,6 +5,10 @@ IMPORTANT: Pseudo-labels are noisy — especially on TH14+ bases where the basel
 model lacks classes (Monolith, Spell Tower) and TH-level-specific skins. Every
 pseudo-label MUST be manually reviewed before treating them as ground truth.
 
+Deprecated hero-pad classes (kingpad, queenpad, rcpad, wardenpad) are filtered
+out by default — they no longer exist in current CoC bases and produce junk on
+TH15/16 screenshots.
+
 Output layout:
   ml/tests/regression_set/labels/<relative_path>.txt   — YOLO format sidecars
   ml/tests/regression_set/labels/_pseudo_label_metadata.json — provenance + flags
@@ -25,7 +29,9 @@ from PIL import Image
 from model_utils import (
     ML_ROOT,
     REPO_ROOT,
-    active_class_names,
+    deprecated_class_names,
+    filter_deprecated_yolo_lines,
+    model_class_names,
     load_keremberke_yolov5,
     yolov5_predictions_to_yolo_lines,
 )
@@ -33,6 +39,7 @@ from model_utils import (
 DEFAULT_REGRESSION_DIR = ML_ROOT / "tests" / "regression_set"
 DEFAULT_LABELS_DIR = DEFAULT_REGRESSION_DIR / "labels"
 DEFAULT_CONFIG = ML_ROOT / "configs" / "train_config.yaml"
+DEFAULT_CONF = 0.35
 IMAGE_SUFFIXES = {".png", ".jpg", ".jpeg", ".webp"}
 
 
@@ -55,13 +62,21 @@ def relative_to_regression(image_path: Path, regression_dir: Path) -> Path:
     return image_path.relative_to(regression_dir)
 
 
-def pseudo_label_image(model, image_path: Path, class_names: list[str], imgsz: int) -> tuple[list[str], int]:
+def pseudo_label_image(
+    model,
+    image_path: Path,
+    class_names: list[str],
+    imgsz: int,
+    *,
+    include_deprecated: bool = False,
+) -> tuple[list[str], int, int]:
     with Image.open(image_path) as img:
         width, height = img.size
     results = model(str(image_path), size=imgsz)
     predictions = results.pred[0]
-    lines = yolov5_predictions_to_yolo_lines(predictions, class_names, width, height)
-    return lines, len(lines)
+    raw_lines = yolov5_predictions_to_yolo_lines(predictions, class_names, width, height)
+    lines, removed = filter_deprecated_yolo_lines(raw_lines, include_deprecated=include_deprecated)
+    return lines, len(raw_lines), removed
 
 
 def write_pseudo_labels(
@@ -72,9 +87,10 @@ def write_pseudo_labels(
     iou: float,
     imgsz: int,
     include_extras: bool,
+    include_deprecated: bool,
     dry_run: bool,
 ) -> dict:
-    class_names = active_class_names()
+    class_names = model_class_names()
     model = load_keremberke_yolov5(conf=conf, iou=iou)
 
     images = find_regression_images(regression_dir, include_extras=include_extras)
@@ -84,37 +100,53 @@ def write_pseudo_labels(
         "conf": conf,
         "iou": iou,
         "imgsz": imgsz,
+        "include_deprecated": include_deprecated,
+        "filtered_deprecated_classes": [] if include_deprecated else deprecated_class_names(),
         "manual_review_required": True,
         "disclaimer": (
             "These labels are model-generated guesses. Expect false positives on "
             "TH14+ buildings and missed detections for Monolith, Spell Tower, and "
-            "new TH skins. Do NOT use without human review."
+            "new TH skins. Deprecated hero-pad classes are excluded by default. "
+            "Do NOT use without human review."
         ),
         "labels": {},
     }
 
     total_boxes = 0
+    total_raw_boxes = 0
+    total_deprecated_removed = 0
     for image_path in images:
         rel = relative_to_regression(image_path, regression_dir)
         label_rel = rel.with_suffix(".txt")
         label_path = labels_dir / label_rel
-        lines, count = pseudo_label_image(model, image_path, class_names, imgsz)
-        total_boxes += count
+        lines, raw_count, removed = pseudo_label_image(
+            model, image_path, class_names, imgsz, include_deprecated=include_deprecated
+        )
+        total_boxes += len(lines)
+        total_raw_boxes += raw_count
+        total_deprecated_removed += removed
 
         metadata["labels"][str(rel)] = {
             "pseudo_label": True,
             "label_file": str(label_path.relative_to(regression_dir)),
-            "detection_count": count,
+            "detection_count": len(lines),
+            "raw_detection_count": raw_count,
+            "deprecated_removed": removed,
             "source_image": str(rel),
         }
 
         if dry_run:
-            logging.info("[dry-run] %s → %d boxes", rel, count)
+            logging.info("[dry-run] %s → %d boxes (%d raw, %d deprecated removed)", rel, len(lines), raw_count, removed)
             continue
 
         label_path.parent.mkdir(parents=True, exist_ok=True)
         label_path.write_text("\n".join(lines) + ("\n" if lines else ""), encoding="utf-8")
-        logging.info("Wrote %s (%d boxes)", label_path.relative_to(REPO_ROOT), count)
+        logging.info(
+            "Wrote %s (%d boxes, %d deprecated removed)",
+            label_path.relative_to(REPO_ROOT),
+            len(lines),
+            removed,
+        )
 
     if not dry_run:
         labels_dir.mkdir(parents=True, exist_ok=True)
@@ -125,6 +157,8 @@ def write_pseudo_labels(
     return {
         "images": len(images),
         "total_boxes": total_boxes,
+        "total_raw_boxes": total_raw_boxes,
+        "deprecated_removed": total_deprecated_removed,
         "metadata": metadata,
     }
 
@@ -146,10 +180,15 @@ def main(argv: list[str] | None = None) -> int:
         help="Output labels root (default: <regression-dir>/labels/)",
     )
     parser.add_argument("--config", type=Path, default=DEFAULT_CONFIG)
-    parser.add_argument("--conf", type=float, default=None)
+    parser.add_argument("--conf", type=float, default=None, help=f"Confidence threshold (default: {DEFAULT_CONF})")
     parser.add_argument("--iou", type=float, default=None)
     parser.add_argument("--imgsz", type=int, default=None)
     parser.add_argument("--no-extras", action="store_true", help="Skip _extras/ folder")
+    parser.add_argument(
+        "--include-deprecated",
+        action="store_true",
+        help="Keep deprecated hero-pad classes (kingpad, queenpad, rcpad, wardenpad)",
+    )
     parser.add_argument("--dry-run", action="store_true")
     parser.add_argument("-v", "--verbose", action="store_true")
     args = parser.parse_args(argv)
@@ -158,14 +197,20 @@ def main(argv: list[str] | None = None) -> int:
 
     cfg = load_train_config(args.config)
     pl_cfg = cfg.get("pseudo_label", {})
-    conf = args.conf if args.conf is not None else pl_cfg.get("conf", 0.25)
+    conf = args.conf if args.conf is not None else pl_cfg.get("conf", DEFAULT_CONF)
     iou = args.iou if args.iou is not None else pl_cfg.get("iou", 0.45)
     imgsz = args.imgsz if args.imgsz is not None else pl_cfg.get("imgsz", 640)
     labels_dir = args.labels_dir or (args.regression_dir / "labels")
 
+    filter_note = ""
+    if not args.include_deprecated:
+        deprecated = ", ".join(deprecated_class_names())
+        filter_note = f"    Filtering deprecated classes: {deprecated}.\n"
+
     print(
         "\n⚠️  Pseudo-labels require MANUAL REVIEW before training on them as ground truth.\n"
         "    Expect false positives and missed TH14+ buildings.\n"
+        f"{filter_note}"
     )
 
     result = write_pseudo_labels(
@@ -175,9 +220,20 @@ def main(argv: list[str] | None = None) -> int:
         iou=iou,
         imgsz=imgsz,
         include_extras=not args.no_extras,
+        include_deprecated=args.include_deprecated,
         dry_run=args.dry_run,
     )
-    print(json.dumps({"images": result["images"], "total_boxes": result["total_boxes"]}, indent=2))
+    print(
+        json.dumps(
+            {
+                "images": result["images"],
+                "total_boxes": result["total_boxes"],
+                "total_raw_boxes": result["total_raw_boxes"],
+                "deprecated_removed": result["deprecated_removed"],
+            },
+            indent=2,
+        )
+    )
     return 0
 
 

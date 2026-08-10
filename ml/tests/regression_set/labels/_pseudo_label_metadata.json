@@ -1,76 +1,105 @@
 {
-  "generated_at": "2026-08-10T16:18:41Z",
+  "generated_at": "2026-08-10T16:49:37Z",
   "model": "keremberke/yolov5m-clash-of-clans",
-  "conf": 0.25,
+  "conf": 0.35,
   "iou": 0.45,
   "imgsz": 640,
+  "include_deprecated": false,
+  "filtered_deprecated_classes": [
+    "kingpad",
+    "queenpad",
+    "rcpad",
+    "wardenpad"
+  ],
   "manual_review_required": true,
-  "disclaimer": "These labels are model-generated guesses. Expect false positives on TH14+ buildings and missed detections for Monolith, Spell Tower, and new TH skins. Do NOT use without human review.",
+  "disclaimer": "These labels are model-generated guesses. Expect false positives on TH14+ buildings and missed detections for Monolith, Spell Tower, and new TH skins. Deprecated hero-pad classes are excluded by default. Do NOT use without human review.",
   "labels": {
     "_extras/progress_base_drachen_meddler.png": {
       "pseudo_label": true,
       "label_file": "labels/_extras/progress_base_drachen_meddler.txt",
-      "detection_count": 32,
+      "detection_count": 26,
+      "raw_detection_count": 26,
+      "deprecated_removed": 0,
       "source_image": "_extras/progress_base_drachen_meddler.png"
     },
     "_extras/th13_war_arena_coclayout.png": {
       "pseudo_label": true,
       "label_file": "labels/_extras/th13_war_arena_coclayout.txt",
-      "detection_count": 27,
+      "detection_count": 19,
+      "raw_detection_count": 19,
+      "deprecated_removed": 0,
       "source_image": "_extras/th13_war_arena_coclayout.png"
     },
     "_extras/th15_eagle_compartment_cocbase_007.png": {
       "pseudo_label": true,
       "label_file": "labels/_extras/th15_eagle_compartment_cocbase_007.txt",
-      "detection_count": 53,
+      "detection_count": 39,
+      "raw_detection_count": 39,
+      "deprecated_removed": 0,
       "source_image": "_extras/th15_eagle_compartment_cocbase_007.png"
     },
     "_extras/th15_purple_magic_cocbase_008.png": {
       "pseudo_label": true,
       "label_file": "labels/_extras/th15_purple_magic_cocbase_008.txt",
-      "detection_count": 38,
+      "detection_count": 31,
+      "raw_detection_count": 31,
+      "deprecated_removed": 0,
       "source_image": "_extras/th15_purple_magic_cocbase_008.png"
     },
     "_extras/th15_scattershot_spread_005.png": {
       "pseudo_label": true,
       "label_file": "labels/_extras/th15_scattershot_spread_005.txt",
-      "detection_count": 46,
+      "detection_count": 38,
+      "raw_detection_count": 38,
+      "deprecated_removed": 0,
       "source_image": "_extras/th15_scattershot_spread_005.png"
     },
     "_extras/th15_war_shadow_scenery_cocbase.png": {
       "pseudo_label": true,
       "label_file": "labels/_extras/th15_war_shadow_scenery_cocbase.txt",
-      "detection_count": 44,
+      "detection_count": 35,
+      "raw_detection_count": 35,
+      "deprecated_removed": 0,
       "source_image": "_extras/th15_war_shadow_scenery_cocbase.png"
     },
     "_extras/war_base_illyrian_god.png": {
       "pseudo_label": true,
       "label_file": "labels/_extras/war_base_illyrian_god.txt",
-      "detection_count": 33,
+      "detection_count": 22,
+      "raw_detection_count": 22,
+      "deprecated_removed": 0,
       "source_image": "_extras/war_base_illyrian_god.png"
     },
     "th15/war_base_cocbase_wizztower_ring.png": {
       "pseudo_label": true,
       "label_file": "labels/th15/war_base_cocbase_wizztower_ring.txt",
-      "detection_count": 52,
+      "detection_count": 43,
+      "raw_detection_count": 43,
+      "deprecated_removed": 0,
       "source_image": "th15/war_base_cocbase_wizztower_ring.png"
     },
     "th15/war_base_illyrian_god.png": {
       "pseudo_label": true,
       "label_file": "labels/th15/war_base_illyrian_god.txt",
-      "detection_count": 33,
+      "detection_count": 22,
+      "raw_detection_count": 22,
+      "deprecated_removed": 0,
       "source_image": "th15/war_base_illyrian_god.png"
     },
     "th16/war_base_cocbase_sakura_scenery.png": {
       "pseudo_label": true,
       "label_file": "labels/th16/war_base_cocbase_sakura_scenery.txt",
-      "detection_count": 27,
+      "detection_count": 24,
+      "raw_detection_count": 24,
+      "deprecated_removed": 0,
       "source_image": "th16/war_base_cocbase_sakura_scenery.png"
     },
     "th16/war_base_cocbase_volcanic_warmap.png": {
       "pseudo_label": true,
       "label_file": "labels/th16/war_base_cocbase_volcanic_warmap.txt",
-      "detection_count": 33,
+      "detection_count": 26,
+      "raw_detection_count": 26,
+      "deprecated_removed": 0,
       "source_image": "th16/war_base_cocbase_volcanic_warmap.png"
     }
   }

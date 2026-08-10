@@ -288,6 +288,17 @@ datasets/processed/yolo_v1/
 
 **Labeling-TODO:** Echte Screenshots manuell labeln oder Pseudo-Labels mit
 `keremberke/yolov5m-clash-of-clans` erzeugen (manuell prüfen — im Report vermerkt).
+Deprecated Helden-Pads (`kingpad`, `queenpad`, `rcpad`, `wardenpad`) werden beim
+Pseudo-Labeling standardmäßig herausgefiltert (`ml/src/pseudo_label.py`, conf=0.35).
+
+### Empfehlung bei kleinem Datensatz
+
+Mit wenigen echten Screenshots (<20 manuell geprüfte Labels) zuerst **nur synthetisch
+trainieren** (ClashKing-Renderer + Domain Randomization). Echte TH15/16-Screenshots
+liefern ohne manuelles Labeling oder deutlich besseres Modell vor allem Rauschen —
+Pseudo-Labels vom keremberke-Baseline sind auf TH14+ unzuverlässig (fehlende Klassen,
+veraltete Helden-Pads). Erst nach Review freigegebene Regression-Labels in den Mix
+nehmen; alternativ bewusst synthetic-only bis mehr manuelle Labels vorliegen.
 
 TH wird aus Ordner (`th15/`) oder Dateiname (`th13_war_…`) inferiert; `_extras/`-Bilder
 fließen mit ein, können `unknown` TH haben.

@@ -26,7 +26,9 @@ sys.path.insert(0, str(ML_ROOT / "src"))
 
 from model_utils import (  # noqa: E402
     active_class_names,
+    deprecated_class_indices,
     load_keremberke_yolov5,
+    model_class_names,
 )
 from pseudo_label import load_train_config, pseudo_label_image  # noqa: E402
 
@@ -113,12 +115,15 @@ def _label_path_for(image_path: Path) -> Path:
 def _read_yolo_boxes(label_path: Path) -> list[tuple[int, float, float, float, float]]:
     if not label_path.is_file():
         return []
+    deprecated = deprecated_class_indices()
     boxes: list[tuple[int, float, float, float, float]] = []
     for line in label_path.read_text(encoding="utf-8").splitlines():
         parts = line.strip().split()
         if len(parts) < 5:
             continue
         cls_id = int(parts[0])
+        if cls_id in deprecated:
+            continue
         cx, cy, w, h = map(float, parts[1:5])
         boxes.append((cls_id, cx, cy, w, h))
     return boxes
@@ -140,13 +145,15 @@ def regenerate_labels(image_path: Path, *, conf: float) -> int:
     cfg = load_train_config(CONFIG_PATH)
     pl_cfg = cfg.get("pseudo_label", {})
     imgsz = pl_cfg.get("imgsz", 640)
-    class_names = active_class_names()
+    class_names = model_class_names()
     model = _get_model(conf)
-    lines, count = pseudo_label_image(model, image_path, class_names, imgsz)
+    lines, _raw_count, _removed = pseudo_label_image(
+        model, image_path, class_names, imgsz, include_deprecated=False
+    )
     label_path = _label_path_for(image_path)
     label_path.parent.mkdir(parents=True, exist_ok=True)
     label_path.write_text("\n".join(lines) + ("\n" if lines else ""), encoding="utf-8")
-    return count
+    return len(lines)
 
 
 def _move_to_rejected(image_path: Path) -> None:
@@ -199,10 +206,13 @@ def _append_review(reviews_data: dict, *, path: str, status: str, action_taken: 
 
 class ReviewSession:
     def __init__(self) -> None:
-        self.class_names = active_class_names()
+        self.class_names = model_class_names()
+        self.active_names = active_class_names()
         self.reviews_data = _load_reviews()
         self.queue = _pending_images(self.reviews_data)
         self.index = 0
+        cfg = load_train_config(CONFIG_PATH)
+        self.regen_conf = cfg.get("pseudo_label", {}).get("conf", 0.35)
 
     def refresh_queue(self) -> None:
         self.queue = _pending_images(self.reviews_data)
@@ -242,11 +252,11 @@ class ReviewSession:
             r for r in self.reviews_data.get("reviews", [])
             if r.get("status") == "rejected" and r.get("action_taken") == "excluded_to_rejected"
         ]
-        regen = [r for r in self.reviews_data.get("reviews", []) if r.get("action_taken") == "regenerated_conf_0.15"]
+        regen = [r for r in self.reviews_data.get("reviews", []) if r.get("action_taken", "").startswith("regenerated_conf_")]
         lines = [
             f"✅ {len(approved)} für Training freigegeben",
             f"❌ {len(rejected)} nach _rejected/ verschoben",
-            f"🔄 {len(regen)} neu pseudo-gelabelt (conf=0.15)",
+            f"🔄 {len(regen)} neu pseudo-gelabelt (conf={self.regen_conf})",
         ]
         if not self.queue:
             lines.append("\nAlle Bilder bearbeitet. Klicke **Dataset neu bauen**.")
@@ -275,10 +285,11 @@ class ReviewSession:
         counts[rel] = counts.get(rel, 0) + 1
 
         if counts[rel] == 1:
-            box_count = regenerate_labels(image_path, conf=0.15)
-            _append_review(self.reviews_data, path=rel, status="rejected", action_taken="regenerated_conf_0.15")
+            box_count = regenerate_labels(image_path, conf=self.regen_conf)
+            action = f"regenerated_conf_{self.regen_conf}"
+            _append_review(self.reviews_data, path=rel, status="rejected", action_taken=action)
             _save_reviews(self.reviews_data)
-            msg = f"Neu gelabelt mit conf=0.15 ({box_count} Boxen). Bitte erneut prüfen."
+            msg = f"Neu gelabelt mit conf={self.regen_conf} ({box_count} Boxen, ohne Helden-Pads). Bitte erneut prüfen."
         else:
             _move_to_rejected(image_path)
             _append_review(self.reviews_data, path=rel, status="rejected", action_taken="excluded_to_rejected")
@@ -326,7 +337,10 @@ def create_app() -> gr.Blocks:
 
     with gr.Blocks(title="CoC Label Review") as app:
         gr.Markdown("# Pseudo-Label Review")
-        gr.Markdown("Nur **Richtig** oder **Falsch** klicken — der Rest passiert automatisch.")
+        gr.Markdown(
+            "Nur **Richtig** oder **Falsch** klicken — der Rest passiert automatisch.\n\n"
+            "*Alte Helden-Pads (kingpad/queenpad/rcpad/wardenpad) werden nicht mehr angezeigt.*"
+        )
 
         with gr.Row():
             image_out = gr.Image(value=img0, label="Screenshot mit Pseudo-Labels", type="pil")
@@ -341,7 +355,7 @@ def create_app() -> gr.Blocks:
 
         btn_rebuild = gr.Button("Dataset neu bauen")
         rebuild_out = gr.Markdown("")
-        gr.Markdown(f"**Klassen:** {_class_legend(session.class_names)}")
+        gr.Markdown(f"**Aktive Klassen:** {_class_legend(session.active_names)}")
 
         btn_right.click(session.approve, outputs=[image_out, progress_out, info_out, summary_out])
         btn_wrong.click(session.reject, outputs=[image_out, progress_out, info_out, summary_out])

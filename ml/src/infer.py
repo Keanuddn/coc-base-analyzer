@@ -10,7 +10,7 @@ from pathlib import Path
 
 import yaml
 
-from model_utils import ML_ROOT, REPO_ROOT, active_class_names, load_keremberke_yolov5
+from model_utils import ML_ROOT, REPO_ROOT, model_class_names, load_keremberke_yolov5
 
 DEFAULT_CONFIG = ML_ROOT / "configs" / "train_config.yaml"
 
@@ -26,7 +26,7 @@ def find_latest_weights(runs_dir: Path) -> Path | None:
 
 
 def infer_keremberke(image_path: Path, *, conf: float, iou: float, imgsz: int) -> dict:
-    class_names = active_class_names()
+    class_names = model_class_names()
     model = load_keremberke_yolov5(conf=conf, iou=iou)
     results = model(str(image_path), size=imgsz)
     predictions = results.pred[0]
@@ -56,7 +56,7 @@ def infer_keremberke(image_path: Path, *, conf: float, iou: float, imgsz: int) -
 def infer_ultralytics(weights: Path, image_path: Path, *, conf: float, iou: float, max_det: int) -> dict:
     from ultralytics import YOLO
 
-    class_names = active_class_names()
+    class_names = model_class_names()
     model = YOLO(str(weights))
     results = model.predict(
         source=str(image_path),

@@ -33,6 +33,6 @@ inference:
 
 pseudo_label:
   model: keremberke/yolov5m-clash-of-clans
-  conf: 0.25
+  conf: 0.35
   iou: 0.45
   imgsz: 640

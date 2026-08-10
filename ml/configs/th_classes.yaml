@@ -3,8 +3,8 @@
 version: 1
 source_model: keremberke/yolov5m-clash-of-clans
 
-# Active classes used in current training (indices 0..15 match keremberke).
-classes:
+# Keremberke YOLOv5 head — fixed indices 0..15, do not reorder.
+model_classes:
   - ad
   - airsweeper
   - bombtower
@@ -22,6 +22,35 @@ classes:
   - wizztower
   - xbow
 
+# Classes still useful for detection on current TH15+ bases (subset of model_classes).
+active_classes:
+  - ad
+  - airsweeper
+  - bombtower
+  - canon
+  - clancastle
+  - eagle
+  - inferno
+  - mortar
+  - scattershot
+  - th13
+  - wizztower
+  - xbow
+
+# Hero altar pads — removed from CoC; baseline model mislabels TH15/16 screenshots.
+deprecated_classes:
+  - kingpad
+  - queenpad
+  - rcpad
+  - wardenpad
+
+deprecated_notes: |
+  Hero altar "pad" classes from keremberke's 2021–2024 TH13-era training.
+  King/Queen/Royal Champion/Warden pads no longer exist as separate map tiles in
+  current bases; the baseline model hallucinates them on ground tiles, decorations,
+  and hero-altar-adjacent clutter. Pseudo-labels filter them out by default.
+  Use pseudo_label --include-deprecated to retain them (not recommended for review).
+
 # Placeholders for future manual labeling / fine-tuning rounds (not yet in model head).
 placeholders:
   - monolith      # TH14+
@@ -33,6 +62,6 @@ placeholders:
   - th18
 
 notes: |
-  The keremberke model only knows the 16 active classes above.
+  The keremberke model only knows the 16 model_classes above (indices 0..15).
   TH14–TH18 town halls are visually distinct but share the th13 class slot in baseline weights.
   Monolith and Spell Tower require new labels before they can be trained.

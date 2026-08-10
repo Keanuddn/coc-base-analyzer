@@ -96,40 +96,59 @@ ml/.venv/bin/python ml/scripts/phase0_smoke_test.py
 
 Phase 0-Infrastruktur ist vollständig eingerichtet (Notebook, Smoke-Test-Skript, Regression-Set-Struktur, CSV-Export). Der Smoke Test wurde **lokal mit Netzwerk erfolgreich ausgeführt** (2026-08-09 UTC): Modell `keremberke/yolov5m-clash-of-clans` lädt und Inference läuft (PyTorch 2.6+ erfordert `weights_only=False` beim Laden des YOLOv5-Checkpoints — im Skript abgedeckt).
 
+**Erste Evaluation auf echten TH15-Screenshots** (2026-08-10 UTC): 2 Bilder im Regression-Set getestet. Das Modell erkennt grundlegende Verteidigungen, ist aber für TH15 unvollständig.
+
 | Aspekt | Ergebnis |
 |--------|----------|
 | Modell-Laden | Erfolgreich (HF-Weights) |
-| Regression-Set | Leer — keine CoC-Screenshots unter `ml/tests/regression_set/` |
-| HF-Beispielbild | Download fehlgeschlagen: Dataset-Skripte von Hugging Face nicht mehr unterstützt |
-| Fallback-Inferenz | `yolov5/data/images/zidane.jpg` — **0 Detections**, Klassen `[]` (kein CoC-Inhalt; bestätigt nur Pipeline) |
-| CSV | `ml/notebooks/phase0_results.csv` aktualisiert (`smoke_test_only`) |
+| Regression-Set | 2 TH15-Screenshots unter `ml/tests/regression_set/th15/` |
+| Inferenz | 32–33 Detections pro Bild, Confidence 0.25–0.90 |
+| Annotierte Outputs | `ml/notebooks/phase0_output/*_annotated.jpg` |
+| CSV | `ml/notebooks/phase0_results.csv` mit manueller Evaluation |
 
-Für aussagekräftige Detections CoC-Basis-Screenshots ins Regression-Set legen und den Smoke Test erneut ausführen.
+### TH15-Evaluationsergebnisse (2 Bilder)
 
-### Erwartete Eignung (basierend auf Model Card)
+| Bild | Detections | Klassen | Correct | FP | FN | Fazit |
+|------|------------|---------|---------|----|----|-------|
+| `war_base_illyrian_god.png` | 33 | canon (16), mortar (12), inferno (2), airsweeper (1), ad (1), wizztower (1) | ~18 | ~10 | ~22 | Starke Erkennung von Kanonen/Mörsern; schwach bei Eagle, X-Bow, Scattershot, TH15-Neubauten |
+| `progress_base_drachen_meddler.png` | 32 | canon (11), wizztower (6), ad (5), mortar (5), bombtower (2), xbow (2), eagle (1) | ~20 | ~8 | ~18 | Gruppierte Verteidigungen gut erkannt; Inferno, Scattershot, Monolith, Spell Tower fehlen |
+
+**Erkannte Klassen (beide Bilder):** `ad`, `airsweeper`, `bombtower`, `canon`, `eagle`, `inferno`, `mortar`, `wizztower`, `xbow`
+
+**Nicht erkannt (TH15-spezifisch oder fehlend im Label-Set):** Town Hall (`th13`-Klasse passt visuell nicht), Monolith, Spell Tower, Scattershot (war base), Clan Castle, Hero-Pads, Ressourcen-Gebäude
+
+**Visuelle Beobachtungen:**
+- TH15-Gebäude-Skins (lila/gold statt TH13-Eis-Theme) reduzieren Erkennungsrate nicht vollständig — Silhouetten von Kanonen, Mörsern, Infernos bleiben brauchbar
+- Progress-Base-Layout (Gebäude gruppiert) liefert bessere Detections als War-Base (dichte, überlappende Verteidigungen)
+- Viele Low-Confidence-Boxen (0.25–0.35) deuten auf unsichere Klassifikation hin
+- `yolov5.render()` schlägt mit OpenCV 5.0 fehl (readonly-Array); Annotation via PIL-Workaround
+
+### Erwartete Eignung (basierend auf Model Card + TH15-Test)
 
 | TH-Level | Erwartung | Begründung |
 |----------|-----------|------------|
 | TH10–TH12 | Möglicherweise brauchbar | Viele Gebäude (canon, mortar, xbow, inferno) sind im Dataset; TH-spezifische Klasse fehlt |
 | TH13 | **Am besten geeignet** | Einzige explizite TH-Klasse (`th13`); Scattershot, Giga-Inferno-Pads enthalten |
-| TH14–TH15 | Eingeschränkt | Neue Gebäude (Monolith ab TH14, Spell Tower ab TH15) nicht im Training |
+| TH14–TH15 | Eingeschränkt | Neue Gebäude (Monolith ab TH14, Spell Tower ab TH15) nicht im Training — **bestätigt durch Test** |
 | TH16–TH18 | **Voraussichtlich unzureichend** | Training-Daten von 2022; TH16+ existierte nicht. Keine Klassen für neue Verteidigungen (Giga Inferno TH16+, neue Truppen-Pads, etc.) |
 
-### Offene Punkte (Nutzer-Aktion erforderlich)
+### Phase-0-Go/No-Go
 
-1. **20–30 Screenshots bereitstellen** unter:
-   ```
-   ml/tests/regression_set/th{10-18}/*.png
-   ```
-   Gegner-Basis-Screenshots (Scouting-Ansicht), verschiedene TH-Levels.
+| Kriterium | Status |
+|-----------|--------|
+| Pipeline funktioniert (Modell laden, Inferenz, CSV) | ✅ |
+| Detections auf echten CoC-Screenshots | ✅ (32–33 pro Bild) |
+| Brauchbare Baseline für TH15 | ⚠️ Teilweise — nur Grundverteidigungen |
+| Regression-Set ausreichend (20–30 Bilder) | ❌ Nur 2 Bilder |
+| TH15-Neubauten abgedeckt | ❌ |
 
-2. **Smoke Test erneut ausführen**, sobald Regression-Set-Bilder vorliegen:
-   ```bash
-   ml/.venv/bin/python ml/scripts/phase0_smoke_test.py
-   ```
-   (Initialer Lauf ohne CoC-Bilder: Modell OK, 0 Detections auf YOLOv5-Fallback.)
+**Empfehlung:** Phase 0 ist **teilweise abgeschlossen** — genug für Go zu Phase 1 (Datensatz-Aufbau + Fine-Tuning), aber Regression-Set sollte auf 20–30 Bilder erweitert werden.
 
-3. **Manuelle Evaluation** im Notebook: pro Bild `correct`, `false_positives`, `false_negatives` eintragen.
+### Offene Punkte
+
+1. **Regression-Set erweitern** auf 20–30 Screenshots (`ml/tests/regression_set/th{10-18}/`), inkl. TH13-Basen als Baseline-Vergleich
+2. **Neue Klassen** für Phase 1: `monolith`, `spelltower`, `th14`–`th18`, ggf. `archertower`
+3. **OpenCV 5.0-Kompatibilität** in Visualisierung (PIL-Fallback oder Pin auf OpenCV 4.x)
 
 ### Artefakte
 
@@ -137,12 +156,13 @@ Für aussagekräftige Detections CoC-Basis-Screenshots ins Regression-Set legen 
 |-------|-------|
 | `ml/notebooks/phase0_feasibility_check.ipynb` | Interaktiver Machbarkeits-Check |
 | `ml/scripts/phase0_smoke_test.py` | Headless Smoke Test |
-| `ml/notebooks/phase0_results.csv` | Strukturierte Ergebnisse (Smoke Test 2026-08-09: Fallback-Bild, 0 Detections) |
-| `ml/tests/regression_set/th{10-18}/` | Regression-Set-Ordner (leer, bereit für Screenshots) |
+| `ml/notebooks/phase0_results.csv` | Strukturierte Ergebnisse (2 TH15-Bilder evaluiert) |
+| `ml/notebooks/phase0_output/` | Annotierte Bounding-Box-Bilder |
+| `ml/tests/regression_set/th15/` | 2 TH15-Screenshots (War + Progress Base) |
 
 ### Empfehlung für Phase 1
 
 - Modell als **Baseline für TH13-Basen** nutzbar (mAP 0.874 auf TH13-Daten)
-- Für TH14+ ist **Fine-Tuning mit eigenem Datensatz** erforderlich
+- Für TH14+ ist **Fine-Tuning mit eigenem Datensatz** erforderlich — **durch TH15-Test bestätigt**
 - Neue Klassen für TH14–18-Gebäude müssen zum Label-Set hinzugefügt werden
 - Regression Set (20–30 Bilder) als kontinuierlicher Qualitäts-Check beibehalten

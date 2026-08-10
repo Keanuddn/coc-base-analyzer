@@ -1,0 +1,52 @@
+# Maps project building_type identifiers → ClashKing sprite folder slugs.
+# Verified against docs/ARCHITECTURE.md (YOLO labels) and link_decoder/schema.py.
+#
+# Sprite path template:
+#   clashking/home-village/{clashking_slug}/level_{level}.webp
+#
+# Town Hall: use town_hall/level_{town_hall_level}.webp (not the th13 YOLO class name).
+
+aliases:
+  ad: air_defense
+  airsweeper: air_sweeper
+  bombtower: bomb_tower
+  canon: cannon
+  clancastle: clan_castle
+  eagle: eagle_artillery
+  inferno: inferno_tower
+  mortar: mortar
+  scattershot: scattershot
+  wizztower: wizard_tower
+  xbow: x-bow
+  monolith: monolith
+  spelltower: spell_tower
+
+# Explicit slug = identity (for schema strings that match ClashKing names)
+identity:
+  - air_defense
+  - air_sweeper
+  - archer_tower
+  - bomb_tower
+  - cannon
+  - clan_castle
+  - eagle_artillery
+  - firespitter
+  - hidden_tesla
+  - inferno_tower
+  - monolith
+  - mortar
+  - multi-archer_tower
+  - multi-gear_tower
+  - revenge_tower
+  - ricochet_cannon
+  - scattershot
+  - spell_tower
+  - super_wizard_tower
+  - town_hall
+  - wizard_tower
+  - x-bow
+
+town_hall:
+  sprite_slug: town_hall
+  # YOLO only has th13; renderer should use decoded town_hall_level for skin
+  yolo_class: th13

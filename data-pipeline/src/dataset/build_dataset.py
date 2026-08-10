@@ -64,6 +64,7 @@ class BuildDatasetConfig:
     demo_dir: Path = DEFAULT_DEMO_DIR
     regression_dir: Path = DEFAULT_REGRESSION_DIR
     pseudo_labels_dir: Path = DEFAULT_PSEUDO_LABELS_DIR
+    approved_reviews_path: Path | None = None
     synthetic_variant_count: int = 8
     render_synthetic_variants: bool = True
 
@@ -165,6 +166,18 @@ def collect_synthetic_samples(config: BuildDatasetConfig) -> list[DatasetSample]
     return samples
 
 
+def _load_approved_reviews(path: Path | None) -> set[str] | None:
+    """Load approved image paths from label review JSON (None = no filter)."""
+    if path is None or not path.is_file():
+        return None
+    payload = json.loads(path.read_text(encoding="utf-8"))
+    return {
+        entry["path"]
+        for entry in payload.get("reviews", [])
+        if entry.get("status") == "approved" and entry.get("path")
+    }
+
+
 def _load_pseudo_label_index(pseudo_labels_dir: Path) -> dict[str, bool]:
     """Load pseudo-label metadata index (image rel path → pseudo_label flag)."""
     meta_path = pseudo_labels_dir / "_pseudo_label_metadata.json"
@@ -219,12 +232,21 @@ def collect_real_samples(config: BuildDatasetConfig) -> list[DatasetSample]:
         else {}
     )
 
+    approved_paths = _load_approved_reviews(config.approved_reviews_path)
+
     if config.include_regression and config.regression_dir.is_dir():
         for image_path in sorted(config.regression_dir.rglob("*")):
             if image_path.suffix.lower() not in IMAGE_SUFFIXES:
                 continue
             if "labels" in image_path.parts and image_path.parent.name == "labels":
                 continue
+            if approved_paths is not None:
+                try:
+                    rel_key = str(image_path.relative_to(config.regression_dir))
+                except ValueError:
+                    continue
+                if rel_key not in approved_paths:
+                    continue
             label_path, notes = resolve_regression_label_path(
                 image_path,
                 config.regression_dir,
@@ -614,6 +636,12 @@ def main(argv: list[str] | None = None) -> int:
         default=DEFAULT_REGRESSION_DIR,
         help="Regression screenshot root",
     )
+    parser.add_argument(
+        "--approved-reviews",
+        type=Path,
+        default=None,
+        help="Only include regression images approved in label review JSON",
+    )
     parser.add_argument("-v", "--verbose", action="store_true")
     args = parser.parse_args(argv)
 
@@ -638,6 +666,7 @@ def main(argv: list[str] | None = None) -> int:
         demo_dir=args.demo_dir,
         regression_dir=args.regression_dir,
         pseudo_labels_dir=args.regression_dir / "labels",
+        approved_reviews_path=args.approved_reviews,
         synthetic_variant_count=args.synthetic_variants,
         render_synthetic_variants=not args.no_render_variants,
     )

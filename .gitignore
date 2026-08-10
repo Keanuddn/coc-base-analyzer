@@ -39,3 +39,5 @@ Thumbs.db
 data-pipeline/src/renderer/sprites/clashking/
 data-pipeline/src/renderer/sprites/**/*.webp
 !data-pipeline/src/renderer/sprites/download_clashking_sprites.sh
+data-pipeline/datasets/processed/*
+!data-pipeline/datasets/processed/.gitkeep

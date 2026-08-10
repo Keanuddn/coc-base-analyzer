@@ -29,6 +29,8 @@ def find_regression_images() -> list[Path]:
     images: list[Path] = []
     if REGRESSION_SET.exists():
         for p in sorted(REGRESSION_SET.rglob("*")):
+            if "_extras" in p.parts:
+                continue
             if p.suffix.lower() in exts and p.is_file():
                 images.append(p)
     return images

@@ -1,14 +1,10 @@
 # TH15 Regression Set
 
-**Status:** 2/2 Bilder vorhanden ✅
+**Status:** 2/2 War Bases ✅
 
-| Datei | Basistyp | Spieler | Klassifikation |
-|-------|----------|---------|----------------|
-| `war_base_illyrian_god.png` | War Base | ILLYRIAN GOD (TH211) | TH15 — purple/gold Magic-Theme, Monolith, Spell Towers |
-| `progress_base_drachen_meddler.png` | Progress Base | DRACHEN MEDDLER (TH135) | TH15 — purple/gold Magic-Theme, Monolith, Spell Towers |
+| Datei | Quelle | Basistyp | Klassifikation |
+|-------|--------|----------|----------------|
+| `war_base_001.png` | ILLYRIAN GOD (in-game Scouting) | War Base | TH15 — purple/gold Magic-Theme |
+| `war_base_002.png` | CocBase.Net (16.46.47) | War Base | TH15 — purple/gold Magic-Theme |
 
-Beide Screenshots stammen aus der in-game Scouting-Ansicht (kein Website-Wasserzeichen).
-
-## Hinweis (2026-08-10)
-
-Vom Nutzer nachgereichte Assets im Cursor-Workspace (`Screenshot_2026-08-10_at_16.36.*`) sind byte-identische Duplikate dieser beiden Dateien — keine zusätzlichen TH15-Bilder.
+Extras (CocBase.Net-Wasserzeichen, Progress Base): `_extras/`

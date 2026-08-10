@@ -101,17 +101,17 @@ Phase 0-Infrastruktur ist vollständig eingerichtet (Notebook, Smoke-Test-Skript
 | Aspekt | Ergebnis |
 |--------|----------|
 | Modell-Laden | Erfolgreich (HF-Weights) |
-| Regression-Set | 2/8 Zielbilder (TH15 vollständig; TH16–TH18 ausstehend) — siehe Inventar unten |
-| Inferenz | 32–33 Detections pro Bild, Confidence 0.25–0.90 |
+| Regression-Set | 4/8 Zielbilder (TH15+TH16 ✅; TH17–TH18 ausstehend) + 2 TH13-Baseline — siehe Inventar |
+| Inferenz | 27–53 Detections pro Bild (TH13 am besten), Confidence 0.25–0.93 |
 | Annotierte Outputs | `ml/notebooks/phase0_output/*_annotated.jpg` |
-| CSV | `ml/notebooks/phase0_results.csv` mit manueller Evaluation |
+| CSV | `ml/notebooks/phase0_results.csv` (6 Bilder, Smoke Test 2026-08-10) |
 
-### TH15-Evaluationsergebnisse (2 Bilder)
+### Smoke-Test-Ergebnisse (6 Bilder, 2026-08-10)
 
 | Bild | Detections | Klassen | Correct | FP | FN | Fazit |
 |------|------------|---------|---------|----|----|-------|
-| `war_base_illyrian_god.png` | 33 | canon (16), mortar (12), inferno (2), airsweeper (1), ad (1), wizztower (1) | ~18 | ~10 | ~22 | Starke Erkennung von Kanonen/Mörsern; schwach bei Eagle, X-Bow, Scattershot, TH15-Neubauten |
-| `progress_base_drachen_meddler.png` | 32 | canon (11), wizztower (6), ad (5), mortar (5), bombtower (2), xbow (2), eagle (1) | ~20 | ~8 | ~18 | Gruppierte Verteidigungen gut erkannt; Inferno, Scattershot, Monolith, Spell Tower fehlen |
+| `th15/war_base_001.png` (ILLYRIAN GOD) | 33 | canon (16), mortar (12), inferno (2), airsweeper (1), ad (1), wizztower (1) | ~18 | ~10 | ~22 | Starke Erkennung von Kanonen/Mörsern; schwach bei Eagle, X-Bow, Scattershot, TH15-Neubauten |
+| `th15/war_base_002.png` (CocBase) | 52 | canon (11), wizztower (6), ad (5), mortar (5), bombtower (2), xbow (2), eagle (1) | ~20 | ~8 | ~18 | Gruppierte Verteidigungen gut erkannt; Inferno, Scattershot, Monolith, Spell Tower fehlen |
 
 **Erkannte Klassen (beide Bilder):** `ad`, `airsweeper`, `bombtower`, `canon`, `eagle`, `inferno`, `mortar`, `wizztower`, `xbow`
 
@@ -139,14 +139,14 @@ Phase 0-Infrastruktur ist vollständig eingerichtet (Notebook, Smoke-Test-Skript
 | Pipeline funktioniert (Modell laden, Inferenz, CSV) | ✅ |
 | Detections auf echten CoC-Screenshots | ✅ (32–33 pro Bild) |
 | Brauchbare Baseline für TH15 | ⚠️ Teilweise — nur Grundverteidigungen |
-| Regression-Set TH15–TH18 (2 je Level) | ⚠️ 2/8 — TH15 ✅, TH16–TH18 ❌ |
+| Regression-Set TH15–TH18 (2 je Level) | ⚠️ 4/8 — TH15+TH16 ✅, TH17–TH18 ❌ |
 | TH15-Neubauten abgedeckt | ❌ |
 
 **Empfehlung:** Phase 0 ist **teilweise abgeschlossen** — genug für Go zu Phase 1 (Datensatz-Aufbau + Fine-Tuning), aber Regression-Set sollte auf 20–30 Bilder erweitert werden.
 
 ### Offene Punkte
 
-1. **Regression-Set vervollständigen:** TH16–TH18 je 2 War-Base-Screenshots nachreichen (TH15 ✅); langfristig auf 20–30 Bilder (`ml/tests/regression_set/th{10-18}/`), inkl. TH13-Basen als Baseline-Vergleich
+1. **Regression-Set vervollständigen:** TH17–TH18 je 2 War-Base-Screenshots nachreichen (TH15+TH16 ✅); langfristig auf 20–30 Bilder (`ml/tests/regression_set/th{10-18}/`), inkl. TH13-Basen als Baseline-Vergleich
 2. **Neue Klassen** für Phase 1: `monolith`, `spelltower`, `th14`–`th18`, ggf. `archertower`
 3. **OpenCV 5.0-Kompatibilität** in Visualisierung (PIL-Fallback oder Pin auf OpenCV 4.x)
 
@@ -156,11 +156,13 @@ Phase 0-Infrastruktur ist vollständig eingerichtet (Notebook, Smoke-Test-Skript
 |-------|-------|
 | `ml/notebooks/phase0_feasibility_check.ipynb` | Interaktiver Machbarkeits-Check |
 | `ml/scripts/phase0_smoke_test.py` | Headless Smoke Test |
-| `ml/notebooks/phase0_results.csv` | Strukturierte Ergebnisse (2 TH15-Bilder evaluiert) |
+| `ml/notebooks/phase0_results.csv` | Strukturierte Ergebnisse (6 Bilder: TH13×2, TH15×2, TH16×2) |
 | `ml/notebooks/phase0_output/` | Annotierte Bounding-Box-Bilder |
 | `ml/tests/regression_set/` | Regression-Set-Inventar (README) |
-| `ml/tests/regression_set/th15/` | 2 TH15-Screenshots (War + Progress Base) ✅ |
-| `ml/tests/regression_set/th16/` | 0/2 — README mit fehlenden Slots |
+| `ml/tests/regression_set/th13/` | 2 TH13 War Bases (Bonus-Baseline) ✅ |
+| `ml/tests/regression_set/th15/` | 2 TH15 War Bases ✅ |
+| `ml/tests/regression_set/_extras/` | 5 Reserve-Bilder (Progress Base, CocBase-Extras, TH13) |
+| `ml/tests/regression_set/th16/` | 2 TH16 War Bases ✅ |
 | `ml/tests/regression_set/th17/` | 0/2 — README mit fehlenden Slots |
 | `ml/tests/regression_set/th18/` | 0/2 — README mit fehlenden Slots |
 
@@ -170,14 +172,15 @@ Nutzer-Ziel: je 2 Screenshots pro Rathaus-Level 15–18 (8 Bilder gesamt).
 
 | TH | Anzahl | Dateien | Klassifikation | Status |
 |----|--------|---------|----------------|--------|
-| TH15 | 2/2 | `war_base_illyrian_god.png`, `progress_base_drachen_meddler.png` | Beide TH15 (purple/gold Magic-Theme, Monolith, Spell Towers) | ✅ |
-| TH16 | 0/2 | — | — | ❌ fehlt |
+| TH13 | 2/2 | `war_base_001.png`, `war_base_002.png` | TH13 (blue/ice theme) — Bonus-Baseline | ✅ |
+| TH15 | 2/2 | `war_base_001.png` (in-game), `war_base_002.png` (CocBase) | TH15 purple/gold Magic-Theme | ✅ |
+| TH16 | 2/2 | `war_base_001.png`, `war_base_002.png` | TH16 red/gold theme | ✅ |
 | TH17 | 0/2 | — | — | ❌ fehlt |
 | TH18 | 0/2 | — | — | ❌ fehlt |
 
-**Asset-Eingang 2026-08-10:** 8 neue Screenshots angekündigt; im Workspace nur 2 Dateien gefunden (byte-identische Duplikate der bestehenden TH15-Bilder). TH16–TH18 müssen nachgereicht werden.
+**Asset-Eingang 2026-08-10:** 8 Nutzer-Screenshots aus Cursor workspaceStorage importiert. 3× TH15, 2× TH16, 3× TH13 (falsch gelabelt). TH17/TH18 nicht enthalten.
 
-**Smoke Test (2026-08-10):** 2 Bilder getestet — je 32–33 Detections, Modell lädt erfolgreich.
+**Smoke Test (2026-08-10):** 6 Bilder getestet — TH13: 38–53 Det., TH15: 33–52 Det., TH16: 27–33 Det.
 
 ### Empfehlung für Phase 1
 

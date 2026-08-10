@@ -1,29 +1,30 @@
 # Regression Set — CoC Base Analyzer
 
-Ziel: 2 Screenshots pro Rathaus-Level (TH15–TH18), insgesamt 8 Bilder für Phase-0/1-Evaluation.
+Ziel: 2 War-Base-Screenshots pro Rathaus-Level TH15–TH18 (8 Bilder).
 
 ## Inventar (Stand 2026-08-10)
 
 | TH-Level | Anzahl | Status |
 |----------|--------|--------|
+| TH13 | 2/2 | ✅ Bonus-Baseline (falsch gelabelt in Nutzer-Batch) |
 | TH15 | 2/2 | ✅ vollständig |
-| TH16 | 0/2 | ❌ fehlt |
+| TH16 | 2/2 | ✅ vollständig |
 | TH17 | 0/2 | ❌ fehlt |
 | TH18 | 0/2 | ❌ fehlt |
 
-**Gesamt:** 2/8 Bilder (25 %)
+**Ziel TH15–TH18:** 4/8 (50 %)
 
-## Asset-Eingang (2026-08-10)
+## Bild-Zuordnung (8 Nutzer-Screenshots)
 
-Vom Nutzer wurden 8 neue Screenshots angekündigt (je 2× TH15–TH18). Im Workspace wurden nur 2 Dateien gefunden; diese sind Duplikate der bestehenden TH15-Bilder. TH16–TH18 fehlen vollständig.
+| Timestamp | TH | Zielordner |
+|-----------|-----|------------|
+| 16.46.05 | TH15 | `_extras/` (Extra) |
+| 16.46.47 | TH15 | `th15/war_base_002.png` |
+| 16.47.17 | TH16 | `th16/war_base_001.png` |
+| 16.47.51 | TH16 | `th16/war_base_002.png` |
+| 16.48.37 | TH15 | `_extras/` (Extra) |
+| 16.49.34 | TH13 | `th13/war_base_001.png` |
+| 16.50.03 | TH13 | `th13/war_base_002.png` |
+| 16.50.21 | TH13 | `_extras/` (Extra) |
 
-Nachreichung erforderlich:
-- TH16: 2 War-Base-Screenshots
-- TH17: 2 War-Base-Screenshots
-- TH18: 2 War-Base-Screenshots
-
-## Benennung
-
-- War Bases: `war_base_<name>.png` oder `war_base_001.png`
-- Progress Bases: `progress_base_<name>.png`
-- Extras: `extras/` Unterordner (nicht vom Smoke Test verarbeitet, wenn außerhalb der TH-Ordner)
+Bestehendes TH15 in-game: `th15/war_base_001.png` (ILLYRIAN GOD)

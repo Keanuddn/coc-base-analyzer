@@ -1,16 +1,8 @@
-# TH16 Regression Set — ausstehend
+# TH16 Regression Set
 
-**Ziel:** 2 War-Base-Screenshots (Scouting-Ansicht, in-game)
+**Status:** 2/2 War Bases ✅
 
-**Status:** 0/2 Bilder vorhanden
-
-## Fehlende Assets
-
-| Slot | Beschreibung | Status |
-|------|--------------|--------|
-| `war_base_001.png` | TH16 War Base (volcanic/red-gold TH16-Skin) | ❌ fehlt |
-| `war_base_002.png` | TH16 War Base (alternatives Layout) | ❌ fehlt |
-
-## Hinweis (2026-08-10)
-
-Vom Nutzer angegebene 8 Screenshots (TH15–TH18, je 2) wurden nicht vollständig im Workspace gefunden. TH16-Bilder müssen nachgereicht werden, bevor Phase 1 startet.
+| Datei | Quelle | Basistyp | Klassifikation |
+|-------|--------|----------|----------------|
+| `war_base_001.png` | CocBase.Net (16.47.17) | War Base | TH16 — red/gold, volcanic War Map |
+| `war_base_002.png` | CocBase.Net (16.47.51) | War Base | TH16 — red/gold, Zen/Sakura Scenery |

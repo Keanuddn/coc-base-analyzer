@@ -1,6 +1,6 @@
 # Datenstrategie
 
-> Phase 1a/1b abgeschlossen. Phase 1c (synthetisches Rendering) implementiert. Dataset Assembly (1d) folgt.
+> Phase 1a/1b/1c abgeschlossen. Phase 1d (Dataset Assembly) implementiert.
 
 ## Übersicht Phase 1
 
@@ -9,7 +9,7 @@
 | **1a** | Base-Links harvesten (YouTube, Community-Sites) | ✅ Scaffold |
 | **1b** | `link.clashofclans.com` dekodieren | ✅ Structural |
 | **1c** | Basis rendern (ClashKing-Sprites + Domain Randomization) | ✅ Prototype |
-| **1d** | Datensatz assemblieren + Supabase persistieren | 🔲 Geplant |
+| **1d** | Datensatz assemblieren (YOLO + Reports) | ✅ Implementiert |
 
 ## Link Harvesting (1a)
 
@@ -229,12 +229,70 @@ Bis Geometrie verfügbar ist, liefert `demo_render.py` und manuelle Placements d
 
 ### Nächste Schritte
 
-1. **Phase 1d:** `build_dataset.py` — Registry + Placements → Batch-Render → Train/Val-Split
+1. **Manuelles Labeling:** YOLO-`.txt`-Sidecars für `ml/tests/regression_set/` anlegen
 2. **Preview-Parsing:** Layout-Geometrie aus Harvester-Vorschaubildern (oder Community-Files)
 3. Harvester-Lauf → Batch-Decode → Supabase-Persist (`decode_status`)
-4. Sim-to-Real-Vergleich: synthetisches Render vs. `ml/tests/regression_set/th15/`
+4. **Phase 2:** Fine-Tuning auf YOLO-Dataset (noch nicht gestartet)
 
-## Supabase (1d)
+## Dataset Assembly (1d)
+
+Kombiniert synthetische Renders (Phase 1c) und echte Regression-Screenshots zu einem
+Ultralytics-kompatiblen YOLO-Dataset mit Train/Val/Test-Split, TH-Balance-Report und
+Real-vs-Synthetic-Ratio.
+
+### Module
+
+| Modul | Zweck |
+|-------|-------|
+| `dataset/dedup.py` | Content-Dedup für Registry-Einträge (`layout_content_key`) + SHA-256-Bild-Dedup |
+| `dataset/build_dataset.py` | YOLO-Assembly, Split, `data.yaml`, `dataset_report.json` |
+
+Registry-URL-Dedup (1a) bleibt in `BaseRegistry`; `dataset/dedup.py` ergänzt
+**dekodierte Layout-Identität** — gleiche Base unter `/en?` vs `/de?` wird erkannt.
+Low-Level-Fingerprint: `link_decoder/dedup.py` (`layout_content_key`).
+
+### CLI
+
+```bash
+cd data-pipeline
+python -m dataset.build_dataset \
+  --output datasets/processed/yolo_v1 \
+  --include-demo \
+  --include-regression
+```
+
+Optionen: `--train-ratio`, `--val-ratio`, `--test-ratio`, `--seed`, `--user-screenshots`,
+`--synthetic-variants` (Extra-Renders wenn Sprites vorhanden), `--no-render-variants`.
+
+### Output-Layout
+
+```
+datasets/processed/yolo_v1/
+├── data.yaml
+├── dataset_report.json
+├── dataset_report.md
+├── train/images/ + train/labels/
+├── val/images/ + val/labels/ + val/images_unlabeled/
+└── test/images/ + test/labels/ + test/images_unlabeled/
+```
+
+### Real vs Synthetic
+
+| Quelle | Labels | Split |
+|--------|--------|-------|
+| Demo + synthetische Varianten | ✅ perfekt (Renderer) | train/val/test |
+| `ml/tests/regression_set/` | ❌ fehlen initial | `images_unlabeled/` in val/test |
+
+`dataset_report.json` enthält Pflicht-Counter: `totals`, `real_vs_synthetic_ratio`,
+`town_hall_balance`, `unlabeled_real_images.warning`.
+
+**Labeling-TODO:** Echte Screenshots manuell labeln oder Pseudo-Labels mit
+`keremberke/yolov5m-clash-of-clans` erzeugen (manuell prüfen — im Report vermerkt).
+
+TH wird aus Ordner (`th15/`) oder Dateiname (`th13_war_…`) inferiert; `_extras/`-Bilder
+fließen mit ein, können `unknown` TH haben.
+
+## Supabase (Future)
 
 Stub in `db/supabase_client.py`. Geplante Tabelle `base_links`:
 
@@ -254,4 +312,4 @@ ml/tests/regression_set/
 - **Inhalt:** Gegner-Basis-Screenshots (Scouting-Ansicht)
 - TH17/TH18-Misclassification im Regression Set — bekannt, Fix später
 
-Details zu Labeling, Augmentation und Trainingsdaten folgen in Phase 1c/1d.
+Details zu Labeling und Augmentation: siehe Abschnitt **Dataset Assembly (1d)** oben.

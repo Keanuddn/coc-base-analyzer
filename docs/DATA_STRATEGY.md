@@ -7,7 +7,7 @@
 | Sub-Phase | Ziel | Status |
 |-----------|------|--------|
 | **1a** | Base-Links harvesten (YouTube, Community-Sites) | ✅ Scaffold |
-| **1b** | `link.clashofclans.com` dekodieren | 🔲 Stub |
+| **1b** | `link.clashofclans.com` dekodieren | ✅ Structural |
 | **1c** | Basis rendern (ohne Supercell-Assets) | 🔲 Geplant |
 | **1d** | Datensatz assemblieren + Supabase persistieren | 🔲 Geplant |
 
@@ -79,30 +79,94 @@ domains:
 | Backoff bei HTTP 429/503 | Exponentiell, max. 60 s |
 | YouTube API | 1 s Pause zwischen Video-Fetches |
 
-## Link Decoding (1b) — Roadmap
+## Link Decoding (1b)
 
-Share-Links enthalten ein komprimiertes/encodiertes Layout-Payload. Phase 1b reverse-engineert das Format.
+Share-Links (`action=OpenLayout`) enthalten **keine Gebäude-Koordinaten** — nur einen
+24-Byte-opaque Identifier, den Supercell serverseitig auflöst. Reverse-Engineering
+quelle: [nschmeller/clash-bases](https://github.com/nschmeller/clash-bases)
+(`scripts/validate-bases.py`, 5 617+ verifizierte Links).
+
+### URL-Format
+
+```
+https://link.clashofclans.com/{lang}?action=OpenLayout&id=TH{N}%3A{HV|WB}%3A{blob32}
+```
+
+| Segment | Bedeutung |
+|---------|-----------|
+| `TH{N}` | Town-Hall-Level (1–18+) |
+| `HV` | Home Village |
+| `WB` | War Base |
+| `blob32` | 32 Zeichen Base64url → **24 Bytes** |
+
+### Payload-Struktur (24 Bytes, big-endian)
+
+| Offset | Größe | Feld |
+|--------|-------|------|
+| 0–3 | 4 B | Collection index (beobachtet: 0–93) |
+| 4–7 | 4 B | Layout slot: 1, 2 oder 3 (Layout 1/2/War) |
+| 8–23 | 16 B | HMAC-Tag (Supercell-signiert, nicht öffentlich verifizierbar) |
+
+**Wichtig:** Weder `link.clashofclans.com` noch `api.clashofclans.com` liefern
+Gebäude-JSON für einen Link. Die Share-Landingpage ist für alle IDs identisch;
+nur der In-Game-Deep-Link-Handler löst Layouts auf.
 
 ### Ziel-Schema (`DecodedBase`)
 
 ```python
-BuildingPlacement(building_type, level, x, y, rotation)
-TrapPlacement(trap_type, level, x, y)
-DecodedBase(link, town_hall_level, buildings, traps, raw_payload)
+BuildingPlacement(building_type, level, x, y, rotation)  # Phase 1c — nicht aus URL
+TrapPlacement(trap_type, level, x, y)                      # Phase 1c — nicht aus URL
+DecodedBase(
+    link, town_hall_level, village_type, layout_slot,
+    collection_index, layout_fingerprint, buildings, traps, raw_payload
+)
 ```
 
-### Aktueller Stand
+`buildings` / `traps` bleiben leer bis Phase 1c (Rendering) oder manueller
+Import. Der Decoder liefert strukturelle Metadaten + `layout_fingerprint` für
+Content-Dedup.
 
-- `link_decoder/decoder.py` — Stub: URL-Validierung, Payload-Extraktion, Fehler-Logging
-- Fehlgeschlagene Dekodierungen werden in-memory geloggt (`get_failed_decodings()`)
-- **TODO:** Payload-Format analysieren (Community-Tools, clash-bases Referenz)
+### Implementierung
 
-### Nächste Schritte 1b
+| Modul | Zweck |
+|-------|-------|
+| `link_decoder/format.py` | URL-Parsing, Base64url-Dekodierung, Payload-Extraktion |
+| `link_decoder/decoder.py` | `decode_base_link()`, Batch-Decode, Fehler-Logging |
+| `link_decoder/dedup.py` | Content-Fingerprint (`TH{N}:{HV\|WB}:{hmac_hex}`) |
+| `link_decoder/schema.py` | `DecodedBase`, `BuildingPlacement`, `TrapPlacement` |
 
-1. Sample-Links aus Registry sammeln (TH14–TH18)
-2. Payload-Struktur dokumentieren (Base64, Kompression, Building-IDs)
-3. Decoder implementieren + Unit-Tests mit bekannten Layouts
-4. TH-Level aus Gebäude-Set ableiten
+Abgelehnte Formate (mit geloggtem Grund, kein Crash):
+
+- `action=CopyArmy` — Truppen-Link, kein Layout
+- Legacy `?clan=&tag=&token=` — kein öffentlicher Decoder
+- Ungültige Base64url / falsche Payload-Länge / Slot ∉ {1,2,3}
+
+### Content-Dedup (1a-Ergänzung)
+
+Registry dedupliziert URLs (`BaseRegistry._seen_urls`). `dedup.py` vergleicht
+dekodierte Identität — gleiche Layout-ID unter `/en?` vs `/de?` oder mit
+`&ref=` wird erkannt.
+
+### Test-Vektoren
+
+Verifizierte Links aus Supercell-Blog (MCES TH12, 2019) und
+MonsieurSingh/ClashofClans_auto_loot (TH15/TH16). Siehe
+`data-pipeline/tests/test_decoder.py`.
+
+### Offen / User-Input für volle Geometrie
+
+Für `building_type, level, x, y, rotation, traps` aus Links:
+
+1. **Nicht möglich** ohne Supercell-HMAC-Key oder In-Game-Capture
+2. **Alternative Phase 1c:** Layout-Screenshots rendern (Preview-URLs aus Harvest)
+3. **Optional:** Nutzer liefert 1–2 Links + In-Game-Screenshot-Paar zur
+   Validierung des Rendering-Pfads
+
+### Nächste Schritte
+
+1. Phase 1c: Basis aus Preview-Bildern / SVG-Overlays rendern
+2. Harvester-Lauf mit `YOUTUBE_API_KEY` → Registry füllen → Batch-Decode
+3. Supabase-Persist (`decode_status`: `success` | `failed` | `partial`)
 
 ## Supabase (1d)
 

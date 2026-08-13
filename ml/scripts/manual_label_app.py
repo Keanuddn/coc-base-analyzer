@@ -13,6 +13,7 @@ import sys
 from pathlib import Path
 
 import gradio as gr
+from gradio_image_annotation import image_annotator
 from PIL import Image, ImageDraw, ImageFont
 
 ML_ROOT = Path(__file__).resolve().parents[1]
@@ -40,6 +41,7 @@ BOX_COLORS = [
 ]
 
 Box = tuple[int, float, float, float, float]
+AnnotatorValue = dict
 
 
 def _load_class_names() -> list[str]:
@@ -89,6 +91,79 @@ def _class_name(cls_id: int, model_names: list[str]) -> str:
     return str(cls_id)
 
 
+def _hex_to_rgb(hex_color: str) -> tuple[int, int, int]:
+    value = hex_color.lstrip("#")
+    return int(value[0:2], 16), int(value[2:4], 16), int(value[4:6], 16)
+
+
+def _label_colors_for(class_names: list[str], model_names: list[str]) -> list[str]:
+    colors: list[str] = []
+    for name in class_names:
+        cls_id = model_names.index(name) if name in model_names else 0
+        colors.append(BOX_COLORS[cls_id % len(BOX_COLORS)])
+    return colors
+
+
+def _image_size(value: AnnotatorValue | None) -> tuple[int, int]:
+    if not value or value.get("image") is None:
+        return 1, 1
+    image = value["image"]
+    if isinstance(image, Image.Image):
+        return image.size
+    if isinstance(image, str):
+        with Image.open(image) as img:
+            return img.size
+    if hasattr(image, "shape"):
+        height, width = image.shape[:2]
+        return width, height
+    return 1, 1
+
+
+def boxes_to_annotator_value(image_path: Path, boxes: list[Box], model_names: list[str]) -> AnnotatorValue:
+    img = Image.open(image_path).convert("RGB")
+    width, height = img.size
+    ann_boxes = []
+    for cls_id, cx, cy, w, h in boxes:
+        x1 = (cx - w / 2) * width
+        y1 = (cy - h / 2) * height
+        x2 = (cx + w / 2) * width
+        y2 = (cy + h / 2) * height
+        name = _class_name(cls_id, model_names)
+        ann_boxes.append(
+            {
+                "xmin": round(x1),
+                "ymin": round(y1),
+                "xmax": round(x2),
+                "ymax": round(y2),
+                "label": name,
+                "color": _hex_to_rgb(BOX_COLORS[cls_id % len(BOX_COLORS)]),
+            }
+        )
+    return {"image": img, "boxes": ann_boxes}
+
+
+def annotator_value_to_boxes(value: AnnotatorValue | None, model_names: list[str]) -> list[Box]:
+    if not value:
+        return []
+    width, height = _image_size(value)
+    boxes: list[Box] = []
+    for box in value.get("boxes") or []:
+        xmin, ymin = float(box["xmin"]), float(box["ymin"])
+        xmax, ymax = float(box["xmax"]), float(box["ymax"])
+        if xmax <= xmin or ymax <= ymin:
+            continue
+        cx = ((xmin + xmax) / 2) / width
+        cy = ((ymin + ymax) / 2) / height
+        w = (xmax - xmin) / width
+        h = (ymax - ymin) / height
+        label = (box.get("label") or "").strip()
+        if label not in model_names:
+            continue
+        cls_id = model_names.index(label)
+        boxes.append((cls_id, cx, cy, w, h))
+    return boxes
+
+
 def render_annotated_image(image_path: Path, boxes: list[Box], model_names: list[str]) -> Image.Image:
     img = Image.open(image_path).convert("RGB")
     draw = ImageDraw.Draw(img)
@@ -114,7 +189,7 @@ def render_annotated_image(image_path: Path, boxes: list[Box], model_names: list
 
 def _format_box_list(boxes: list[Box], model_names: list[str]) -> str:
     if not boxes:
-        return "_Keine Boxen — Koordinaten eingeben und „Box hinzufügen“._"
+        return "_Keine Boxen — Rechteck auf dem Bild zeichnen und „Box übernehmen“ klicken._"
     lines = []
     for idx, (cls_id, cx, cy, w, h) in enumerate(boxes, start=1):
         name = _class_name(cls_id, model_names)
@@ -157,19 +232,38 @@ class LabelSession:
             return f"Label-Datei: `{label_path.relative_to(REGRESSION_DIR)}` (gespeichert)"
         return f"Label-Datei: `{label_path.relative_to(REGRESSION_DIR)}` (noch nicht gespeichert)"
 
-    def render(self) -> tuple[Image.Image, str, str, str]:
-        img = render_annotated_image(self._current_image(), self.boxes, self.model_names)
-        return img, self.progress_text(), _format_box_list(self.boxes, self.model_names), self.status_text()
+    def annotator_value(self) -> AnnotatorValue:
+        return boxes_to_annotator_value(self._current_image(), self.boxes, self.model_names)
 
-    def _class_to_id(self, class_name: str) -> int:
-        if class_name not in self.model_names:
-            raise ValueError(f"Unbekannte Klasse: {class_name}")
-        return self.model_names.index(class_name)
+    def render(self) -> tuple[AnnotatorValue, Image.Image, str, str, str]:
+        return (
+            self.annotator_value(),
+            render_annotated_image(self._current_image(), self.boxes, self.model_names),
+            self.progress_text(),
+            _format_box_list(self.boxes, self.model_names),
+            self.status_text(),
+        )
 
-    def add_box(self, class_name: str, cx: float, cy: float, w: float, h: float) -> tuple:
-        cls_id = self._class_to_id(class_name)
-        self.boxes.append((cls_id, cx, cy, w, h))
+    def _apply_annotator(self, value: AnnotatorValue | None, class_name: str) -> None:
+        if not value:
+            return
+        boxes = value.get("boxes") or []
+        if boxes:
+            last = boxes[-1]
+            last["label"] = class_name
+            cls_id = self.model_names.index(class_name)
+            last["color"] = _hex_to_rgb(BOX_COLORS[cls_id % len(BOX_COLORS)])
+        self.boxes = annotator_value_to_boxes(value, self.model_names)
         self._cache_current()
+
+    def accept_box(self, value: AnnotatorValue | None, class_name: str) -> tuple:
+        self._apply_annotator(value, class_name)
+        return self.render()
+
+    def sync_annotator(self, value: AnnotatorValue | None) -> tuple:
+        if value:
+            self.boxes = annotator_value_to_boxes(value, self.model_names)
+            self._cache_current()
         return self.render()
 
     def remove_last(self) -> tuple:
@@ -178,12 +272,16 @@ class LabelSession:
             self._cache_current()
         return self.render()
 
-    def save_current(self) -> tuple:
+    def save_current(self, value: AnnotatorValue | None) -> tuple:
+        if value:
+            self.boxes = annotator_value_to_boxes(value, self.model_names)
         _write_yolo_boxes(_label_path_for(self._current_image()), self.boxes)
         self._cache_current()
         return self.render()
 
-    def save_and_next(self) -> tuple:
+    def save_and_next(self, value: AnnotatorValue | None) -> tuple:
+        if value:
+            self.boxes = annotator_value_to_boxes(value, self.model_names)
         _write_yolo_boxes(_label_path_for(self._current_image()), self.boxes)
         self._cache_current()
         if self.index < len(self.images) - 1:
@@ -191,14 +289,18 @@ class LabelSession:
             self._load_boxes_for_current()
         return self.render()
 
-    def prev_image(self) -> tuple:
+    def prev_image(self, value: AnnotatorValue | None) -> tuple:
+        if value:
+            self.boxes = annotator_value_to_boxes(value, self.model_names)
         if self.index > 0:
             self._cache_current()
             self.index -= 1
             self._load_boxes_for_current()
         return self.render()
 
-    def next_image(self) -> tuple:
+    def next_image(self, value: AnnotatorValue | None) -> tuple:
+        if value:
+            self.boxes = annotator_value_to_boxes(value, self.model_names)
         if self.index < len(self.images) - 1:
             self._cache_current()
             self.index += 1
@@ -208,20 +310,37 @@ class LabelSession:
 
 def create_app() -> gr.Blocks:
     session = LabelSession()
-    img0, prog0, boxes0, status0 = session.render()
+    ann0, preview0, prog0, boxes0, status0 = session.render()
     class_choices = session.class_names
+    label_colors = _label_colors_for(class_choices, session.model_names)
     legend = " · ".join(f"{session.model_names.index(n)}:{n}" for n in session.class_names)
 
     with gr.Blocks(title="CoC Manuelles Labeling") as app:
         gr.Markdown("# Manuelles Labeling — Regression-Set")
         gr.Markdown(
-            "Zeichne YOLO-Boxen per **normalisierten Koordinaten** (0–1). "
-            "Vorschau zeigt alle Boxen. Speichern schreibt `.txt` nach `labels/th15/` bzw. `labels/th16/`.\n\n"
+            "Zeichne YOLO-Boxen **direkt auf dem Bild** (Maus ziehen wie in labelImg). "
+            "Klasse wählen, Rechteck aufziehen, dann **Box übernehmen**. "
+            "Speichern schreibt `.txt` nach `labels/th15/` bzw. `labels/th16/`.\n\n"
             f"**Aktive Klassen:** {legend}"
         )
 
         with gr.Row():
-            preview = gr.Image(value=img0, label="Vorschau mit Boxen", type="pil", interactive=False)
+            annotator = image_annotator(
+                value=ann0,
+                label="Box zeichnen (ziehen oder zwei Klicks)",
+                label_list=class_choices,
+                label_colors=label_colors,
+                use_default_label=True,
+                image_type="pil",
+                sources=[],
+                show_clear_button=False,
+                show_download_button=False,
+                height=720,
+                interactive=True,
+            )
+
+        with gr.Row():
+            preview = gr.Image(value=preview0, label="Vorschau mit allen Boxen", type="pil", interactive=False)
 
         progress = gr.Markdown(prog0)
         box_list = gr.Markdown(boxes0)
@@ -229,15 +348,9 @@ def create_app() -> gr.Blocks:
 
         with gr.Row():
             class_in = gr.Dropdown(choices=class_choices, value=class_choices[0], label="Klasse")
-        with gr.Row():
-            cx_in = gr.Slider(0, 1, value=0.5, step=0.001, label="x_center")
-            cy_in = gr.Slider(0, 1, value=0.5, step=0.001, label="y_center")
-        with gr.Row():
-            w_in = gr.Slider(0.001, 1, value=0.05, step=0.001, label="Breite")
-            h_in = gr.Slider(0.001, 1, value=0.05, step=0.001, label="Höhe")
 
         with gr.Row():
-            btn_add = gr.Button("Box hinzufügen", variant="secondary")
+            btn_accept = gr.Button("Box übernehmen", variant="secondary")
             btn_remove = gr.Button("Letzte löschen")
 
         with gr.Row():
@@ -246,14 +359,15 @@ def create_app() -> gr.Blocks:
             btn_save = gr.Button("Speichern", variant="secondary")
             btn_save_next = gr.Button("Speichern & Weiter", variant="primary")
 
-        outputs = [preview, progress, box_list, status]
+        outputs = [annotator, preview, progress, box_list, status]
 
-        btn_add.click(session.add_box, inputs=[class_in, cx_in, cy_in, w_in, h_in], outputs=outputs)
+        btn_accept.click(session.accept_box, inputs=[annotator, class_in], outputs=outputs)
         btn_remove.click(session.remove_last, outputs=outputs)
-        btn_prev.click(session.prev_image, outputs=outputs)
-        btn_next.click(session.next_image, outputs=outputs)
-        btn_save.click(session.save_current, outputs=outputs)
-        btn_save_next.click(session.save_and_next, outputs=outputs)
+        btn_prev.click(session.prev_image, inputs=[annotator], outputs=outputs)
+        btn_next.click(session.next_image, inputs=[annotator], outputs=outputs)
+        btn_save.click(session.save_current, inputs=[annotator], outputs=outputs)
+        btn_save_next.click(session.save_and_next, inputs=[annotator], outputs=outputs)
+        annotator.change(session.sync_annotator, inputs=[annotator], outputs=outputs)
 
     return app
 

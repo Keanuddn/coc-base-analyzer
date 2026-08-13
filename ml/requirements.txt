@@ -13,3 +13,4 @@ datasets>=2.14.0
 ipykernel>=6.25.0
 nbconvert>=7.0.0
 gradio>=4.0.0
+gradio-image-annotation>=0.5.2

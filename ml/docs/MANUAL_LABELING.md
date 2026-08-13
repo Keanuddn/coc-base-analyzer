@@ -15,14 +15,16 @@ cd coc-base-analyzer/ml
 
 ### Ablauf in der App
 
-1. Vorschau zeigt das Bild mit vorhandenen Boxen (falls `.txt` existiert)
-2. **Klasse** wählen, **x_center / y_center / Breite / Höhe** (0–1 normalisiert) einstellen
-3. **Box hinzufügen** — Box erscheint in der Vorschau und in der Liste
-4. **Letzte löschen** entfernt die zuletzt hinzugefügte Box
+1. Großes Bild mit **Bounding-Box-Editor** — Rechteck per **Maus ziehen** (click-drag) oder zwei Klicks zeichnen, wie in labelImg
+2. **Klasse** im Dropdown wählen (12 Klassen aus `classes.txt`)
+3. Rechteck auf dem Bild aufziehen, dann **Box übernehmen** — Box erscheint in der Liste und in der Vorschau
+4. Boxen im Editor anklicken, verschieben oder an den Ecken skalieren; **Letzte löschen** entfernt die zuletzt gespeicherte Box
 5. **Speichern** schreibt die `.txt`-Datei; **Speichern & Weiter** speichert und geht zum nächsten Bild
 6. **Zurück / Weiter** navigiert zwischen den 4 Kern-Bildern (Änderungen bleiben im Speicher bis Speichern)
 
 **Klassen:** Dropdown aus `classes.txt` — 12 aktive Klassen, keine Hero-Pads (`kingpad`, `queenpad`, `rcpad`, `wardenpad`).
+
+**Technik:** `gradio-image-annotation` — kein manuelles Einstellen von Koordinaten-Slidern mehr nötig.
 
 ## labelImg (veraltet)
 

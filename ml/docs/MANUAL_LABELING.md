@@ -97,6 +97,15 @@ cd coc-base-analyzer/data-pipeline
 
 Ohne manuelle Labels werden die 4 War-Bases als unlabeled unter `images_unlabeled/` abgelegt.
 
+## First training pass (2026-08-16)
+
+Incomplete manual labels were accepted for the first fine-tune (`arbeite damit erstmal`):
+
+- **`th13` is Town Hall.** The name comes from the keremberke YOLOv5 head. There is no separate TH15/TH16 class; halls labeled with this slot are TH15/TH16 visually.
+- **Dataset mixes TH15 and TH16** (2 core war bases each). That mix is expected for this pass.
+- **Labels are incomplete** (forgotten buildings, no Town Hall boxes in the first 4 files). Source `.txt` files were not rewritten.
+- Browser labeler writes **keremberke model indices** (0–15), not compact `classes.txt` 0–11 indices.
+
 ## Tipps
 
 - Rathaus (`th13`) = visuell TH15/TH16, im Baseline-Modell heißt die Klasse noch `th13`

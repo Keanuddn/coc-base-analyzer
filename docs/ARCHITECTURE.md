@@ -270,5 +270,6 @@ Keremberke YOLOv5-Checkpoints erfordern `weights_only=False` beim `torch.load` �
 
 - Pseudo-Labels sind **Rauschen**, kein Ground Truth
 - TH14–18-Klassen sind Platzhalter in `th_classes.yaml`, noch nicht im Modell-Head
-- CPU-Training: nur Smoke Test; volles Fine-Tuning auf GPU/Colab
+- CPU-Training: nur Smoke Test; volles Fine-Tuning auf GPU/Colab **oder Apple MPS**
+- **First training pass (2026-08-16):** 4 manuell gelabelte Kern-War-Bases (TH15+TH16 gemischt). Klasse `th13` ist das Rathaus (Legacy-Name aus keremberke) — TH15/TH16-Halls teilen denselben Slot. Labels sind unvollständig (fehlende Gebäude akzeptiert). Siehe `ml/docs/MANUAL_LABELING.md`.
 

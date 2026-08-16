@@ -15,15 +15,27 @@ cd coc-base-analyzer/ml
 
 ### Ablauf in der App
 
-1. **Klasse** im Dropdown wählen (12 Klassen aus `classes.txt`)
-2. Auf dem Bild **ziehen** (Maus gedrückt halten, loslassen) — die Box wird sofort übernommen und eingezeichnet
-3. **Escape** bricht eine angefangene Box ab; **Letzte löschen** entfernt die zuletzt gespeicherte Box
-4. **Speichern** schreibt die `.txt`-Datei; **Speichern & Weiter** speichert und geht zum nächsten Bild
-5. **Zurück / Weiter** navigiert zwischen den 4 Kern-Bildern (Änderungen bleiben im Speicher bis Speichern)
+1. Optional **Vorschläge laden** — keremberke zeichnet gestrichelte orange Boxen (ohne Hero-Pads, conf 0.40)
+2. Vorschläge prüfen: **Alle übernehmen**, oder einzelne per **Klick + Entf / Auswahl löschen** verwerfen
+3. **Klasse** im Dropdown wählen und fehlende Boxen **ziehen**
+4. **Escape** bricht eine angefangene Box ab; **Letzte löschen** entfernt die zuletzt gezeichnete Box
+5. **Speichern** schreibt nur bestätigte Boxen in die `.txt`-Datei; **Speichern & Weiter** speichert und geht zum nächsten Bild
+6. **Zurück / Weiter** navigiert zwischen den 4 Kern-Bildern (Änderungen bleiben im Speicher bis Speichern)
 
 **Klassen:** Dropdown aus `classes.txt` — 12 aktive Klassen, keine Hero-Pads (`kingpad`, `queenpad`, `rcpad`, `wardenpad`).
 
-**Technik:** FastAPI liefert PNG-Bytes an einen HTML-Canvas (kein Gradio-Dateiserving). Bilder werden für die Anzeige auf max. 1200 px Breite skaliert; YOLO-Koordinaten bleiben korrekt normalisiert.
+### Automatisch vs. manuell
+
+| Was | Automatisch? | Qualität |
+|-----|--------------|----------|
+| **Synthetische Renders** (`python -m dataset.generate_synthetic`) | Ja — Layout + YOLO-Boxen aus dem Isometric-Renderer | Hoch (perfekte Labels), aber **nicht** echte In-Game-Screenshots |
+| **keremberke-Vorschläge** in dieser App (**Vorschläge laden**) | Halbautomatisch — Boxen vorschlagen, du bestätigst | Unzuverlässig auf TH15/16 (falsche Klassen, fehlende Gebäude). Hero-Pads werden gefiltert, conf=0.40 |
+| **OpenLayout-Links** | Nein — enthalten keine Gebäudekoordinaten | — |
+| **Echte War-Base-Screenshots** | Nein — weiterhin menschlich | Pflicht, wenn das Modell auf echten Fotos treffen soll |
+
+100 % automatische Labels auf echten Screenshots sind **noch nicht** hochwertig. Workflow: Synthetik skalieren; in der App Vorschläge prüfen/löschen/ergänzen; speichern.
+
+**Technik:** FastAPI liefert PNG-Bytes an einen HTML-Canvas (kein Gradio-Dateiserving). Bilder werden für die Anzeige auf max. 1200 px Breite skaliert; YOLO-Koordinaten bleiben korrekt normalisiert. Das keremberke-Modell wird einmal beim Serverstart geladen.
 
 ## labelImg (veraltet)
 
@@ -79,6 +91,15 @@ Alte Pseudo-Labels liegen unter `labels/_pseudo_backup/` — **nicht** für manu
 
 ## Dataset neu bauen (nach dem Labeling)
 
+Synthetik erzeugen (Standard: 200 Layouts, gitignored unter `datasets/processed/synthetic_v1/`):
+
+```bash
+cd coc-base-analyzer/data-pipeline
+.venv/bin/python -m dataset.generate_synthetic --count 200
+```
+
+Dann YOLO-Datensatz bauen:
+
 ```bash
 cd coc-base-analyzer/data-pipeline
 
@@ -86,7 +107,8 @@ cd coc-base-analyzer/data-pipeline
   --output datasets/processed/yolo_v1 \
   --include-demo \
   --include-regression \
-  --manual-labels-only
+  --manual-labels-only \
+  --include-synthetic-bulk
 ```
 
 `--manual-labels-only`:

@@ -8,6 +8,7 @@ Run:
 
 from __future__ import annotations
 
+import hashlib
 import logging
 import sys
 from pathlib import Path
@@ -24,6 +25,7 @@ from model_utils import deprecated_class_indices, model_class_names  # noqa: E40
 REGRESSION_DIR = ML_ROOT / "tests" / "regression_set"
 LABELS_DIR = REGRESSION_DIR / "labels"
 CLASSES_PATH = REGRESSION_DIR / "classes.txt"
+PREVIEW_DIR = Path("/tmp")
 PORT = 8766
 MAX_DISPLAY_WIDTH = 1200
 
@@ -217,9 +219,22 @@ class LabelSession:
 
         return display
 
-    def render(self, pending: PendingCorner = None) -> tuple[Image.Image, str, str, str, str]:
+    def _preview_path(self, pending: PendingCorner) -> Path:
+        source = self._current_image().resolve()
+        key = f"{source}|{self.boxes!r}|{pending!r}"
+        digest = hashlib.md5(key.encode()).hexdigest()[:12]
+        return PREVIEW_DIR / f"coc_label_preview_{digest}.jpg"
+
+    def _display_filepath(self, pending: PendingCorner = None) -> str:
+        if not self.boxes and pending is None:
+            return str(self._current_image().resolve())
+        preview = self._preview_path(pending)
+        self.render_image(pending).save(preview, "JPEG", quality=90)
+        return str(preview.resolve())
+
+    def render(self, pending: PendingCorner = None) -> tuple[str, str, str, str, str]:
         return (
-            self.render_image(pending),
+            self._display_filepath(pending),
             self.progress_text(),
             _format_box_list(self.boxes, self.model_names),
             self.status_text(),
@@ -299,8 +314,7 @@ def create_app() -> gr.Blocks:
             image = gr.Image(
                 value=img0,
                 label="Box zeichnen (zwei Klicks: Ecke 1, Ecke 2)",
-                type="pil",
-                format="png",
+                type="filepath",
                 interactive=True,
                 sources=[],
                 buttons=[],
@@ -348,7 +362,13 @@ def create_app() -> gr.Blocks:
 def main() -> int:
     logging.basicConfig(level=logging.INFO, format="%(levelname)s %(message)s")
     print(f"\nÖffne http://127.0.0.1:{PORT}\n")
-    create_app().launch(server_name="127.0.0.1", server_port=PORT, share=False, show_error=True)
+    create_app().launch(
+        server_name="127.0.0.1",
+        server_port=PORT,
+        share=False,
+        show_error=True,
+        allowed_paths=[str(REGRESSION_DIR.resolve()), str(PREVIEW_DIR.resolve())],
+    )
     return 0
 
 

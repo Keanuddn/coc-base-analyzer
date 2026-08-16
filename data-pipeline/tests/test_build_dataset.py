@@ -234,6 +234,26 @@ class TestManualLabels:
         # active index 3 in classes.txt is "canon" → model index 3
         assert real_labels[0].read_text(encoding="utf-8").startswith("3 ")
 
+    def test_include_synthetic_bulk(self, tmp_path: Path) -> None:
+        bulk = tmp_path / "synthetic_v1" / "th15"
+        bulk.mkdir(parents=True)
+        _write_minimal_yolo_pair(bulk, "synthetic_0001")
+        output = tmp_path / "yolo_bulk"
+        config = BuildDatasetConfig(
+            output_dir=output,
+            include_demo=False,
+            include_regression=False,
+            include_synthetic_bulk=True,
+            synthetic_bulk_dir=tmp_path / "synthetic_v1",
+            render_synthetic_variants=False,
+            seed=5,
+        )
+        result = build_yolo_dataset(config)
+        report = json.loads(result.report_path.read_text(encoding="utf-8"))
+        assert report["totals"]["synthetic"] == 1
+        assert report["totals"]["labeled"] == 1
+        assert report["town_hall_balance"]["TH15"]["total"] == 1
+
 
 class TestRegistryDedupIntegration:
     def test_registry_content_dedup(self) -> None:

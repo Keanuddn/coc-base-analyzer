@@ -27,6 +27,7 @@ PIPELINE_ROOT = Path(__file__).resolve().parents[2]
 REPO_ROOT = PIPELINE_ROOT.parent
 
 DEFAULT_DEMO_DIR = PIPELINE_ROOT / "datasets" / "processed" / "demo"
+DEFAULT_SYNTHETIC_BULK_DIR = PIPELINE_ROOT / "datasets" / "processed" / "synthetic_v1"
 DEFAULT_REGRESSION_DIR = REPO_ROOT / "ml" / "tests" / "regression_set"
 DEFAULT_PSEUDO_LABELS_DIR = DEFAULT_REGRESSION_DIR / "labels"
 DEFAULT_CLASSES_FILE = DEFAULT_REGRESSION_DIR / "classes.txt"
@@ -60,10 +61,12 @@ class BuildDatasetConfig:
     seed: int = 42
     include_demo: bool = False
     include_regression: bool = False
+    include_synthetic_bulk: bool = False
     include_pseudo_labels: bool = False
     manual_labels_only: bool = False
     user_screenshots_dir: Path | None = None
     demo_dir: Path = DEFAULT_DEMO_DIR
+    synthetic_bulk_dir: Path = DEFAULT_SYNTHETIC_BULK_DIR
     regression_dir: Path = DEFAULT_REGRESSION_DIR
     pseudo_labels_dir: Path = DEFAULT_PSEUDO_LABELS_DIR
     approved_reviews_path: Path | None = None
@@ -166,6 +169,11 @@ def collect_synthetic_samples(config: BuildDatasetConfig) -> list[DatasetSample]
             )
 
     return samples
+
+
+def collect_synthetic_bulk_samples(config: BuildDatasetConfig) -> list[DatasetSample]:
+    """Collect pre-rendered bulk synthetics (``synthetic_v1/th15|th16/*.png``)."""
+    return _collect_labeled_pairs(config.synthetic_bulk_dir, origin="synthetic", default_th=None)
 
 
 def _load_approved_reviews(path: Path | None) -> set[str] | None:
@@ -639,11 +647,16 @@ def build_yolo_dataset(config: BuildDatasetConfig) -> BuildDatasetResult:
 
     if config.include_demo:
         samples.extend(collect_synthetic_samples(config))
+    if config.include_synthetic_bulk:
+        samples.extend(collect_synthetic_bulk_samples(config))
     if config.include_regression or config.user_screenshots_dir:
         samples.extend(collect_real_samples(config))
 
     if not samples:
-        raise ValueError("No samples collected — enable --include-demo and/or --include-regression")
+        raise ValueError(
+            "No samples collected — enable --include-demo, --include-synthetic-bulk, "
+            "and/or --include-regression"
+        )
 
     assign_splits(
         samples,
@@ -693,6 +706,17 @@ def main(argv: list[str] | None = None) -> int:
         help=f"Output directory (default: {DEFAULT_OUTPUT})",
     )
     parser.add_argument("--include-demo", action="store_true", help="Include synthetic demo renders")
+    parser.add_argument(
+        "--include-synthetic-bulk",
+        action="store_true",
+        help="Include bulk synthetic renders from datasets/processed/synthetic_v1/",
+    )
+    parser.add_argument(
+        "--synthetic-bulk-dir",
+        type=Path,
+        default=DEFAULT_SYNTHETIC_BULK_DIR,
+        help="Directory with bulk synthetic PNG+txt (default: synthetic_v1)",
+    )
     parser.add_argument(
         "--include-regression",
         action="store_true",
@@ -758,8 +782,16 @@ def main(argv: list[str] | None = None) -> int:
         format="%(levelname)s %(message)s",
     )
 
-    if not args.include_demo and not args.include_regression and not args.user_screenshots:
-        parser.error("Specify at least one of --include-demo, --include-regression, --user-screenshots")
+    if (
+        not args.include_demo
+        and not args.include_regression
+        and not args.user_screenshots
+        and not args.include_synthetic_bulk
+    ):
+        parser.error(
+            "Specify at least one of --include-demo, --include-synthetic-bulk, "
+            "--include-regression, --user-screenshots"
+        )
     if args.manual_labels_only and args.include_pseudo_labels:
         parser.error("Use either --manual-labels-only or --include-pseudo-labels, not both")
 
@@ -771,10 +803,12 @@ def main(argv: list[str] | None = None) -> int:
         seed=args.seed,
         include_demo=args.include_demo,
         include_regression=args.include_regression,
+        include_synthetic_bulk=args.include_synthetic_bulk,
         include_pseudo_labels=args.include_pseudo_labels,
         manual_labels_only=args.manual_labels_only,
         user_screenshots_dir=args.user_screenshots,
         demo_dir=args.demo_dir,
+        synthetic_bulk_dir=args.synthetic_bulk_dir,
         regression_dir=args.regression_dir,
         pseudo_labels_dir=args.regression_dir / "labels",
         approved_reviews_path=args.approved_reviews,

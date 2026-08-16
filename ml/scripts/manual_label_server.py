@@ -11,6 +11,7 @@ from __future__ import annotations
 import io
 import logging
 import sys
+from contextlib import asynccontextmanager
 from pathlib import Path
 
 from fastapi import FastAPI, HTTPException
@@ -21,13 +22,19 @@ from pydantic import BaseModel, Field
 ML_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ML_ROOT / "src"))
 
-from model_utils import deprecated_class_indices, model_class_names  # noqa: E402
+from model_utils import (  # noqa: E402
+    deprecated_class_indices,
+    load_keremberke_yolov5,
+    model_class_names,
+)
 
 REGRESSION_DIR = ML_ROOT / "tests" / "regression_set"
 LABELS_DIR = REGRESSION_DIR / "labels"
 CLASSES_PATH = REGRESSION_DIR / "classes.txt"
 PORT = 8766
 MAX_DISPLAY_WIDTH = 1200
+PROPOSAL_CONF = 0.40
+PROPOSAL_COLOR = "#ff8800"
 
 CORE_IMAGES = [
     REGRESSION_DIR / "th15" / "war_base_illyrian_god.png",
@@ -64,12 +71,11 @@ def _label_path_for(image_path: Path) -> Path:
     return LABELS_DIR / rel.with_suffix(".txt")
 
 
-def _read_yolo_boxes(label_path: Path) -> list[Box]:
-    if not label_path.is_file():
-        return []
+def yolo_lines_to_boxes(lines: list[str]) -> list[Box]:
+    """Parse YOLO label lines and drop deprecated hero-pad classes."""
     deprecated = deprecated_class_indices()
     boxes: list[Box] = []
-    for line in label_path.read_text(encoding="utf-8").splitlines():
+    for line in lines:
         parts = line.strip().split()
         if len(parts) < 5:
             continue
@@ -79,6 +85,17 @@ def _read_yolo_boxes(label_path: Path) -> list[Box]:
         cx, cy, w, h = map(float, parts[1:5])
         boxes.append((cls_id, cx, cy, w, h))
     return boxes
+
+
+def filter_proposal_boxes(boxes: list[Box]) -> list[Box]:
+    deprecated = deprecated_class_indices()
+    return [box for box in boxes if box[0] not in deprecated]
+
+
+def _read_yolo_boxes(label_path: Path) -> list[Box]:
+    if not label_path.is_file():
+        return []
+    return yolo_lines_to_boxes(label_path.read_text(encoding="utf-8").splitlines())
 
 
 def _write_yolo_boxes(label_path: Path, boxes: list[Box]) -> None:
@@ -129,52 +146,112 @@ def _box_from_display_rect(
     return model_names.index(class_name), cx, cy, w, h
 
 
+_proposal_model = None
+_proposal_model_error: str | None = None
+
+
+def get_proposal_model():
+    """Load keremberke once; reuse for all proposal requests."""
+    global _proposal_model, _proposal_model_error
+    if _proposal_model is not None:
+        return _proposal_model
+    if _proposal_model_error is not None:
+        raise RuntimeError(_proposal_model_error)
+    try:
+        _proposal_model = load_keremberke_yolov5(conf=PROPOSAL_CONF, iou=0.45)
+    except Exception as exc:  # noqa: BLE001 — surface load failures in the UI
+        _proposal_model_error = str(exc)
+        raise RuntimeError(_proposal_model_error) from exc
+    return _proposal_model
+
+
+def default_proposal_runner(image_path: Path, conf: float = PROPOSAL_CONF) -> list[Box]:
+    from pseudo_label import pseudo_label_image
+
+    model = get_proposal_model()
+    model.conf = conf
+    lines, _, _ = pseudo_label_image(
+        model,
+        image_path,
+        model_class_names(),
+        640,
+        include_deprecated=False,
+    )
+    return yolo_lines_to_boxes(lines)
+
+
 class LabelSession:
-    def __init__(self) -> None:
+    def __init__(
+        self,
+        *,
+        images: list[Path] | None = None,
+        regression_dir: Path | None = None,
+        labels_dir: Path | None = None,
+    ) -> None:
+        self.regression_dir = regression_dir or REGRESSION_DIR
+        self.labels_dir = labels_dir or (self.regression_dir / "labels")
         self.model_names = model_class_names()
         self.class_names = _load_class_names()
-        self.images = [p for p in CORE_IMAGES if p.is_file()]
+        self.images = images if images is not None else [p for p in CORE_IMAGES if p.is_file()]
         if not self.images:
             raise FileNotFoundError("Keine Regression-Bilder in th15/ oder th16/ gefunden")
         self.index = 0
         self.box_cache: dict[str, list[Box]] = {}
+        self.proposal_cache: dict[str, list[Box]] = {}
         self.boxes: list[Box] = []
+        self.proposals: list[Box] = []
         self.display_size: tuple[int, int] = (1, 1)
         self._load_boxes_for_current()
+
+    def _rel_image_path(self, image_path: Path | None = None) -> str:
+        path = image_path or self._current_image()
+        return str(path.relative_to(self.regression_dir))
+
+    def _label_path_for(self, image_path: Path | None = None) -> Path:
+        rel = Path(self._rel_image_path(image_path)).with_suffix(".txt")
+        return self.labels_dir / rel
 
     def _current_image(self) -> Path:
         return self.images[self.index]
 
     def _cache_current(self) -> None:
-        self.box_cache[_rel_image_path(self._current_image())] = list(self.boxes)
+        rel = self._rel_image_path()
+        self.box_cache[rel] = list(self.boxes)
+        self.proposal_cache[rel] = list(self.proposals)
 
     def _load_boxes_for_current(self) -> None:
-        rel = _rel_image_path(self._current_image())
+        rel = self._rel_image_path()
         if rel in self.box_cache:
             self.boxes = list(self.box_cache[rel])
         else:
-            self.boxes = _read_yolo_boxes(_label_path_for(self._current_image()))
+            self.boxes = _read_yolo_boxes(self._label_path_for())
+        self.proposals = list(self.proposal_cache.get(rel, []))
         with Image.open(self._current_image()) as img:
             _, self.display_size = _resize_for_display(img.convert("RGB"))
 
+    def _box_row(self, idx: int, box: Box, *, proposed: bool) -> dict:
+        cls_id, cx, cy, w, h = box
+        return {
+            "index": idx,
+            "cls_id": cls_id,
+            "name": _class_name(cls_id, self.model_names),
+            "cx": cx,
+            "cy": cy,
+            "w": w,
+            "h": h,
+            "color": PROPOSAL_COLOR if proposed else BOX_COLORS[cls_id % len(BOX_COLORS)],
+            "proposed": proposed,
+        }
+
     def to_state(self) -> dict:
-        rel = _rel_image_path(self._current_image())
-        label_path = _label_path_for(self._current_image())
-        box_rows = []
-        for idx, (cls_id, cx, cy, w, h) in enumerate(self.boxes, start=1):
-            name = _class_name(cls_id, self.model_names)
-            box_rows.append(
-                {
-                    "index": idx,
-                    "cls_id": cls_id,
-                    "name": name,
-                    "cx": cx,
-                    "cy": cy,
-                    "w": w,
-                    "h": h,
-                    "color": BOX_COLORS[cls_id % len(BOX_COLORS)],
-                }
-            )
+        rel = self._rel_image_path()
+        label_path = self._label_path_for()
+        box_rows = [self._box_row(idx, box, proposed=False) for idx, box in enumerate(self.boxes, start=1)]
+        proposal_rows = [self._box_row(idx, box, proposed=True) for idx, box in enumerate(self.proposals, start=1)]
+        try:
+            label_rel = str(label_path.relative_to(self.regression_dir))
+        except ValueError:
+            label_rel = str(label_path)
         return {
             "index": self.index,
             "total": len(self.images),
@@ -188,8 +265,10 @@ class LabelSession:
                 if n in self.model_names
             ],
             "boxes": box_rows,
+            "proposals": proposal_rows,
+            "proposal_conf": PROPOSAL_CONF,
             "saved": label_path.is_file(),
-            "label_rel": str(label_path.relative_to(REGRESSION_DIR)),
+            "label_rel": label_rel,
         }
 
     def render_image_bytes(self) -> bytes:
@@ -211,8 +290,26 @@ class LabelSession:
             self.boxes.pop()
             self._cache_current()
 
+    def delete_item(self, kind: str, index: int) -> None:
+        target = self.proposals if kind == "proposal" else self.boxes
+        if index < 0 or index >= len(target):
+            raise ValueError("Ungültiger Box-Index")
+        target.pop(index)
+        self._cache_current()
+
+    def accept_all_proposals(self) -> None:
+        self.boxes.extend(self.proposals)
+        self.proposals = []
+        self._cache_current()
+
+    def load_proposals(self, runner=None, conf: float = PROPOSAL_CONF) -> None:
+        run = runner or default_proposal_runner
+        raw = run(self._current_image(), conf)
+        self.proposals = filter_proposal_boxes(raw)
+        self._cache_current()
+
     def save_current(self) -> None:
-        _write_yolo_boxes(_label_path_for(self._current_image()), self.boxes)
+        _write_yolo_boxes(self._label_path_for(), self.boxes)
         self._cache_current()
 
     def save_and_next(self) -> None:
@@ -235,7 +332,19 @@ class LabelSession:
 
 
 session = LabelSession()
-app = FastAPI(title="CoC Manuelles Labeling")
+
+
+@asynccontextmanager
+async def lifespan(_app: FastAPI):
+    try:
+        get_proposal_model()
+        logging.info("keremberke proposal model loaded (conf=%.2f)", PROPOSAL_CONF)
+    except Exception as exc:  # noqa: BLE001
+        logging.warning("keremberke proposal model not loaded: %s", exc)
+    yield
+
+
+app = FastAPI(title="CoC Manuelles Labeling", lifespan=lifespan)
 
 
 class AddBoxRequest(BaseModel):
@@ -248,6 +357,11 @@ class AddBoxRequest(BaseModel):
 
 class NavRequest(BaseModel):
     direction: str = Field(pattern="^(prev|next)$")
+
+
+class DeleteItemRequest(BaseModel):
+    kind: str = Field(pattern="^(box|proposal)$")
+    index: int
 
 
 HTML_PAGE = """<!DOCTYPE html>
@@ -302,11 +416,14 @@ HTML_PAGE = """<!DOCTYPE html>
   button { cursor: pointer; }
   button.primary { background: #1a73e8; border-color: #1a73e8; color: #fff; }
   button.danger { color: var(--danger); }
+  button.proposal { background: #c2640a; border-color: #c2640a; color: #fff; }
   button:disabled { opacity: 0.5; cursor: not-allowed; }
   .meta { margin: 0.75rem 0; }
   .meta strong { color: var(--accent); }
   .box-list { background: var(--panel); border: 1px solid var(--border); border-radius: 8px; padding: 0.75rem 1rem; min-height: 3rem; }
   .box-list li { margin: 0.25rem 0; font-family: ui-monospace, monospace; font-size: 0.9rem; }
+  .box-list li.proposed { color: #ffb366; }
+  .box-list li.selected { outline: 1px solid var(--accent); }
   .empty { color: var(--muted); font-style: italic; }
   .hint { color: var(--muted); font-size: 0.9rem; margin-top: 0.5rem; }
   .status.saved { color: #81c995; }
@@ -317,16 +434,18 @@ HTML_PAGE = """<!DOCTYPE html>
 <div class="wrap">
   <h1>Manuelles Labeling — Regression-Set</h1>
   <p class="intro">
-    YOLO-Boxen per <strong>Mausziehen</strong> setzen: Klasse wählen, auf dem Bild
-    <strong>ziehen</strong> (Maus gedrückt halten) — die Box wird beim Loslassen übernommen.
-    Speichern schreibt <code>.txt</code> nach <code>labels/th15/</code> bzw. <code>labels/th16/</code>.
+    YOLO-Boxen per <strong>Mausziehen</strong> setzen. Optional
+    <strong>Vorschläge laden</strong> (keremberke, conf 0.40, ohne Hero-Pads) —
+    gestrichelte orange Boxen prüfen, <strong>Alle übernehmen</strong> oder
+    einzelne per Klick + Entf löschen. Speichern schreibt nur bestätigte Boxen
+    nach <code>labels/th15/</code> bzw. <code>labels/th16/</code>.
   </p>
   <div class="legend" id="legend"></div>
 
   <div class="canvas-wrap">
     <canvas id="canvas"></canvas>
   </div>
-  <p class="hint">Tipp: Escape bricht eine angefangene Box ab.</p>
+  <p class="hint">Tipp: kurzer Klick wählt eine Box; Escape bricht eine angefangene Box ab; Entf löscht die Auswahl.</p>
 
   <div class="toolbar">
     <label for="class-select">Klasse:</label>
@@ -334,6 +453,9 @@ HTML_PAGE = """<!DOCTYPE html>
   </div>
 
   <div class="actions">
+    <button type="button" id="btn-propose" class="proposal">Vorschläge laden</button>
+    <button type="button" id="btn-accept">Alle übernehmen</button>
+    <button type="button" id="btn-delete-sel" class="danger">Auswahl löschen</button>
     <button type="button" id="btn-remove" class="danger">Letzte löschen</button>
     <button type="button" id="btn-prev">Zurück</button>
     <button type="button" id="btn-next">Weiter</button>
@@ -359,6 +481,7 @@ let img = new Image();
 let dragging = false;
 let dragStart = null;
 let previewRect = null;
+let selected = null;
 
 async function api(path, opts = {}) {
   const res = await fetch(path, {
@@ -395,12 +518,18 @@ function yoloToRect(box) {
   return { x, y, w: bw, h: bh };
 }
 
-function drawBox(rect, color, label, dashed = false) {
+function drawBox(rect, color, label, dashed = false, highlight = false) {
   ctx.save();
   ctx.strokeStyle = color;
-  ctx.lineWidth = 2;
+  ctx.lineWidth = highlight ? 4 : 2;
   if (dashed) ctx.setLineDash([6, 4]);
   ctx.strokeRect(rect.x, rect.y, rect.w, rect.h);
+  if (highlight) {
+    ctx.setLineDash([]);
+    ctx.strokeStyle = "#ffffff";
+    ctx.lineWidth = 1;
+    ctx.strokeRect(rect.x - 2, rect.y - 2, rect.w + 4, rect.h + 4);
+  }
   if (label) {
     ctx.fillStyle = color;
     ctx.font = "14px sans-serif";
@@ -409,32 +538,73 @@ function drawBox(rect, color, label, dashed = false) {
   ctx.restore();
 }
 
+function isSelected(kind, idx0) {
+  return selected && selected.kind === kind && selected.index === idx0;
+}
+
 function redraw() {
   if (!img.complete || !state) return;
   ctx.clearRect(0, 0, canvas.width, canvas.height);
   ctx.drawImage(img, 0, 0);
-  for (const box of state.boxes) {
-    drawBox(yoloToRect(box), box.color, box.name);
-  }
+  (state.boxes || []).forEach((box, i) => {
+    drawBox(yoloToRect(box), box.color, box.name, false, isSelected("box", i));
+  });
+  (state.proposals || []).forEach((box, i) => {
+    drawBox(yoloToRect(box), box.color || "#ff8800", box.name, true, isSelected("proposal", i));
+  });
   if (previewRect) {
     drawBox(previewRect, "#00ff88", classSelect.value, true);
   }
 }
 
+function hitTest(x, y) {
+  const lists = [
+    ["proposal", state.proposals || []],
+    ["box", state.boxes || []],
+  ];
+  for (const [kind, items] of lists) {
+    for (let i = items.length - 1; i >= 0; i--) {
+      const r = yoloToRect(items[i]);
+      if (x >= r.x && x <= r.x + r.w && y >= r.y && y <= r.y + r.h) {
+        return { kind, index: i };
+      }
+    }
+  }
+  return null;
+}
+
 function renderMeta() {
-  progressEl.innerHTML = `<strong>Bild ${state.index + 1}/${state.total}</strong> — <code>${state.rel_path}</code> — ${state.boxes.length} Boxen`;
+  const nProp = (state.proposals || []).length;
+  progressEl.innerHTML = `<strong>Bild ${state.index + 1}/${state.total}</strong> — <code>${state.rel_path}</code> — ${state.boxes.length} Boxen` +
+    (nProp ? ` · ${nProp} Vorschläge (conf≥${state.proposal_conf})` : "");
   const cls = state.saved ? "saved" : "unsaved";
   const txt = state.saved ? "gespeichert" : "noch nicht gespeichert";
   statusEl.innerHTML = `<span class="status ${cls}">Label-Datei: <code>${state.label_rel}</code> (${txt})</span>`;
-  if (state.boxes.length === 0) {
-    boxListEl.innerHTML = '<span class="empty">Keine Boxen — auf dem Bild ziehen, um eine Box zu setzen.</span>';
+  const rows = [];
+  (state.boxes || []).forEach((b, i) => {
+    const sel = isSelected("box", i) ? " selected" : "";
+    rows.push(`<li class="${sel}" data-kind="box" data-index="${i}">${b.index}. <strong>${b.name}</strong> (id ${b.cls_id}) — bestätigt</li>`);
+  });
+  (state.proposals || []).forEach((b, i) => {
+    const sel = isSelected("proposal", i) ? " selected" : "";
+    rows.push(`<li class="proposed${sel}" data-kind="proposal" data-index="${i}">V${b.index}. <strong>${b.name}</strong> (id ${b.cls_id}) — Vorschlag</li>`);
+  });
+  if (rows.length === 0) {
+    boxListEl.innerHTML = '<span class="empty">Keine Boxen — ziehen zum Zeichnen oder „Vorschläge laden“.</span>';
   } else {
-    boxListEl.innerHTML = "<ul>" + state.boxes.map(b =>
-      `<li>${b.index}. <strong>${b.name}</strong> (id ${b.cls_id}) — cx=${b.cx.toFixed(4)}, cy=${b.cy.toFixed(4)}, w=${b.w.toFixed(4)}, h=${b.h.toFixed(4)}</li>`
-    ).join("") + "</ul>";
+    boxListEl.innerHTML = "<ul>" + rows.join("") + "</ul>";
+    boxListEl.querySelectorAll("li[data-kind]").forEach((li) => {
+      li.addEventListener("click", () => {
+        selected = { kind: li.dataset.kind, index: Number(li.dataset.index) };
+        renderMeta();
+        redraw();
+      });
+    });
   }
   document.getElementById("btn-prev").disabled = state.index === 0;
   document.getElementById("btn-next").disabled = state.index >= state.total - 1;
+  document.getElementById("btn-accept").disabled = nProp === 0;
+  document.getElementById("btn-delete-sel").disabled = !selected;
 }
 
 function renderLegend() {
@@ -464,6 +634,7 @@ async function loadImage() {
 
 async function refresh() {
   state = await api("/api/state");
+  selected = null;
   renderClasses();
   renderLegend();
   renderMeta();
@@ -492,7 +663,15 @@ canvas.addEventListener("mouseup", async (evt) => {
   if (!dragging || !dragStart) return;
   dragging = false;
   const p = canvasCoords(evt);
+  const dist = Math.hypot(p.x - dragStart.x, p.y - dragStart.y);
   previewRect = null;
+  if (dist < 5) {
+    selected = hitTest(p.x, p.y);
+    renderMeta();
+    redraw();
+    dragStart = null;
+    return;
+  }
   try {
     state = await api("/api/box", {
       method: "POST",
@@ -504,6 +683,7 @@ canvas.addEventListener("mouseup", async (evt) => {
         y2: p.y,
       }),
     });
+    selected = null;
     renderMeta();
     redraw();
   } catch (e) {
@@ -522,6 +702,17 @@ canvas.addEventListener("mouseleave", () => {
   }
 });
 
+async function deleteSelected() {
+  if (!selected) return;
+  state = await api("/api/delete-item", {
+    method: "POST",
+    body: JSON.stringify(selected),
+  });
+  selected = null;
+  renderMeta();
+  redraw();
+}
+
 document.addEventListener("keydown", (evt) => {
   if (evt.key === "Escape" && dragging) {
     dragging = false;
@@ -529,10 +720,41 @@ document.addEventListener("keydown", (evt) => {
     previewRect = null;
     redraw();
   }
+  if ((evt.key === "Delete" || evt.key === "Backspace") && selected && !dragging) {
+    evt.preventDefault();
+    deleteSelected();
+  }
 });
+
+document.getElementById("btn-propose").addEventListener("click", async () => {
+  const btn = document.getElementById("btn-propose");
+  btn.disabled = true;
+  btn.textContent = "Lade Vorschläge…";
+  try {
+    state = await api("/api/proposals", { method: "POST" });
+    selected = null;
+    renderMeta();
+    redraw();
+  } catch (e) {
+    alert(e.message);
+  } finally {
+    btn.disabled = false;
+    btn.textContent = "Vorschläge laden";
+  }
+});
+
+document.getElementById("btn-accept").addEventListener("click", async () => {
+  state = await api("/api/proposals/accept", { method: "POST" });
+  selected = null;
+  renderMeta();
+  redraw();
+});
+
+document.getElementById("btn-delete-sel").addEventListener("click", deleteSelected);
 
 document.getElementById("btn-remove").addEventListener("click", async () => {
   state = await api("/api/box/last", { method: "DELETE" });
+  selected = null;
   renderMeta();
   redraw();
 });
@@ -544,6 +766,7 @@ document.getElementById("btn-save").addEventListener("click", async () => {
 
 document.getElementById("btn-save-next").addEventListener("click", async () => {
   state = await api("/api/save-next", { method: "POST" });
+  selected = null;
   renderLegend();
   renderMeta();
   await loadImage();
@@ -551,6 +774,7 @@ document.getElementById("btn-save-next").addEventListener("click", async () => {
 
 document.getElementById("btn-prev").addEventListener("click", async () => {
   state = await api("/api/nav", { method: "POST", body: JSON.stringify({ direction: "prev" }) });
+  selected = null;
   renderLegend();
   renderMeta();
   await loadImage();
@@ -558,6 +782,7 @@ document.getElementById("btn-prev").addEventListener("click", async () => {
 
 document.getElementById("btn-next").addEventListener("click", async () => {
   state = await api("/api/nav", { method: "POST", body: JSON.stringify({ direction: "next" }) });
+  selected = null;
   renderLegend();
   renderMeta();
   await loadImage();
@@ -599,6 +824,30 @@ def add_box(req: AddBoxRequest) -> dict:
 @app.delete("/api/box/last")
 def remove_last_box() -> dict:
     session.remove_last()
+    return session.to_state()
+
+
+@app.post("/api/delete-item")
+def delete_item(req: DeleteItemRequest) -> dict:
+    try:
+        session.delete_item(req.kind, req.index)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    return session.to_state()
+
+
+@app.post("/api/proposals")
+def load_proposals() -> dict:
+    try:
+        session.load_proposals()
+    except Exception as exc:
+        raise HTTPException(status_code=503, detail=f"Vorschläge fehlgeschlagen: {exc}") from exc
+    return session.to_state()
+
+
+@app.post("/api/proposals/accept")
+def accept_proposals() -> dict:
+    session.accept_all_proposals()
     return session.to_state()
 
 

@@ -15,16 +15,16 @@ cd coc-base-analyzer/ml
 
 ### Ablauf in der App
 
-1. Großes Bild mit **Bounding-Box-Editor** — Rechteck per **Maus ziehen** (click-drag) oder zwei Klicks zeichnen, wie in labelImg
-2. **Klasse** im Dropdown wählen (12 Klassen aus `classes.txt`)
-3. Rechteck auf dem Bild aufziehen, dann **Box übernehmen** — Box erscheint in der Liste und in der Vorschau
-4. Boxen im Editor anklicken, verschieben oder an den Ecken skalieren; **Letzte löschen** entfernt die zuletzt gespeicherte Box
+1. **Klasse** im Dropdown wählen (12 Klassen aus `classes.txt`)
+2. **Erste Ecke** der Box auf dem Bild anklicken (grünes Fadenkreuz)
+3. **Zweite Ecke** anklicken — die Box wird sofort übernommen und eingezeichnet
+4. **Klick zurücksetzen** bricht einen angefangenen Zwei-Klick ab; **Letzte löschen** entfernt die zuletzt gespeicherte Box
 5. **Speichern** schreibt die `.txt`-Datei; **Speichern & Weiter** speichert und geht zum nächsten Bild
 6. **Zurück / Weiter** navigiert zwischen den 4 Kern-Bildern (Änderungen bleiben im Speicher bis Speichern)
 
 **Klassen:** Dropdown aus `classes.txt` — 12 aktive Klassen, keine Hero-Pads (`kingpad`, `queenpad`, `rcpad`, `wardenpad`).
 
-**Technik:** `gradio-image-annotation` — kein manuelles Einstellen von Koordinaten-Slidern mehr nötig.
+**Technik:** Leichtes `gr.Image` mit Zwei-Klick-Modus (kein schwerer Annotation-Widget). Bilder werden für die Anzeige auf max. 1200 px Breite skaliert; YOLO-Koordinaten bleiben korrekt normalisiert.
 
 ## labelImg (veraltet)
 

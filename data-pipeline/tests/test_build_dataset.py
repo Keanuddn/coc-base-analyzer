@@ -13,6 +13,7 @@ from dataset.build_dataset import (
     assign_splits,
     build_yolo_dataset,
     infer_town_hall_level,
+    labels_use_model_indices,
     remap_active_class_indices,
     resolve_regression_label_path,
     write_data_yaml,
@@ -185,6 +186,19 @@ class TestManualLabels:
         remapped = remap_active_class_indices(lines, active)
         assert remapped[0].startswith("3 ")  # canon
         assert remapped[1].startswith("8 ")  # mortar (model index, skips hero pads)
+
+    def test_passthrough_model_indices_from_fastapi_labeler(self) -> None:
+        active = [
+            "ad", "airsweeper", "bombtower", "canon", "clancastle", "eagle",
+            "inferno", "mortar", "scattershot", "th13", "wizztower", "xbow",
+        ]
+        # FastAPI canvas labeler already writes keremberke ids (14=wizztower, 15=xbow).
+        lines = ["8 0.5 0.5 0.1 0.1", "14 0.4 0.4 0.1 0.1", "15 0.3 0.3 0.1 0.1"]
+        assert labels_use_model_indices(lines, active)
+        remapped = remap_active_class_indices(lines, active)
+        assert remapped[0].startswith("8 ")
+        assert remapped[1].startswith("14 ")
+        assert remapped[2].startswith("15 ")
 
     def test_manual_labels_only_in_dataset(self, synthetic_demo_dir: Path, tmp_path: Path) -> None:
         from PIL import Image

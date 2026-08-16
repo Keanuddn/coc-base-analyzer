@@ -191,9 +191,41 @@ def _load_active_class_names(classes_file: Path = DEFAULT_CLASSES_FILE) -> list[
     return [name for name in YOLO_CLASS_NAMES if name not in {"kingpad", "queenpad", "rcpad", "wardenpad"}]
 
 
+def labels_use_model_indices(lines: list[str], active_names: list[str]) -> bool:
+    """True if labels already store keremberke 0..15 ids (FastAPI canvas labeler).
+
+    labelImg wrote compact active-class indices (0..len(active)-1). The browser
+    labeler writes model indices, including 14=wizztower and 15=xbow, which are
+    out of range for the 12-name classes.txt list and must not be remapped.
+    """
+    for line in lines:
+        parts = line.strip().split()
+        if len(parts) < 5:
+            continue
+        if int(parts[0]) >= len(active_names):
+            return True
+    return False
+
+
 def remap_active_class_indices(lines: list[str], active_names: list[str]) -> list[str]:
-    """Map labelImg active-class indices (0..len(active)-1) to keremberke model indices."""
+    """Map labelImg active-class indices (0..len(active)-1) to keremberke model indices.
+
+    Files that already use model indices are passed through unchanged (aside from
+    dropping malformed / out-of-range lines).
+    """
     remapped: list[str] = []
+    if labels_use_model_indices(lines, active_names):
+        for line in lines:
+            parts = line.strip().split()
+            if len(parts) < 5:
+                continue
+            idx = int(parts[0])
+            if idx < 0 or idx >= len(YOLO_CLASS_NAMES):
+                logger.warning("Skipping label line with out-of-range class index %d: %s", idx, line)
+                continue
+            remapped.append(" ".join(parts))
+        return remapped
+
     for line in lines:
         parts = line.strip().split()
         if len(parts) < 5:
@@ -275,6 +307,11 @@ def collect_real_samples(config: BuildDatasetConfig) -> list[DatasetSample]:
         for image_path in sorted(config.regression_dir.rglob("*")):
             if image_path.suffix.lower() not in IMAGE_SUFFIXES:
                 continue
+            if any(
+                part in {"_rejected", "_pseudo_backup"} or part.startswith("labels_backup")
+                for part in image_path.parts
+            ):
+                continue
             if "labels" in image_path.parts and image_path.parent.name == "labels":
                 continue
             if approved_paths is not None:
@@ -323,6 +360,7 @@ def collect_real_samples(config: BuildDatasetConfig) -> list[DatasetSample]:
             if sample.origin == "real" and not sample.has_labels:
                 sample.notes.append("manual_labeling_required")
 
+    samples.sort(key=lambda s: (0 if s.has_labels else 1, str(s.source_path)))
     unique_paths, dupes = deduplicate_images_by_hash([s.source_path for s in samples])
     if dupes:
         logger.info("Removed %d duplicate real screenshot(s) by content hash", len(dupes))
@@ -616,6 +654,11 @@ def build_yolo_dataset(config: BuildDatasetConfig) -> BuildDatasetResult:
     )
 
     config.output_dir.mkdir(parents=True, exist_ok=True)
+    for split in ("train", "val", "test"):
+        for sub in ("images", "labels", "images_unlabeled"):
+            target = config.output_dir / split / sub
+            if target.is_dir():
+                shutil.rmtree(target)
     active_names = _load_active_class_names() if config.manual_labels_only else None
     materialized = materialize_yolo_dataset(
         samples,

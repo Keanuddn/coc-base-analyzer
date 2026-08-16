@@ -32,7 +32,11 @@ def pick_device(requested: str) -> str | int:
     try:
         import torch
 
-        return 0 if torch.cuda.is_available() else "cpu"
+        if torch.cuda.is_available():
+            return 0
+        if getattr(torch.backends, "mps", None) is not None and torch.backends.mps.is_available():
+            return "mps"
+        return "cpu"
     except ImportError:
         return "cpu"
 

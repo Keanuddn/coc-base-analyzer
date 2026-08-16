@@ -2,9 +2,9 @@
 
 Kurzanleitung zum manuellen Annotieren der 4 Kern-War-Bases (TH15/TH16) im YOLO-Format.
 
-## Empfohlen: Browser-App (Gradio)
+## Empfohlen: Browser-App (FastAPI + Canvas)
 
-**labelImg** (PyQt5) stürzt unter Python 3.14 und auch unter 3.12 beim Scrollen/Zoomen ab (`TypeError: setValue … float`). Statt labelImg-Patches nutzen wir die **browserbasierte Label-App** im Haupt-venv:
+**labelImg** (PyQt5) stürzt unter Python 3.14 und auch unter 3.12 beim Scrollen/Zoomen ab (`TypeError: setValue … float`). Statt labelImg nutzen wir die **browserbasierte Label-App** im Haupt-venv — **ohne Gradio**, mit HTML-Canvas (Bilder laden zuverlässig):
 
 ```bash
 cd coc-base-analyzer/ml
@@ -16,21 +16,21 @@ cd coc-base-analyzer/ml
 ### Ablauf in der App
 
 1. **Klasse** im Dropdown wählen (12 Klassen aus `classes.txt`)
-2. **Erste Ecke** der Box auf dem Bild anklicken (grünes Fadenkreuz)
-3. **Zweite Ecke** anklicken — die Box wird sofort übernommen und eingezeichnet
-4. **Klick zurücksetzen** bricht einen angefangenen Zwei-Klick ab; **Letzte löschen** entfernt die zuletzt gespeicherte Box
-5. **Speichern** schreibt die `.txt`-Datei; **Speichern & Weiter** speichert und geht zum nächsten Bild
-6. **Zurück / Weiter** navigiert zwischen den 4 Kern-Bildern (Änderungen bleiben im Speicher bis Speichern)
+2. Auf dem Bild **ziehen** (Maus gedrückt halten, loslassen) — die Box wird sofort übernommen und eingezeichnet
+3. **Escape** bricht eine angefangene Box ab; **Letzte löschen** entfernt die zuletzt gespeicherte Box
+4. **Speichern** schreibt die `.txt`-Datei; **Speichern & Weiter** speichert und geht zum nächsten Bild
+5. **Zurück / Weiter** navigiert zwischen den 4 Kern-Bildern (Änderungen bleiben im Speicher bis Speichern)
 
 **Klassen:** Dropdown aus `classes.txt` — 12 aktive Klassen, keine Hero-Pads (`kingpad`, `queenpad`, `rcpad`, `wardenpad`).
 
-**Technik:** Leichtes `gr.Image` mit Zwei-Klick-Modus (kein schwerer Annotation-Widget). Bilder werden für die Anzeige auf max. 1200 px Breite skaliert; YOLO-Koordinaten bleiben korrekt normalisiert.
+**Technik:** FastAPI liefert PNG-Bytes an einen HTML-Canvas (kein Gradio-Dateiserving). Bilder werden für die Anzeige auf max. 1200 px Breite skaliert; YOLO-Koordinaten bleiben korrekt normalisiert.
 
 ## labelImg (veraltet)
 
 | Option | Status |
 |--------|--------|
-| **Gradio `manual_label_app.py`** | **Empfohlen** |
+| **FastAPI `manual_label_server.py`** | **Empfohlen** |
+| Gradio `manual_label_app.py` | Veraltet — Gradio `gr.Image` „Loading…“-Bug |
 | labelImg + Python-3.12-venv + Patch | Veraltet — PyQt-Crashes, Whack-a-Mole |
 
 Falls nötig (nicht empfohlen):

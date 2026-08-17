@@ -288,9 +288,14 @@ def sprite_stays_on_playable(
     if left < 0 or top < 0 or right > cw or foot_y > ch:
         return False
     extra_north = max(0, math.ceil((height - size * TILE_HEIGHT) / TILE_HEIGHT))
-    if x + y < extra_north:
+    # Stick-up goes toward decreasing x and y (screen-up). Guard both diamond edges,
+    # not only the north tip (x+y); otherwise y=0 placements hang into the forest.
+    margin = math.ceil(extra_north / 2.0) + 1
+    if x < margin or y < margin:
         return False
-    # Widest part of the isometric footprint (not the south tip — that AABB is transparent).
+    if x + size > GRID_SIZE - 1 or y + size > GRID_SIZE - 1:
+        return False
+    # Widest part of the isometric footprint (not the south/north tips).
     mid_y = foot_y - size * TILE_HEIGHT / 2.0
     diamond_lo = -0.5
     diamond_hi = GRID_SIZE - 0.5

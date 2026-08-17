@@ -246,7 +246,7 @@ Bis Geometrie verfügbar ist, liefert `demo_render.py` und manuelle Placements d
 1. **Manuelles Labeling:** YOLO-`.txt`-Sidecars für `ml/tests/regression_set/` anlegen
 2. **Preview-Parsing:** Layout-Geometrie aus Harvester-Vorschaubildern (oder Community-Files)
 3. Harvester-Lauf → Batch-Decode → Supabase-Persist (`decode_status`)
-4. **Phase 2:** Fine-Tuning auf YOLO-Dataset (noch nicht gestartet)
+4. **Phase 2:** Fine-Tuning v2 (2026-08-17) auf `yolo_v1` (209 synthetic + 4 manual). Synthetic val looks strong; real-screenshot recall remains too low for use. More real labels (or domain-randomized renders closer to scouting UI) needed before another train.
 
 ## Dataset Assembly (1d)
 

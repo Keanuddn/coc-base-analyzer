@@ -272,4 +272,5 @@ Keremberke YOLOv5-Checkpoints erfordern `weights_only=False` beim `torch.load` �
 - TH14–18-Klassen sind Platzhalter in `th_classes.yaml`, noch nicht im Modell-Head
 - CPU-Training: nur Smoke Test; volles Fine-Tuning auf GPU/Colab **oder Apple MPS**
 - **First training pass (2026-08-16):** 4 manuell gelabelte Kern-War-Bases (TH15+TH16 gemischt). Klasse `th13` ist das Rathaus (Legacy-Name aus keremberke) — TH15/TH16-Halls teilen denselben Slot. Labels sind unvollständig (fehlende Gebäude akzeptiert). Siehe `ml/docs/MANUAL_LABELING.md`.
+- **v2 training (2026-08-17):** `yolo_v1` = 213 labeled (209 synthetic bulk + 4 manual). YOLOv8n, MPS, 43/50 epochs (disk full during epoch 44; best at epoch 39). Synthetic val: mAP50 **0.988**, mAP50-95 **0.869**. Real screenshots: 10 boxes on TH15 Illyrian God (was 0; GT 31) and 4 on TH16 volcanic (was 0; GT 28). **Not usable on real scouting screenshots** — val is synthetic-only; the 4 real labels sit in train and are drowned by synthetic appearance. Weights stay gitignored (`*.pt`).
 

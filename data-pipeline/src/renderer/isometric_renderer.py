@@ -55,6 +55,13 @@ COC_TILE_FOOTPRINTS: dict[str, int] = {
     "firespitter": 3,
     "spelltower": 3,
     "spell_tower": 3,
+    "monolith": 3,
+    "tesla": 2,
+    "hidden_tesla": 2,
+    "builderhut": 2,
+    "builder's_hut": 2,
+    "multi-gear_tower": 3,
+    "revenge_tower": 3,
     "wall": 1,
 }
 
@@ -81,6 +88,13 @@ TILE_FOOTPRINTS: dict[str, int] = {
     "firespitter": 4,  # ClashKing max 165px wide → ceil(165/44)=4
     "spelltower": 3,
     "spell_tower": 3,
+    "monolith": 4,  # ClashKing max 150px wide → ceil(150/44)=4
+    "tesla": 3,
+    "hidden_tesla": 3,
+    "builderhut": 4,  # weaponized hut max 161px
+    "builder's_hut": 4,
+    "multi-gear_tower": 4,
+    "revenge_tower": 4,
     "wall": 1,  # 1×1 editor tiles; adjacent walls may overlap each other on purpose
 }
 

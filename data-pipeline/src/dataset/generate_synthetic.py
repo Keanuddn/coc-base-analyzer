@@ -2,28 +2,25 @@
 
 Layouts are random-but-plausible occupancy on the 44×44 editor grid.
 Count ranges and tile footprints are collision/variety parameters — not
-combat stats or wiki army tables.
+combat stats. **Which buildings exist at a TH** comes from
+``renderer/sprites/th_unlocks.yaml`` (internet-sourced; see
+``knowledge-base/SOURCES.md``). Types without a sourced row are omitted.
 
 Sprite levels use a **visual-tier proxy** (not an official CoC cap),
-with user-corrected merge exceptions:
+with sourced merge windows:
 
 * Cannons max at TH15 (``cannon/level_21.webp`` purple). TH16–18 place
-  ``ricochet_cannon`` (2→1 merge). YOLO class remains ``canon``.
+  ``ricochet_cannon`` (wiki merge TH16). YOLO class remains ``canon``.
 * Wizard towers max at TH17 (``wizard_tower/level_17.webp``). TH18 places
-  ``super_wizard_tower``. YOLO class remains ``wizztower``.
-* Eagle artillery only through TH16 (skip TH17/TH18). Visual-tier is
-  relative to eagle ``max_th`` (16), so TH16 uses the highest eagle file
-  and TH15 uses max-1 — not leftover ``level_4``/``level_5`` (TH14-looking).
-* Firespitter only from TH17 onward (skip TH15/TH16).
-* Spell towers: all four ClashKing designs on TH15 / TH17 / TH18
-  (``spell_tower/level_1.webp`` … ``level_4.webp``), one of each. **Not at TH16.**
-* Walls (``wall/``): visual-tier from maxed TH18 (highest / max-1 / max-2 /
-  max-3). 1×1 tiles around and between buildings. Rendered but not YOLO-labeled
-  (keremberke has no wall class).
+  ``super_wizard_tower`` (wiki merge TH18). YOLO class remains ``wizztower``.
+* Eagle artillery TH11–16; removed at TH17 (merged into Inferno Artillery).
+* Firespitter TH17+; Multi-Gear Tower TH17+; Revenge Tower TH18.
+* Spell towers: wiki Number Available is 2 at TH15–18. **Generator skips
+  TH15** (user 2026-08-17). Place 2 on TH16–18. Not the old “TH15+ except 16”.
+* Monolith TH15+; Hidden Tesla TH7+; weaponized Builder Hut TH14+.
+* Walls (``wall/``): visual-tier from maxed TH18. 1×1 tiles, unlabeled.
 * Other defenses use ClashKing max / max-1 / max-2 / max-3 for
   TH18 / 17 / 16 / 15. One sprite level per building type per image.
-  See ``renderer/sprites/max_level_by_th.yaml`` and
-  ``building_type_map.yaml`` ``era_merges`` / ``era_availability``.
 """
 
 from __future__ import annotations
@@ -65,12 +62,16 @@ DEFAULT_PREVIEW_DIR = REPO_ROOT / "ml" / "notebooks" / "phase2_output"
 LEVEL_POLICY_PATH = (
     PIPELINE_ROOT / "src" / "renderer" / "sprites" / "max_level_by_th.yaml"
 )
+TH_UNLOCKS_PATH = (
+    PIPELINE_ROOT / "src" / "renderer" / "sprites" / "th_unlocks.yaml"
+)
 DEFAULT_COUNT = 200
 ERA_MAX_TOWN_HALL = 18
 REQUESTED_TOWN_HALL_LEVELS = (15, 16, 17, 18)
 TOWN_HALL_LEVELS = REQUESTED_TOWN_HALL_LEVELS
 
 # Active classes from building_type_map aliases + town_hall (no hero pads).
+# Extra defenses added after the TH15–18 wiki/ClashKing gap audit (SOURCES.md).
 SYNTHETIC_BUILDING_TYPES: tuple[str, ...] = (
     "canon",
     "archertower",
@@ -87,6 +88,11 @@ SYNTHETIC_BUILDING_TYPES: tuple[str, ...] = (
     "airsweeper",
     "clancastle",
     "town_hall",
+    "monolith",
+    "tesla",
+    "builderhut",
+    "multi-gear_tower",
+    "revenge_tower",
 )
 
 # Placement types used after era merges (not in the logical SYNTHETIC list).
@@ -102,8 +108,8 @@ SPELL_TOWER_VARIANT_FILES: tuple[str, ...] = (
     "spell_tower/level_4.webp",
 )
 
-# How many of each type to try placing. Not TH unlock tables.
-# Eagle / firespitter / spell towers also have era_availability windows.
+# How many of each type to try placing. Caps come from wiki counts in
+# th_unlocks.yaml when present; these are occupancy fallbacks only.
 COUNT_RANGES: dict[str, tuple[int, int]] = {
     "town_hall": (1, 1),
     "clancastle": (1, 1),
@@ -118,20 +124,30 @@ COUNT_RANGES: dict[str, tuple[int, int]] = {
     "bombtower": (1, 2),
     "archertower": (2, 5),
     "firespitter": (1, 2),
-    "spelltower": (4, 4),
+    "spelltower": (2, 2),
     "airsweeper": (1, 2),
+    "monolith": (1, 1),
+    "tesla": (1, 3),
+    "builderhut": (1, 3),
+    "multi-gear_tower": (1, 1),
+    "revenge_tower": (1, 1),
 }
 
 # Place these before the shuffled remainder so TH-window uniques still fit.
 PRIORITY_TYPES: tuple[str, ...] = (
     "eagle",
     "clancastle",
+    "monolith",
     "firespitter",
     "spelltower",
-    "bombtower",
+    "multi-gear_tower",
+    "revenge_tower",
+    "wizztower",
     "canon",
     "archertower",
-    "wizztower",
+    "bombtower",
+    "tesla",
+    "builderhut",
 )
 
 PREVIEW_SPECS: tuple[tuple[str, int, int], ...] = (
@@ -188,6 +204,7 @@ class SpriteLevelCatalog:
     source_path: Path | None = None
     type_map: Mapping[str, Any] = field(default_factory=dict)
     sprites_root: Path | None = None
+    unlocks: Mapping[str, Any] = field(default_factory=dict)
 
     def levels_for(self, building_type: str) -> list[int]:
         levels = self.levels_by_type.get(building_type)
@@ -230,21 +247,45 @@ class SpriteLevelCatalog:
         return rule
 
     def _availability(self, building_type: str) -> Mapping[str, Any] | None:
+        """Prefer sourced ``th_unlocks.yaml``; fall back to type_map heuristics."""
+        buildings = self.unlocks.get("buildings") or {}
+        rule = buildings.get(building_type)
+        if isinstance(rule, Mapping):
+            return rule
         avail = self.type_map.get("era_availability") or {}
-        rule = avail.get(building_type)
-        if not isinstance(rule, Mapping):
+        fallback = avail.get(building_type)
+        if not isinstance(fallback, Mapping):
             return None
-        return rule
+        return fallback
 
     def available_at_th(self, building_type: str, town_hall_level: int) -> bool:
-        """False when era_availability excludes this type at this TH."""
+        """False when sourced unlocks (or era_availability) exclude this TH."""
+        merge = self._merge_rule(building_type)
+        if merge is not None and town_hall_level >= int(merge["merged_from_th"]):
+            merged_slug = str(merge.get("merged_slug") or "").strip()
+            merged_rule = (self.unlocks.get("buildings") or {}).get(merged_slug)
+            if isinstance(merged_rule, Mapping):
+                return self._rule_allows(merged_rule, town_hall_level)
+            return True
+        sourced = self.unlocks.get("buildings") or {}
+        if sourced and building_type not in sourced and building_type != "town_hall":
+            return False
         rule = self._availability(building_type)
         if rule is None:
             return True
+        return self._rule_allows(rule, town_hall_level)
+
+    @staticmethod
+    def _rule_allows(rule: Mapping[str, Any], town_hall_level: int) -> bool:
         min_th = rule.get("min_th")
         max_th = rule.get("max_th")
-        skip_th = {int(x) for x in (rule.get("skip_th") or rule.get("exclude_th") or [])}
+        removed_at = rule.get("removed_at")
+        skip_th: set[int] = set()
+        for key in ("skip_th", "exclude_th", "generator_skip_th"):
+            skip_th.update(int(x) for x in (rule.get(key) or []))
         if town_hall_level in skip_th:
+            return False
+        if removed_at is not None and town_hall_level >= int(removed_at):
             return False
         if min_th is not None and town_hall_level < int(min_th):
             return False
@@ -373,9 +414,11 @@ class SpriteLevelCatalog:
         sprites_root: Path | None = None,
         policy_path: Path = LEVEL_POLICY_PATH,
         type_map_path: Path = BUILDING_TYPE_MAP_PATH,
+        unlocks_path: Path = TH_UNLOCKS_PATH,
     ) -> SpriteLevelCatalog:
         policy = _load_level_policy(policy_path)
         type_map = _load_building_type_map(type_map_path)
+        unlocks = _load_th_unlocks(unlocks_path)
         observed: dict[str, int] = {str(k): int(v) for k, v in (policy.get("sprite_max_observed") or {}).items()}
         root = sprites_root or CLASHKING_HOME_VILLAGE
         levels_by_type: dict[str, list[int]] = {}
@@ -417,6 +460,7 @@ class SpriteLevelCatalog:
             source_path=policy_path,
             type_map=type_map,
             sprites_root=root,
+            unlocks=unlocks,
         )
 
 
@@ -425,6 +469,16 @@ def _load_level_policy(path: Path = LEVEL_POLICY_PATH) -> dict[str, Any]:
         data = yaml.safe_load(fh) or {}
     if not isinstance(data, dict):
         raise ValueError(f"Level policy must be a mapping: {path}")
+    return data
+
+
+def _load_th_unlocks(path: Path = TH_UNLOCKS_PATH) -> dict[str, Any]:
+    if not path.is_file():
+        return {}
+    with path.open(encoding="utf-8") as fh:
+        data = yaml.safe_load(fh) or {}
+    if not isinstance(data, dict):
+        raise ValueError(f"TH unlocks must be a mapping: {path}")
     return data
 
 
@@ -664,9 +718,9 @@ def generate_random_layout(
 
     Town hall sprite is exactly ``town_hall_level``. Other types use one
     visual-tier file, with cannon/archer/wizard era merges from ``era_merges``.
-    Eagle is TH15–16 only; firespitter is TH17+. Spell towers place all four
-    ClashKing files (one of each) on TH15/17/18, never TH16. Walls are 1×1
-    compartment rings around buildings (rendered, not YOLO-labeled). Occupied
+    Availability is ``th_unlocks.yaml``: eagle ≤ TH16, firespitter ≥ TH17,
+    spell towers on TH16–18 (not TH15), monolith/tesla/builder hut as sourced.
+    Walls are 1×1 compartment rings (rendered, not YOLO-labeled). Occupied
     tiles are never reused; screen-space footprint AABBs must not overlap.
     If a building cannot fit after retries, it is skipped.
     """
@@ -1062,6 +1116,11 @@ def _print_preview_reports(reports: Sequence[Mapping[str, Any]]) -> None:
         "bombtower",
         "firespitter",
         "spelltower",
+        "monolith",
+        "tesla",
+        "builderhut",
+        "multi-gear_tower",
+        "revenge_tower",
         "wall",
     )
     for report in reports:
@@ -1099,8 +1158,8 @@ def _print_preview_reports(reports: Sequence[Mapping[str, Any]]) -> None:
         if spell_info:
             spell_sprites = list(dict.fromkeys(spell_info.get("sprites") or [spell_info["sprite"]]))
             spell_txt = f"n={spell_info['count']} " + ", ".join(spell_sprites)
-        elif th == 16:
-            spell_txt = "(none — spell towers skipped at TH16)"
+        elif th == 15:
+            spell_txt = "(none — spell towers skipped at TH15)"
         else:
             spell_txt = "(none)"
         wall_txt = (

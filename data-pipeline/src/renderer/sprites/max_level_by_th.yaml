@@ -34,9 +34,10 @@
 #         relative to eagle max_th (16), not TH18: TH16 = highest file,
 #         TH15 = max-1. Avoids leftover level_4/5 (TH14-looking).
 #       firespitter: only TH17+ (skip TH15/TH16). Visual-tier among 3 files.
-#       spelltower: four ClashKing files (level_1…4). Place all four designs
-#         per layout (one of each) on TH15 / TH17 / TH18 — not at TH16.
-#         If occupancy cannot fit 4, cycle remaining variants across a batch.
+#       spelltower: wiki 2 at TH15–18. Generator skips TH15 (user 2026-08-17).
+#         TH16–18 place two towers (not all four ClashKing designs).
+#       monolith / tesla / builderhut / multi-gear_tower / revenge_tower:
+#         sourced in th_unlocks.yaml; unlabeled until YOLO classes exist.
 #       wall: ClashKing wall/ folder. Visual-tier from maxed TH18:
 #         TH18 = highest wall file, TH17 = max-1, TH16 = max-2, TH15 = max-3.
 #         1×1 tiles around/between buildings. Rendered, not YOLO-labeled.
@@ -70,3 +71,8 @@ sprite_max_observed:
   firespitter: 3  # source: https://assets.clashk.ing/buildings/home-village/firespitter/level_3.webp
   spell_tower: 4  # source: https://assets.clashk.ing/buildings/home-village/spell_tower/level_4.webp (four designs, not named spells)
   wall: 19  # source: https://assets.clashk.ing/buildings/home-village/wall/level_19.webp
+  monolith: 5  # source: https://assets.clashk.ing/buildings/home-village/monolith/level_5.webp
+  hidden_tesla: 17  # source: https://assets.clashk.ing/buildings/home-village/hidden_tesla/level_17.webp
+  multi-gear_tower: 3  # source: https://assets.clashk.ing/buildings/home-village/multi-gear_tower/level_3.webp
+  revenge_tower: 2  # source: https://assets.clashk.ing/buildings/home-village/revenge_tower/level_2.webp
+  "builder's_hut": 8  # source: https://assets.clashk.ing/buildings/home-village/builder's_hut/level_8.webp

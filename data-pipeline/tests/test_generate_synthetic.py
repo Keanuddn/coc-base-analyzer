@@ -47,6 +47,9 @@ _TYPE_MAP = {
         "archertower": "archer_tower",
         "firespitter": "firespitter",
         "spelltower": "spell_tower",
+        "tesla": "hidden_tesla",
+        "builderhut": "builder's_hut",
+        "monolith": "monolith",
     },
     "identity": [
         "cannon",
@@ -59,6 +62,11 @@ _TYPE_MAP = {
         "firespitter",
         "spell_tower",
         "wall",
+        "monolith",
+        "hidden_tesla",
+        "multi-gear_tower",
+        "revenge_tower",
+        "builder's_hut",
     ],
     "town_hall": {"sprite_slug": "town_hall", "yolo_class": "th13"},
     "yolo_label_overrides": {
@@ -66,11 +74,21 @@ _TYPE_MAP = {
         "super_wizard_tower": "wizztower",
         "multi-archer_tower": "archertower",
     },
-    "yolo_unlabeled": ["archertower", "firespitter", "spelltower", "wall"],
+    "yolo_unlabeled": [
+        "archertower",
+        "firespitter",
+        "spelltower",
+        "wall",
+        "monolith",
+        "tesla",
+        "builderhut",
+        "multi-gear_tower",
+        "revenge_tower",
+    ],
     "random_sprite_variants": {
         "spelltower": {
             "slug": "spell_tower",
-            "place_all": True,
+            "place_all": False,
             "files": [
                 "spell_tower/level_1.webp",
                 "spell_tower/level_2.webp",
@@ -80,9 +98,19 @@ _TYPE_MAP = {
         },
     },
     "era_availability": {
-        "eagle": {"min_th": 15, "max_th": 16, "count_range": [1, 1]},
+        "eagle": {"min_th": 11, "max_th": 16, "removed_at": 17, "count_range": [1, 1]},
         "firespitter": {"min_th": 17},
-        "spelltower": {"min_th": 15, "skip_th": [16], "count_range": [4, 4]},
+        "spelltower": {
+            "min_th": 15,
+            "max_th": 18,
+            "generator_skip_th": [15],
+            "count_range": [2, 2],
+        },
+        "monolith": {"min_th": 15, "count_range": [1, 1]},
+        "tesla": {"min_th": 7},
+        "builderhut": {"min_th": 14},
+        "multi-gear_tower": {"min_th": 17, "count_range": [1, 1]},
+        "revenge_tower": {"min_th": 18, "count_range": [1, 1]},
     },
     "era_merges": {
         "canon": {
@@ -135,6 +163,11 @@ def _fake_catalog(**overrides: object) -> SpriteLevelCatalog:
         "firespitter": list(range(1, 4)),
         "spelltower": list(range(1, 5)),
         "wall": list(range(1, 20)),
+        "monolith": list(range(1, 6)),
+        "tesla": list(range(1, 18)),
+        "builderhut": list(range(1, 9)),
+        "multi-gear_tower": list(range(1, 4)),
+        "revenge_tower": list(range(1, 3)),
     }
     kwargs: dict[str, object] = {
         "levels_by_type": levels,
@@ -481,44 +514,57 @@ class TestAddedDefenses:
                 f"firespitter/level_{spit_level}.webp"
             )
 
-    def test_spell_tower_places_all_four_designs(self) -> None:
+    def test_spell_towers_skipped_on_th15_present_later(self) -> None:
         catalog = _fake_catalog()
-        assert catalog.variant_levels_for_layout("spelltower", 0) == [1, 2, 3, 4]
-        assert catalog.variant_levels_for_layout("spelltower", 1) == [2, 3, 4, 1]
-        for th_level in (15, 17, 18):
+        assert catalog.resolve_for_th("spelltower", 15) is None
+        for seed in range(8):
+            placements = generate_random_layout(
+                random.Random(seed), town_hall_level=15, catalog=catalog
+            )
+            assert not any(p.building_type == "spelltower" for p in placements)
+            assert not any(p.building_type == "spell_tower" for p in placements)
+        for th_level in (16, 17, 18):
+            assert catalog.resolve_for_th("spelltower", th_level) is not None
             placements = generate_random_layout(
                 random.Random(th_level),
                 town_hall_level=th_level,
                 catalog=catalog,
-                variant_cycle=th_level,
             )
             towers = [p for p in placements if p.building_type == "spelltower"]
-            assert len(towers) == 4
-            levels = {p.level for p in towers}
-            assert levels == {1, 2, 3, 4}
+            assert 1 <= len(towers) <= 2
             files = {
                 catalog.sprite_relpath(p.building_type, p.level) for p in towers
             }
-            assert files == set(SPELL_TOWER_VARIANT_FILES)
+            assert files <= set(SPELL_TOWER_VARIANT_FILES)
 
-    def test_th16_never_emits_spell_tower(self) -> None:
+    def test_th16_emits_spell_tower_and_eagle(self) -> None:
         catalog = _fake_catalog()
-        assert catalog.resolve_for_th("spelltower", 16) is None
-        for seed in range(12):
-            placements = generate_random_layout(
-                random.Random(seed), town_hall_level=16, catalog=catalog
-            )
-            assert not any(p.building_type == "spelltower" for p in placements)
-            assert not any(p.building_type == "spell_tower" for p in placements)
-            assert any(p.building_type == "eagle" for p in placements)
+        assert catalog.resolve_for_th("spelltower", 16) is not None
+        placements = generate_random_layout(
+            random.Random(16), town_hall_level=16, catalog=catalog
+        )
+        assert any(p.building_type == "spelltower" for p in placements)
+        assert any(p.building_type == "eagle" for p in placements)
 
-    def test_spell_variant_cycle_even_when_only_two_fit(self) -> None:
+    def test_sourced_gap_defenses_by_th(self) -> None:
         catalog = _fake_catalog()
-        counts = {1: 0, 2: 0, 3: 0, 4: 0}
-        for cycle in range(8):
-            for level in catalog.variant_levels_for_layout("spelltower", cycle)[:2]:
-                counts[level] += 1
-        assert counts == {1: 4, 2: 4, 3: 4, 4: 4}
+        th15 = generate_random_layout(random.Random(15), town_hall_level=15, catalog=catalog)
+        types15 = {p.building_type for p in th15}
+        assert "monolith" in types15
+        assert "tesla" in types15
+        assert catalog.resolve_for_th("builderhut", 15) is not None
+        assert "multi-gear_tower" not in types15
+        assert "revenge_tower" not in types15
+        assert catalog.resolve_for_th("monolith", 15) == ("monolith", 2)
+        th17 = generate_random_layout(random.Random(17), town_hall_level=17, catalog=catalog)
+        types17 = {p.building_type for p in th17}
+        assert "multi-gear_tower" in types17
+        assert "revenge_tower" not in types17
+        th18 = generate_random_layout(random.Random(18), town_hall_level=18, catalog=catalog)
+        types18 = {p.building_type for p in th18}
+        assert "revenge_tower" in types18
+        assert "multi-gear_tower" in types18
+        assert "monolith" in types18
 
     def test_eagle_only_through_th16(self) -> None:
         catalog = _fake_catalog()
@@ -654,21 +700,22 @@ class TestTh18EraPreviews:
                 assert "ricochet_cannon" not in levels
                 assert "eagle" in levels
                 assert "firespitter" not in levels
+                assert "spelltower" not in levels
+                assert "monolith" in levels
             if th == 16:
                 assert "eagle" in levels
                 assert "firespitter" not in levels
-                assert "spelltower" not in levels
+                assert "spelltower" in levels
+                assert 1 <= levels["spelltower"]["count"] <= 2
             if th >= 17:
                 assert "eagle" not in levels
                 assert "firespitter" in levels
+                assert "multi-gear_tower" in levels
+                assert "spelltower" in levels
+                assert 1 <= levels["spelltower"]["count"] <= 2
             if th == 18:
                 assert "wizztower" not in levels
-            if th == 16:
-                continue
-            spell = levels["spelltower"]
-            assert spell["count"] == 4
-            spell_sprites = set(spell.get("sprites") or [spell["sprite"]])
-            assert spell_sprites == set(SPELL_TOWER_VARIANT_FILES)
+                assert "revenge_tower" in levels
 
 
 @pytest.mark.skipif(
@@ -694,13 +741,16 @@ class TestSceneryPreviews:
         assert "multi-archer_tower" in levels
         assert "super_wizard_tower" in levels
         assert "spelltower" in levels
-        assert levels["spelltower"]["count"] == 4
+        assert 1 <= levels["spelltower"]["count"] <= 2
+        assert "revenge_tower" in levels
+        assert "monolith" in levels
         assert "wall" in levels
         assert levels["wall"]["count"] >= MIN_WALL_SEGMENTS
 
         if "preview_bg_th16.png" in by_file:
             th16 = by_file["preview_bg_th16.png"]["sprite_levels"]
-            assert "spelltower" not in th16
+            assert "spelltower" in th16
+            assert 1 <= th16["spelltower"]["count"] <= 2
             assert "eagle" in th16
             assert th16["eagle"]["sprite"] == "eagle_artillery/level_7.webp"
             assert "firespitter" not in th16
@@ -710,9 +760,10 @@ class TestSceneryPreviews:
             assert th15["town_hall"]["sprite"] == "town_hall/level_15.webp"
             assert "eagle" in th15
             assert th15["eagle"]["sprite"] == "eagle_artillery/level_6.webp"
-            assert "spelltower" in th15
+            assert "spelltower" not in th15
             assert "firespitter" not in th15
             assert "ricochet_cannon" not in th15
+            assert "monolith" in th15
 
 
 class TestWallYoloSkip:

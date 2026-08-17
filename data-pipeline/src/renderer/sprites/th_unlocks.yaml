@@ -1,0 +1,253 @@
+# Sourced Home Village defense availability by Town Hall.
+# Access date: 2026-08-17. Cite knowledge-base/SOURCES.md for URLs.
+#
+# This file is the generator's unlock table. Do not infer min_th from
+# ClashKing sprite indices. Types without a sourced row are omitted.
+
+access_date: 2026-08-17
+era_max_town_hall: 18
+scope: TH15-18 synthetic layouts
+policy: sourced-th-unlocks
+
+# Building keys match generate_synthetic.SYNTHETIC_BUILDING_TYPES
+# (and merged placement slugs where noted).
+buildings:
+  town_hall:
+    min_th: 1
+    max_th: 18
+    always: true
+    sources:
+      - url: https://clashofclans.fandom.com/wiki/Town_Hall
+        summary: One Town Hall at every TH. Giga Inferno / Inferno Artillery / Guardians are hall weapons, not separate buildings.
+
+  clancastle:
+    min_th: 3
+    max_th: 18
+    count_range: [1, 1]
+    sources:
+      - url: https://clashofclans.fandom.com/wiki/Town_Hall
+        summary: Clan Castle present through TH18 (wiki max-level table has CC at TH18).
+
+  wall:
+    min_th: 2
+    max_th: 18
+    max_level_by_th: {15: 16, 16: 17, 17: 18, 18: 19}
+    sources:
+      - url: https://www.clash.ninja/guides/max-levels-for-each-th
+        summary: Wall max level 16/17/18/19 at TH15–18.
+      - url: https://clashofclans.fandom.com/wiki/Town_Hall
+        summary: 325 wall segments from TH13+; max level 19 at TH18 (200 of 325).
+
+  canon:
+    min_th: 1
+    max_th: 18  # regular cannons gone after merges; ricochet still present TH16–18
+    merge_from_th: 16
+    sources:
+      - url: https://clashofclans.fandom.com/wiki/Town_Hall
+        summary: Regular cannons 7 at TH13–15; 3* left at TH16 after 2 ricochet merges; 0* at TH17.
+      - url: https://clashofclans.fandom.com/wiki/Ricochet_Cannon
+        summary: Ricochet unlock TH16 (merge two lv21 cannons).
+
+  archertower:
+    min_th: 2
+    max_th: 18  # 2 regular remain at TH17–18 after multi-archer merges
+    merge_from_th: 16
+    sources:
+      - url: https://clashofclans.fandom.com/wiki/Multi-Archer_Tower
+        summary: Multi-Archer unlock TH16 (merge two lv21 archer towers).
+      - url: https://clashofclans.fandom.com/wiki/Town_Hall
+        summary: 2 regular archer towers remain at TH17–18.
+
+  wizztower:
+    min_th: 5
+    max_th: 18  # 2 regular remain at TH18 after super-wizard merges
+    merge_from_th: 18
+    sources:
+      - url: https://supercell.com/en/games/clashofclans/blog/release-notes/town-hall-18-crash-lands-update/
+        summary: Super Wizard Tower merge at TH18.
+      - url: https://clashofclans.fandom.com/wiki/Town_Hall
+        summary: 5 wizard towers TH11–17; 2* remaining at TH18.
+
+  mortar:
+    min_th: 3
+    max_th: 18
+    count_range: [2, 4]
+    sources:
+      - url: https://clashofclans.fandom.com/wiki/Mortar
+        summary: Unlock TH3. Number Available 4 at TH8–18.
+
+  ad:
+    min_th: 4
+    max_th: 18
+    count_range: [2, 4]
+    sources:
+      - url: https://clashofclans.fandom.com/wiki/Town_Hall
+        summary: 4 Air Defenses at TH9–18.
+
+  airsweeper:
+    min_th: 6
+    max_th: 18
+    count_range: [1, 2]
+    sources:
+      - url: https://clashofclans.fandom.com/wiki/Air_Sweeper
+        summary: Unlock TH6. Number Available 2 at TH9–18. Still present TH18.
+
+  tesla:
+    min_th: 7
+    max_th: 18
+    count_range: [2, 4]
+    sources:
+      - url: https://clashofclans.fandom.com/wiki/Hidden_Tesla
+        summary: Unlock TH7. Number Available 5 at TH12–18. Still present TH18.
+
+  bombtower:
+    min_th: 8
+    max_th: 18
+    count_range: [1, 2]
+    sources:
+      - url: https://clashofclans.fandom.com/wiki/Bomb_Tower/Home_Village
+        summary: Unlock TH8. Number Available 2 at TH10–18. Still present TH18.
+
+  xbow:
+    min_th: 9
+    max_th: 18
+    count_range: [2, 4]
+    sources:
+      - url: https://clashofclans.fandom.com/wiki/X-Bow/Home_Village
+        summary: Unlock TH9. Number Available 4 at TH11–18. Still present TH18.
+
+  inferno:
+    min_th: 10
+    max_th: 18
+    count_range: [1, 3]
+    sources:
+      - url: https://clashofclans.fandom.com/wiki/Inferno_Tower
+        summary: Unlock TH10. Number Available 3 at TH12–18. Still present TH18.
+
+  eagle:
+    min_th: 11
+    max_th: 16
+    removed_at: 17
+    count_range: [1, 1]
+    sources:
+      - url: https://www.clasher.us/clash-of-clans/unit/eagle-artillery-home-village
+        summary: Unlocked at Town Hall 11.
+      - url: https://supercell.com/en/games/clashofclans/blog/game-updates/the-town-hall-17-update-is-here-2/
+        summary: TH17 merges Eagle + Town Hall into Inferno Artillery; standalone Eagle gone.
+      - url: https://www.clash.ninja/guides/max-levels-for-each-th
+        summary: Eagle max-level row is "-" at TH17 and TH18.
+
+  scattershot:
+    min_th: 13
+    max_th: 18
+    count_range: [1, 2]
+    sources:
+      - url: https://clashofclans.fandom.com/wiki/Scattershot
+        summary: Unlock TH13. Number Available 2 at TH13–18. Still present TH18.
+
+  builderhut:
+    min_th: 14  # weaponized Battle Builder Hut (wiki: cannot weaponize below TH14)
+    max_th: 18
+    count_range: [1, 3]
+    sources:
+      - url: https://www.clash.ninja/blog/town-hall-14-released
+        summary: Battle Builder Huts from TH14 (weaponized hut is a defense).
+      - url: https://clashofclans.fandom.com/wiki/Town_Hall
+        summary: "5 Builder's Huts at TH13-18. Cannot be weaponized below TH14."
+
+  monolith:
+    min_th: 15
+    max_th: 18
+    count_range: [1, 1]
+    sources:
+      - url: https://supercell.com/en/games/clashofclans/blog/release-notes/full-release-notes-2/
+        summary: Official TH15 notes — Monolith is a new TH15 defense.
+      - url: https://clashofclans.fandom.com/wiki/Town_Hall
+        summary: 1 Monolith at TH15–18.
+
+  spelltower:
+    min_th: 15
+    max_th: 18
+    # User 2026-08-17: TH15 layouts must not place spell towers.
+    # Wiki Number Available is 2 at TH15–18 (SOURCES.md). Generator skips TH15 only.
+    generator_skip_th: [15]
+    count_range: [2, 2]
+    wiki_count_by_th: {15: 2, 16: 2, 17: 2, 18: 2}
+    sources:
+      - url: https://clashofclans.fandom.com/wiki/Spell_Tower
+        summary: Number Available 2 at TH15, 16, 17, 18. Level 4 requires TH17.
+      - url: https://supercell.com/en/games/clashofclans/blog/release-notes/full-release-notes-2/
+        summary: "Official: place 2 Spell Towers at Town Hall 15."
+      - url: https://www.clash.ninja/guides/max-levels-for-each-th
+        summary: Spell Tower max level 3 at TH15–16, 4 at TH17–18 (still present).
+
+  ricochet_cannon:
+    min_th: 16
+    max_th: 18
+    merge_of: canon
+    sources:
+      - url: https://supercell.com/en/games/clashofclans/blog/release-notes/full-patch-notes-th16/
+        summary: Ricochet Cannon added with TH16. 2× available at TH16.
+      - url: https://clashofclans.fandom.com/wiki/Ricochet_Cannon
+        summary: Unlock TH16; still present TH18 (level 4 requires TH18).
+
+  multi-archer_tower:
+    min_th: 16
+    max_th: 18
+    merge_of: archertower
+    sources:
+      - url: https://supercell.com/en/games/clashofclans/blog/release-notes/full-patch-notes-th16/
+        summary: Multi-Archer Tower added with TH16. 2× available at TH16.
+      - url: https://clashofclans.fandom.com/wiki/Multi-Archer_Tower
+        summary: Unlock TH16; still present TH18.
+
+  firespitter:
+    min_th: 17
+    max_th: 18
+    count_range: [1, 2]
+    sources:
+      - url: https://supercell.com/en/games/clashofclans/blog/game-updates/the-town-hall-17-update-is-here-2/
+        summary: Official TH17 notes — new defense Firespitter.
+      - url: https://www.clash.ninja/guides/max-levels-for-each-th
+        summary: Firespitter max level 2 at TH17, 3 at TH18.
+
+  multi-gear_tower:
+    min_th: 17
+    max_th: 18
+    count_range: [1, 1]
+    sources:
+      - url: https://cocmap.com/coc/unit/buildings/multi-gear-tower-home-village
+        summary: Unlock TH17; merge geared-up Cannon + Archer Tower. Distinct from Ricochet.
+      - url: https://clashofclans.fandom.com/wiki/Town_Hall
+        summary: 1 Multi-Gear Tower at TH17–18.
+      - url: https://clashofclans.fandom.com/wiki/Town_Hall/Unlocks
+        summary: Multi-Gear Tower listed as a TH17 unlock.
+
+  super_wizard_tower:
+    min_th: 18
+    max_th: 18
+    merge_of: wizztower
+    sources:
+      - url: https://supercell.com/en/games/clashofclans/blog/release-notes/town-hall-18-crash-lands-update/
+        summary: Official — merge two Wizard Towers at TH18.
+      - url: https://www.clasher.us/clash-of-clans/unit/super-wizard-tower-home-village
+        summary: TH required = 18.
+
+  revenge_tower:
+    min_th: 18
+    max_th: 18
+    count_range: [1, 1]
+    sources:
+      - url: https://supercell.com/en/games/clashofclans/blog/release-notes/town-hall-18-crash-lands-update/
+        summary: Official — Revenge Tower unlocks at Town Hall 18.
+
+# Omitted on purpose (see SOURCES.md)
+todo_omit:
+  - name: crafted_defenses
+    reason: No ClashKing folders for Roaster / Air Bombs / Lava Launcher / Light Beam / Hero Bell / Bomb Hive.
+  - name: hero_altars
+    reason: SuperCell TH17 removed altars; no altar sprites; user asked not to label pads.
+  - name: resource_and_army
+    reason: Pet House, Barracks, collectors — not defenses.
+  - name: inferno_artillery_guardians
+    reason: Part of the Town Hall sprite, not a separate building.

@@ -1,26 +1,32 @@
 """Generate bulk synthetic YOLO-labeled village renders (perfect labels).
 
 Layouts are random-but-plausible occupancy on the 44×44 editor grid.
-Count ranges and tile footprints are collision/variety parameters — not
-combat stats. **Which buildings exist at a TH** comes from
-``renderer/sprites/th_unlocks.yaml`` (internet-sourced; see
+**Which buildings exist at a TH, and how many**, come from
+``renderer/sprites/th_unlocks.yaml`` ``count_by_th`` (internet-sourced; see
 ``knowledge-base/SOURCES.md``). Types without a sourced row are omitted.
+Exact wiki counts are placed (not a random subset). If occupancy cannot fit
+every copy, as many as possible are placed and a warning is logged.
 
 Sprite levels use a **visual-tier proxy** (not an official CoC cap),
 with sourced merge windows:
 
-* Cannons max at TH15 (``cannon/level_21.webp`` purple). TH16–18 place
-  ``ricochet_cannon`` (wiki merge TH16). YOLO class remains ``canon``.
-* Wizard towers max at TH17 (``wizard_tower/level_17.webp``). TH18 places
-  ``super_wizard_tower`` (wiki merge TH18). YOLO class remains ``wizztower``.
+* Cannons max at TH15 (``cannon/level_21.webp`` purple). TH16 places
+  remaining regular cannons **plus** ``ricochet_cannon`` (wiki 3+2).
+  TH17–18: 0 regular + 3 ricochet. YOLO class remains ``canon``.
+* Archer towers: remaining regulars plus ``multi-archer_tower`` per wiki.
+* Wizard towers max at TH17. TH18 places remaining regulars **plus**
+  ``super_wizard_tower``. YOLO class remains ``wizztower``.
 * Eagle artillery TH11–16; removed at TH17 (merged into Inferno Artillery).
 * Firespitter TH17+; Multi-Gear Tower TH17+; Revenge Tower TH18.
-* Spell towers: wiki Number Available is 2 at TH15–18. **Generator skips
-  TH15** (user 2026-08-17). Place 2 on TH16–18. Not the old “TH15+ except 16”.
+* Spell towers: wiki Number Available is 2 at TH15–18 (user confirmed
+  TH15 2026-08-17). Place 2 per layout; cycle ClashKing ``level_1``–``4``
+  evenly so all four designs appear in the dataset.
 * Monolith TH15+; Hidden Tesla TH7+; weaponized Builder Hut TH14+.
 * Walls (``wall/``): visual-tier from maxed TH18. 1×1 tiles, unlabeled.
+  Walls may touch each other; non-wall buildings keep a 1-tile gap.
 * Other defenses use ClashKing max / max-1 / max-2 / max-3 for
-  TH18 / 17 / 16 / 15. One sprite level per building type per image.
+  TH18 / 17 / 16 / 15. One sprite level per building type per image
+  (spell towers excepted: two cycled designs).
 """
 
 from __future__ import annotations
@@ -40,9 +46,12 @@ from link_decoder.schema import BuildingPlacement
 from renderer.domain_randomization import DomainRandomizationConfig
 from renderer.photo_background import scenery_path_by_name
 from renderer.isometric_renderer import (
+    BUILDING_GAP_TILES,
     BUILDING_TYPE_MAP_PATH,
     CLASHKING_HOME_VILLAGE,
+    COC_TILE_FOOTPRINTS,
     GRID_SIZE,
+    SPRITE_RENDER_SCALE,
     TILE_FOOTPRINTS,
     TILE_WIDTH,
     IsometricRenderer,
@@ -50,6 +59,7 @@ from renderer.isometric_renderer import (
     occupancy_tiles,
     occupied_cells,
     placement_in_playable_grid,
+    scale_sprite_size,
     sprite_stays_on_playable,
     _load_building_type_map,
     _slug_for_building_type,
@@ -93,6 +103,9 @@ SYNTHETIC_BUILDING_TYPES: tuple[str, ...] = (
     "builderhut",
     "multi-gear_tower",
     "revenge_tower",
+    "ricochet_cannon",
+    "multi-archer_tower",
+    "super_wizard_tower",
 )
 
 # Placement types used after era merges (not in the logical SYNTHETIC list).
@@ -108,29 +121,39 @@ SPELL_TOWER_VARIANT_FILES: tuple[str, ...] = (
     "spell_tower/level_4.webp",
 )
 
-# How many of each type to try placing. Caps come from wiki counts in
-# th_unlocks.yaml when present; these are occupancy fallbacks only.
+# Wiki Number Available after required merges. Source: Town Hall page
+# https://clashofclans.fandom.com/wiki/Town_Hall  (accessed 2026-08-17).
+# Fallback if th_unlocks.yaml is missing a count_by_th row.
+WIKI_COUNT_BY_TH: dict[str, dict[int, int]] = {
+    "town_hall": {15: 1, 16: 1, 17: 1, 18: 1},
+    "clancastle": {15: 1, 16: 1, 17: 1, 18: 1},
+    "canon": {15: 7, 16: 3, 17: 0, 18: 0},
+    "archertower": {15: 8, 16: 4, 17: 2, 18: 2},
+    "wizztower": {15: 5, 16: 5, 17: 5, 18: 2},
+    "mortar": {15: 4, 16: 4, 17: 4, 18: 4},
+    "ad": {15: 4, 16: 4, 17: 4, 18: 4},
+    "airsweeper": {15: 2, 16: 2, 17: 2, 18: 2},
+    "tesla": {15: 5, 16: 5, 17: 5, 18: 5},
+    "bombtower": {15: 2, 16: 2, 17: 2, 18: 2},
+    "xbow": {15: 4, 16: 4, 17: 4, 18: 4},
+    "inferno": {15: 3, 16: 3, 17: 3, 18: 3},
+    "eagle": {15: 1, 16: 1, 17: 0, 18: 0},
+    "scattershot": {15: 2, 16: 2, 17: 2, 18: 2},
+    "builderhut": {15: 5, 16: 5, 17: 5, 18: 5},
+    "spelltower": {15: 2, 16: 2, 17: 2, 18: 2},
+    "monolith": {15: 1, 16: 1, 17: 1, 18: 1},
+    "ricochet_cannon": {15: 0, 16: 2, 17: 3, 18: 3},
+    "multi-archer_tower": {15: 0, 16: 2, 17: 3, 18: 3},
+    "firespitter": {15: 0, 16: 0, 17: 2, 18: 2},
+    "multi-gear_tower": {15: 0, 16: 0, 17: 1, 18: 1},
+    "super_wizard_tower": {15: 0, 16: 0, 17: 0, 18: 2},
+    "revenge_tower": {15: 0, 16: 0, 17: 0, 18: 1},
+}
+
+# Occupancy fallbacks only — placement uses count_by_th / WIKI_COUNT_BY_TH.
 COUNT_RANGES: dict[str, tuple[int, int]] = {
-    "town_hall": (1, 1),
-    "clancastle": (1, 1),
-    "eagle": (1, 1),
-    "scattershot": (1, 2),
-    "inferno": (1, 3),
-    "xbow": (2, 4),
-    "canon": (2, 5),
-    "mortar": (2, 4),
-    "wizztower": (2, 5),
-    "ad": (2, 4),
-    "bombtower": (1, 2),
-    "archertower": (2, 5),
-    "firespitter": (1, 2),
-    "spelltower": (2, 2),
-    "airsweeper": (1, 2),
-    "monolith": (1, 1),
-    "tesla": (1, 3),
-    "builderhut": (1, 3),
-    "multi-gear_tower": (1, 1),
-    "revenge_tower": (1, 1),
+    name: (counts.get(15, 0), max(counts.values()) if counts else 0)
+    for name, counts in WIKI_COUNT_BY_TH.items()
 }
 
 # Place these before the shuffled remainder so TH-window uniques still fit.
@@ -148,6 +171,9 @@ PRIORITY_TYPES: tuple[str, ...] = (
     "bombtower",
     "tesla",
     "builderhut",
+    "ricochet_cannon",
+    "multi-archer_tower",
+    "super_wizard_tower",
 )
 
 PREVIEW_SPECS: tuple[tuple[str, int, int], ...] = (
@@ -231,7 +257,8 @@ class SpriteLevelCatalog:
         avail = self._availability(building_type)
         if avail is not None and avail.get("max_th") is not None:
             era_max = min(era_max, int(avail["max_th"]))
-        if merge is not None and town_hall_level < int(merge["merged_from_th"]):
+        if merge is not None:
+            # Remaining regulars stay at the pre-merge max sprite (e.g. cannon 21).
             era_max = int(merge["max_regular_th"])
         return visual_tier_level(
             self.levels_for(building_type),
@@ -305,20 +332,13 @@ class SpriteLevelCatalog:
             return building_type, self.sprite_level(building_type, town_hall_level)
         if not self.available_at_th(building_type, town_hall_level):
             return None
+        if self.count_for(building_type, town_hall_level) <= 0:
+            return None
         merge = self._merge_rule(building_type)
         if merge is None:
             return building_type, self.sprite_level(building_type, town_hall_level)
-        merged_from = int(merge["merged_from_th"])
-        merged_slug = str(merge.get("merged_slug") or "").strip()
-        if town_hall_level >= merged_from:
-            if not merged_slug:
-                return None
-            level = visual_tier_level(
-                self.levels_for(merged_slug),
-                town_hall_level,
-                era_max=self.era_max_town_hall,
-            )
-            return merged_slug, level
+        # Regular remaining copies keep the unmerged sprite; merged slugs are
+        # placed separately from their own count_by_th rows.
         return building_type, self.sprite_level(building_type, town_hall_level)
 
     def uses_random_variants(self, building_type: str) -> bool:
@@ -346,18 +366,50 @@ class SpriteLevelCatalog:
         offset = cycle % len(levels)
         return levels[offset:] + levels[:offset]
 
-    def count_range_for(self, building_type: str, town_hall_level: int) -> tuple[int, int]:
-        merge = self._merge_rule(building_type)
-        if merge is not None and town_hall_level >= int(merge["merged_from_th"]):
-            raw = merge.get("count_range")
-            if isinstance(raw, (list, tuple)) and len(raw) == 2:
-                return int(raw[0]), int(raw[1])
+    def cycled_variant_levels(self, building_type: str, cycle: int, count: int) -> list[int]:
+        """Consecutive ClashKing variants wrapping around, offset by cycle.
+
+        Two spell towers per layout × four designs → cycle so all four appear
+        evenly across TH15–18 previews and a bulk batch.
+        """
+        levels = self.levels_for(building_type)
+        if not levels or count <= 0:
+            return []
+        offset = cycle % len(levels)
+        rotated = levels[offset:] + levels[:offset]
+        if count >= len(rotated):
+            return list(rotated)
+        return rotated[:count]
+
+    def count_for(self, building_type: str, town_hall_level: int) -> int:
+        """Exact wiki Number Available at this TH (0 if absent)."""
         avail = self._availability(building_type)
         if avail is not None:
-            raw = avail.get("count_range")
-            if isinstance(raw, (list, tuple)) and len(raw) == 2:
-                return int(raw[0]), int(raw[1])
-        return COUNT_RANGES[building_type]
+            if not self._rule_allows(avail, town_hall_level):
+                return 0
+            by_th = avail.get("count_by_th") or avail.get("wiki_count_by_th")
+            if isinstance(by_th, Mapping):
+                if town_hall_level in by_th:
+                    return int(by_th[town_hall_level])
+                key = str(town_hall_level)
+                if key in by_th:
+                    return int(by_th[key])
+        fallback = WIKI_COUNT_BY_TH.get(building_type)
+        if fallback is not None:
+            return int(fallback.get(town_hall_level, 0))
+        return 0
+
+    def expected_counts(self, town_hall_level: int) -> dict[str, int]:
+        counts: dict[str, int] = {}
+        for name in SYNTHETIC_BUILDING_TYPES:
+            n = self.count_for(name, town_hall_level)
+            if n > 0:
+                counts[name] = n
+        return counts
+
+    def count_range_for(self, building_type: str, town_hall_level: int) -> tuple[int, int]:
+        n = self.count_for(building_type, town_hall_level)
+        return n, n
 
     def defense_level_for_th(self, building_type: str, town_hall_level: int) -> int:
         return self.sprite_level(building_type, town_hall_level)
@@ -401,11 +453,12 @@ class SpriteLevelCatalog:
     def visual_sprite_size(self, building_type: str, level: int) -> tuple[int, int]:
         dims = self.sprite_pixel_size(building_type, level)
         if dims is not None:
-            return dims
+            return scale_sprite_size(*dims)
         from renderer.isometric_renderer import SPRITE_NORTH_PAD_PX, TILE_HEIGHT
 
-        tiles = TILE_FOOTPRINTS.get(building_type, 3)
-        return tiles * TILE_WIDTH, tiles * TILE_HEIGHT + SPRITE_NORTH_PAD_PX
+        tiles = COC_TILE_FOOTPRINTS.get(building_type, TILE_FOOTPRINTS.get(building_type, 3))
+        raw_w, raw_h = tiles * TILE_WIDTH, tiles * TILE_HEIGHT + SPRITE_NORTH_PAD_PX
+        return scale_sprite_size(raw_w, raw_h)
 
     @classmethod
     def load(
@@ -495,9 +548,10 @@ def _fits(
         return False
     if occupied_cells(x, y, size) & occupied:
         return False
-    # One empty tile between occupancy squares so iso sprites do not sit on
-    # each other's feet. Walls may still fill that gap later.
-    dilated = occupied_cells(x - 1, y - 1, size + 2)
+    # One empty tile between non-wall occupancy squares. Walls may fill
+    # that gap later and may touch each other.
+    pad = BUILDING_GAP_TILES
+    dilated = occupied_cells(x - pad, y - pad, size + 2 * pad)
     if dilated & occupied:
         return False
     return sprite_stays_on_playable(x, y, size, sprite_w=sprite_w, sprite_h=sprite_h)
@@ -714,15 +768,16 @@ def generate_random_layout(
     catalog: SpriteLevelCatalog | None = None,
     variant_cycle: int = 0,
 ) -> list[BuildingPlacement]:
-    """Place a TH plus a random mix of active defenses without grid overlap.
+    """Place a TH plus the sourced defense set without grid overlap.
 
     Town hall sprite is exactly ``town_hall_level``. Other types use one
-    visual-tier file, with cannon/archer/wizard era merges from ``era_merges``.
-    Availability is ``th_unlocks.yaml``: eagle ≤ TH16, firespitter ≥ TH17,
-    spell towers on TH16–18 (not TH15), monolith/tesla/builder hut as sourced.
-    Walls are 1×1 compartment rings (rendered, not YOLO-labeled). Occupied
-    tiles are never reused; screen-space footprint AABBs must not overlap.
-    If a building cannot fit after retries, it is skipped.
+    visual-tier file, with cannon/archer/wizard remaining regulars plus
+    merged buildings from ``count_by_th``. Availability is
+    ``th_unlocks.yaml``: eagle ≤ TH16, firespitter ≥ TH17, spell towers 2
+    at TH15–18, remaining cannons/archers/wizards after merges as sourced.
+    Non-wall buildings keep a 1-tile gap; walls are 1×1 and may touch.
+    Occupied tiles are never reused. If a building cannot fit after retries,
+    as many copies as possible are placed and a warning is logged.
     """
     catalog = catalog or SpriteLevelCatalog.load()
 
@@ -760,20 +815,16 @@ def generate_random_layout(
         if resolved is None:
             continue
         place_type, level = resolved
-        variant_order = catalog.variant_levels_for_layout(building_type, variant_cycle)
-        if variant_order is not None:
-            levels_to_place = variant_order
-            skip_on_miss = False
+        count = catalog.count_for(building_type, town_hall_level)
+        if count <= 0:
+            continue
+        if catalog.uses_random_variants(building_type):
+            levels_to_place = catalog.cycled_variant_levels(
+                building_type, variant_cycle, count
+            )
         else:
-            lo, hi = catalog.count_range_for(building_type, town_hall_level)
-            count = rng.randint(lo, hi)
-            if catalog.uses_random_variants(building_type):
-                levels_to_place = [
-                    rng.choice(catalog.levels_for(building_type)) for _ in range(count)
-                ]
-            else:
-                levels_to_place = [level] * count
-            skip_on_miss = True
+            levels_to_place = [level] * count
+        placed_n = 0
         for place_level in levels_to_place:
             size = catalog.occupancy_size(place_type, place_level)
             sprite_w, sprite_h = catalog.visual_sprite_size(place_type, place_level)
@@ -785,12 +836,19 @@ def generate_random_layout(
                 sprite_h=sprite_h,
             )
             if pos is None:
-                if skip_on_miss:
-                    break
                 continue
             _mark(occupied, pos[0], pos[1], size)
             placements.append(
                 BuildingPlacement(place_type, level=place_level, x=pos[0], y=pos[1])
+            )
+            placed_n += 1
+        if placed_n < count:
+            logging.warning(
+                "TH%s %s: placed %d/%d (occupancy)",
+                town_hall_level,
+                place_type,
+                placed_n,
+                count,
             )
 
     placements.extend(
@@ -833,6 +891,36 @@ def summarize_placement_levels(
     return {
         "by_type": dict(sorted(by_type.items())),
         "mixed_levels": mixed,
+    }
+
+
+def compare_defense_counts(
+    placements: Sequence[BuildingPlacement],
+    catalog: SpriteLevelCatalog,
+    town_hall_level: int,
+) -> dict[str, Any]:
+    """Actual vs yaml expected counts (walls excluded)."""
+    expected = catalog.expected_counts(town_hall_level)
+    actual: dict[str, int] = {}
+    for placement in placements:
+        if placement.building_type == "wall":
+            continue
+        actual[placement.building_type] = actual.get(placement.building_type, 0) + 1
+    rows: list[dict[str, Any]] = []
+    short: list[str] = []
+    for name in sorted(set(expected) | set(actual)):
+        exp = expected.get(name, 0)
+        got = actual.get(name, 0)
+        rows.append({"type": name, "expected": exp, "actual": got})
+        if got < exp:
+            short.append(f"{name} {got}/{exp}")
+    return {
+        "expected": expected,
+        "actual": actual,
+        "rows": rows,
+        "short": short,
+        "sprite_scale": SPRITE_RENDER_SCALE,
+        "building_gap_tiles": BUILDING_GAP_TILES,
     }
 
 
@@ -974,6 +1062,7 @@ def generate_th18era_previews(
         )
         result.image.save(out_png, format="PNG")
         level_info = summarize_placement_levels(placements, catalog)
+        counts = compare_defense_counts(placements, catalog, th_level)
         report = {
             "file": str(out_png),
             "town_hall_level": th_level,
@@ -983,6 +1072,7 @@ def generate_th18era_previews(
             "level_policy": catalog.policy,
             "not_official_coc_cap": catalog.not_official_coc_cap,
             "background": result.background_path.name if result.background_path else None,
+            "counts": counts,
         }
         reports.append(report)
         logging.info(
@@ -1064,6 +1154,7 @@ def generate_scenery_previews(
         )
         result.image.save(out_png, format="PNG")
         level_info = summarize_placement_levels(placements, catalog)
+        counts = compare_defense_counts(placements, catalog, th_level)
         reports.append(
             {
                 "file": str(out_png),
@@ -1074,6 +1165,7 @@ def generate_scenery_previews(
                 "mixed_levels": level_info["mixed_levels"],
                 "level_policy": catalog.policy,
                 "not_official_coc_cap": catalog.not_official_coc_cap,
+                "counts": counts,
             }
         )
         logging.info("%s TH=%s background=%s", out_png.name, th_level, bg_path.name)
@@ -1158,8 +1250,6 @@ def _print_preview_reports(reports: Sequence[Mapping[str, Any]]) -> None:
         if spell_info:
             spell_sprites = list(dict.fromkeys(spell_info.get("sprites") or [spell_info["sprite"]]))
             spell_txt = f"n={spell_info['count']} " + ", ".join(spell_sprites)
-        elif th == 15:
-            spell_txt = "(none — spell towers skipped at TH15)"
         else:
             spell_txt = "(none)"
         wall_txt = (
@@ -1171,6 +1261,26 @@ def _print_preview_reports(reports: Sequence[Mapping[str, Any]]) -> None:
         print(f"       eagle={eagle_sprite}")
         print(f"       spells={spell_txt}")
         print(f"       walls={wall_txt}")
+    print(
+        f"\nDefense counts vs wiki (scale={SPRITE_RENDER_SCALE}, "
+        f"gap={BUILDING_GAP_TILES} tile between non-wall buildings):"
+    )
+    for report in reports:
+        th = report["town_hall_level"]
+        if report.get("skipped"):
+            print(f"  TH{th}: SKIPPED")
+            continue
+        counts = report.get("counts") or {}
+        rows = counts.get("rows") or []
+        print(f"  TH{th}:")
+        for row in rows:
+            flag = "" if row["actual"] == row["expected"] else "  <-- short"
+            print(
+                f"    {row['type']:22} {row['actual']:>2}/{row['expected']:<2}{flag}"
+            )
+        short = counts.get("short") or []
+        if short:
+            print(f"    occupancy shortfalls: {', '.join(short)}")
     written = [r["file"] for r in reports if r.get("file")]
     print("\nOpen previews:")
     for path in written:

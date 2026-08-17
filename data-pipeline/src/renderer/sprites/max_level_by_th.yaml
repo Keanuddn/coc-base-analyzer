@@ -34,8 +34,8 @@
 #         relative to eagle max_th (16), not TH18: TH16 = highest file,
 #         TH15 = max-1. Avoids leftover level_4/5 (TH14-looking).
 #       firespitter: only TH17+ (skip TH15/TH16). Visual-tier among 3 files.
-#       spelltower: wiki 2 at TH15–18. Generator skips TH15 (user 2026-08-17).
-#         TH16–18 place two towers (not all four ClashKing designs).
+#       spelltower: wiki 2 at TH15–18 (user confirmed TH15 2026-08-17).
+#         Place two towers per layout; cycle ClashKing level_1…4 evenly.
 #       monolith / tesla / builderhut / multi-gear_tower / revenge_tower:
 #         sourced in th_unlocks.yaml; unlabeled until YOLO classes exist.
 #       wall: ClashKing wall/ folder. Visual-tier from maxed TH18:

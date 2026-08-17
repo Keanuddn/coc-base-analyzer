@@ -63,7 +63,7 @@ random_sprite_variants:
 
 # Fallback TH windows if th_unlocks.yaml is missing. Canonical table:
 # data-pipeline/src/renderer/sprites/th_unlocks.yaml (see knowledge-base/SOURCES.md).
-# Spell towers: wiki 2 at TH15–18; generator skips TH15 (user 2026-08-17).
+# Spell towers: wiki 2 at TH15–18 (user confirmed TH15 2026-08-17).
 era_availability:
   eagle:
     min_th: 11
@@ -75,8 +75,7 @@ era_availability:
   spelltower:
     min_th: 15
     max_th: 18
-    generator_skip_th: [15]
-    count_range: [2, 2]
+    count_by_th: {15: 2, 16: 2, 17: 2, 18: 2}
   monolith:
     min_th: 15
     count_range: [1, 1]
@@ -95,11 +94,11 @@ era_availability:
 # Regular cannon files: cannon/level_1.webp … level_21.webp (no geared-up extras
 # in this folder). level_21 is the purple max; maxed at TH15 — do not show
 # regular cannons as upgradable past TH15.
-# TH16+: two maxed purple cannons → ricochet_cannon.
+# TH16+: remaining regular cannons (wiki 3 at TH16, 0 later) plus ricochet_cannon.
 # Archer towers match cannons: archer_tower/level_21.webp is the purple TH15 max.
-# TH16+: multi-archer_tower only (no regular archer towers).
+# TH16+: remaining regulars plus multi-archer_tower (wiki counts).
 # Wizard towers max at TH17 (wizard_tower/level_17.webp). TH15/16 = max-2 / max-1
-# relative to that. TH18: two wizard towers → super_wizard_tower.
+# relative to that. TH18: remaining regulars plus super_wizard_tower.
 # firespitter is a separate TH17 defense, not the wizard merge.
 era_merges:
   canon:

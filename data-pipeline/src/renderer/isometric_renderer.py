@@ -100,9 +100,14 @@ TILE_FOOTPRINTS: dict[str, int] = {
 
 # Extra tiles reserved around each defense so sprite bodies (not just tile
 # squares) stay apart on photo scenery. Walls stay 1×1 and skip this pad.
-OCCUPANCY_PAD_TILES = 2
+# Occupancy uses CoC editor size (see occupancy_tiles); the 1-tile gap is
+# enforced at placement time between non-wall buildings.
+OCCUPANCY_PAD_TILES = 0
+BUILDING_GAP_TILES = 1
 # Screen-space gap between visual footprint AABBs (photo compositing).
-VISUAL_OVERLAP_GAP_PX = 8
+VISUAL_OVERLAP_GAP_PX = 6
+# Draw ClashKing sprites smaller so a full TH defense set fits the diamond.
+SPRITE_RENDER_SCALE = 0.80
 # 1×1 types that must not inflate from sprite pixel size (walls form a grid).
 UNIT_TILE_TYPES: frozenset[str] = frozenset({"wall"})
 
@@ -238,10 +243,18 @@ def screen_to_tile(sx: float, sy: float, *, origin_x: float, origin_y: float) ->
 
 
 def footprint_size(building_type: str) -> int:
-    """Occupancy AABB in tiles (conservative ClashKing width, else CoC editor size)."""
-    if building_type in TILE_FOOTPRINTS:
-        return TILE_FOOTPRINTS[building_type]
-    return COC_TILE_FOOTPRINTS.get(building_type, 1)
+    """Occupancy in tiles: CoC editor footprint (scaled sprites sit in this diamond)."""
+    if building_type in UNIT_TILE_TYPES:
+        return 1
+    return COC_TILE_FOOTPRINTS.get(building_type, TILE_FOOTPRINTS.get(building_type, 3))
+
+
+def scale_sprite_size(width: int, height: int) -> tuple[int, int]:
+    """Pixel size after ``SPRITE_RENDER_SCALE`` (ClashKing files are oversized)."""
+    return (
+        max(1, int(round(width * SPRITE_RENDER_SCALE))),
+        max(1, int(round(height * SPRITE_RENDER_SCALE))),
+    )
 
 
 def occupancy_tiles(
@@ -251,21 +264,16 @@ def occupancy_tiles(
 ) -> int:
     """Tiles reserved for collision on the 44×44 diamond.
 
-    max(CoC editor size, conservative table, ceil(sprite_width / TILE_WIDTH),
-    ceil(0.5 * sprite_height / TILE_HEIGHT)) plus ``OCCUPANCY_PAD_TILES``.
-    Walls stay 1×1 so segments can sit on adjacent tiles.
+    CoC editor footprint only — scaled sprites are meant to sit in that diamond.
+    Walls stay 1×1 so segments can sit on adjacent tiles. Sprite pixel size is
+    ignored so occupancy does not inflate to the unscaled ClashKing AABB.
     """
+    del sprite_width, sprite_height
     if building_type in UNIT_TILE_TYPES:
         return 1
-    base = COC_TILE_FOOTPRINTS.get(building_type, 1)
-    conservative = TILE_FOOTPRINTS.get(building_type, base)
-    size = max(base, conservative)
-    if sprite_width is not None and sprite_width > 0:
-        size = max(size, math.ceil(sprite_width / TILE_WIDTH))
-    if sprite_height is not None and sprite_height > 0:
-        # Lower half of the sprite is the building body that must not sit on neighbors.
-        size = max(size, math.ceil((sprite_height * 0.55) / TILE_HEIGHT))
-    return size + OCCUPANCY_PAD_TILES
+    return COC_TILE_FOOTPRINTS.get(
+        building_type, TILE_FOOTPRINTS.get(building_type, 3)
+    )
 
 
 def occupied_cells(x: int, y: int, size: int) -> set[tuple[int, int]]:
@@ -624,6 +632,9 @@ class IsometricRenderer:
 
             if placement.rotation % 360 != 0:
                 sprite = sprite.rotate(-placement.rotation, expand=True, resample=Image.Resampling.BICUBIC)
+            scaled = scale_sprite_size(*sprite.size)
+            if scaled != sprite.size:
+                sprite = sprite.resize(scaled, resample=Image.Resampling.LANCZOS)
 
             size = occupancy_tiles(
                 placement.building_type, sprite.size[0], sprite.size[1]

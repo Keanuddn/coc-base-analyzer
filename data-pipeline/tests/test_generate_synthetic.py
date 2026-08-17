@@ -15,6 +15,7 @@ from dataset.generate_synthetic import (
     SYNTHETIC_BUILDING_TYPES,
     TILE_FOOTPRINTS,
     TOWN_HALL_LEVELS,
+    WIKI_COUNT_BY_TH,
     SpriteLevelCatalog,
     generate_random_layout,
     generate_scenery_previews,
@@ -23,9 +24,12 @@ from dataset.generate_synthetic import (
     visual_tier_level,
 )
 from renderer.isometric_renderer import (
+    BUILDING_GAP_TILES,
+    COC_TILE_FOOTPRINTS,
     GRID_SIZE,
     IsometricRenderer,
     OCCUPANCY_PAD_TILES,
+    SPRITE_RENDER_SCALE,
     YOLO_CLASS_NAMES,
     occupancy_tiles,
     occupied_cells,
@@ -103,8 +107,7 @@ _TYPE_MAP = {
         "spelltower": {
             "min_th": 15,
             "max_th": 18,
-            "generator_skip_th": [15],
-            "count_range": [2, 2],
+            "count_by_th": {15: 2, 16: 2, 17: 2, 18: 2},
         },
         "monolith": {"min_th": 15, "count_range": [1, 1]},
         "tesla": {"min_th": 7},
@@ -254,10 +257,10 @@ class TestGenerateRandomLayout:
         assert "super_wizard_tower" in types
         assert "multi-archer_tower" in types
         assert "canon" not in types
-        assert "wizztower" not in types
-        assert "archertower" not in types
-        assert TILE_FOOTPRINTS["ricochet_cannon"] == 4
-        assert TILE_FOOTPRINTS["super_wizard_tower"] == 4
+        assert "wizztower" in types
+        assert "archertower" in types
+        assert occupancy_tiles("ricochet_cannon") == COC_TILE_FOOTPRINTS["ricochet_cannon"]
+        assert occupancy_tiles("super_wizard_tower") == COC_TILE_FOOTPRINTS["super_wizard_tower"]
         ricochets = [p for p in placements if p.building_type == "ricochet_cannon"]
         wizards = [p for p in placements if p.building_type == "super_wizard_tower"]
         assert ricochets and wizards
@@ -272,11 +275,14 @@ class TestGenerateRandomLayout:
         ]
 
     def test_conservative_footprints_cover_coc_and_sprite_aabb(self) -> None:
-        assert TILE_FOOTPRINTS["town_hall"] == 6
-        assert TILE_FOOTPRINTS["eagle"] == 6
-        assert TILE_FOOTPRINTS["inferno"] == 4
-        assert TILE_FOOTPRINTS["canon"] == 5
-        assert TILE_FOOTPRINTS["super_wizard_tower"] >= TILE_FOOTPRINTS["wizztower"]
+        assert occupancy_tiles("town_hall") == COC_TILE_FOOTPRINTS["town_hall"]
+        assert occupancy_tiles("eagle") == COC_TILE_FOOTPRINTS["eagle"]
+        assert occupancy_tiles("inferno") == COC_TILE_FOOTPRINTS["inferno"]
+        assert occupancy_tiles("canon") == COC_TILE_FOOTPRINTS["canon"]
+        assert occupancy_tiles("super_wizard_tower") >= occupancy_tiles("wizztower")
+        assert BUILDING_GAP_TILES == 1
+        assert SPRITE_RENDER_SCALE == 0.80
+        assert OCCUPANCY_PAD_TILES == 0
 
 
 class TestGenerateSyntheticDataset:
@@ -364,23 +370,21 @@ class TestEraMerges:
         assert catalog.sprite_relpath("canon", 21) == "cannon/level_21.webp"
         assert not any(p.building_type == "ricochet_cannon" for p in placements)
 
-    def test_th16_plus_places_ricochet_not_regular_cannon(self) -> None:
+    def test_th16_plus_places_remaining_cannons_and_ricochet(self) -> None:
         catalog = _fake_catalog()
         expected = {16: 2, 17: 3, 18: 4}
+        remaining = {16: 3, 17: 0, 18: 0}
         for th_level, ricochet_level in expected.items():
-            assert catalog.resolve_for_th("canon", th_level) == (
-                "ricochet_cannon",
-                ricochet_level,
-            )
             placements = generate_random_layout(
                 random.Random(th_level), town_hall_level=th_level, catalog=catalog
             )
             regular = [p for p in placements if p.building_type == "canon"]
             ricochets = [p for p in placements if p.building_type == "ricochet_cannon"]
-            assert not regular
-            assert ricochets
-            assert 2 <= len(ricochets) <= 3
+            assert len(regular) == remaining[th_level]
+            assert len(ricochets) == WIKI_COUNT_BY_TH["ricochet_cannon"][th_level]
             assert {p.level for p in ricochets} == {ricochet_level}
+            if regular:
+                assert {p.level for p in regular} == {21}
             assert catalog.sprite_relpath("ricochet_cannon", ricochet_level) == (
                 f"ricochet_cannon/level_{ricochet_level}.webp"
             )
@@ -404,15 +408,21 @@ class TestEraMerges:
             )
             assert not any(p.building_type == "super_wizard_tower" for p in placements)
 
-    def test_th18_places_super_wizard_not_wizard_tower(self) -> None:
+    def test_th18_places_remaining_wizards_and_super_wizard(self) -> None:
         catalog = _fake_catalog()
-        assert catalog.resolve_for_th("wizztower", 18) == ("super_wizard_tower", 2)
+        assert catalog.resolve_for_th("wizztower", 18) == ("wizztower", 17)
         placements = generate_random_layout(
             random.Random(18), town_hall_level=18, catalog=catalog
         )
-        assert not any(p.building_type == "wizztower" for p in placements)
+        regular = [p for p in placements if p.building_type == "wizztower"]
         merged = [p for p in placements if p.building_type == "super_wizard_tower"]
-        assert merged
+        assert len(regular) == 2
+        assert {p.level for p in regular} == {17}
+        assert len(merged) == 2
+        assert {p.level for p in merged} == {2}
+        assert catalog.sprite_relpath("super_wizard_tower", 2) == (
+            "super_wizard_tower/level_2.webp"
+        )
         assert {p.level for p in merged} == {2}
         assert catalog.sprite_relpath("super_wizard_tower", 2) == (
             "super_wizard_tower/level_2.webp"
@@ -436,24 +446,24 @@ class TestAddedDefenses:
         assert {p.level for p in archers} == {21}
         assert catalog.sprite_relpath("archertower", 21) == "archer_tower/level_21.webp"
 
-    def test_th16_has_ricochet_and_multi_archer_not_regular(self) -> None:
+    def test_th16_has_remaining_regulars_plus_merged(self) -> None:
         catalog = _fake_catalog()
         expected = {16: 2, 17: 3, 18: 4}
+        remaining_archers = {16: 4, 17: 2, 18: 2}
+        remaining_cannons = {16: 3, 17: 0, 18: 0}
         for th_level, merged_level in expected.items():
-            assert catalog.resolve_for_th("archertower", th_level) == (
-                "multi-archer_tower",
-                merged_level,
-            )
             placements = generate_random_layout(
                 random.Random(th_level), town_hall_level=th_level, catalog=catalog
             )
             types = {p.building_type for p in placements}
             assert "ricochet_cannon" in types
             assert "multi-archer_tower" in types
-            assert "canon" not in types
-            assert "archertower" not in types
+            archers = [p for p in placements if p.building_type == "archertower"]
+            cannons = [p for p in placements if p.building_type == "canon"]
+            assert len(archers) == remaining_archers[th_level]
+            assert len(cannons) == remaining_cannons[th_level]
             merged = [p for p in placements if p.building_type == "multi-archer_tower"]
-            assert 2 <= len(merged) <= 3
+            assert len(merged) == WIKI_COUNT_BY_TH["multi-archer_tower"][th_level]
             assert {p.level for p in merged} == {merged_level}
             assert catalog.sprite_relpath("multi-archer_tower", merged_level) == (
                 f"multi-archer_tower/level_{merged_level}.webp"
@@ -468,9 +478,11 @@ class TestAddedDefenses:
         assert "super_wizard_tower" in types
         assert "ricochet_cannon" in types
         assert "multi-archer_tower" in types
-        assert "wizztower" not in types
+        assert "wizztower" in types
         assert "canon" not in types
-        assert "archertower" not in types
+        assert "archertower" in types
+        assert len([p for p in placements if p.building_type == "wizztower"]) == 2
+        assert len([p for p in placements if p.building_type == "super_wizard_tower"]) == 2
 
     def test_bomb_tower_visual_tier_th15_to_18(self) -> None:
         catalog = _fake_catalog()
@@ -514,28 +526,25 @@ class TestAddedDefenses:
                 f"firespitter/level_{spit_level}.webp"
             )
 
-    def test_spell_towers_skipped_on_th15_present_later(self) -> None:
+    def test_spell_towers_two_per_layout_th15_through_18(self) -> None:
         catalog = _fake_catalog()
-        assert catalog.resolve_for_th("spelltower", 15) is None
-        for seed in range(8):
-            placements = generate_random_layout(
-                random.Random(seed), town_hall_level=15, catalog=catalog
-            )
-            assert not any(p.building_type == "spelltower" for p in placements)
-            assert not any(p.building_type == "spell_tower" for p in placements)
-        for th_level in (16, 17, 18):
+        seen: set[str] = set()
+        for th_level in (15, 16, 17, 18):
             assert catalog.resolve_for_th("spelltower", th_level) is not None
             placements = generate_random_layout(
                 random.Random(th_level),
                 town_hall_level=th_level,
                 catalog=catalog,
+                variant_cycle=th_level,
             )
             towers = [p for p in placements if p.building_type == "spelltower"]
-            assert 1 <= len(towers) <= 2
+            assert len(towers) == 2
             files = {
                 catalog.sprite_relpath(p.building_type, p.level) for p in towers
             }
             assert files <= set(SPELL_TOWER_VARIANT_FILES)
+            seen.update(files)
+        assert seen == set(SPELL_TOWER_VARIANT_FILES)
 
     def test_th16_emits_spell_tower_and_eagle(self) -> None:
         catalog = _fake_catalog()
@@ -545,6 +554,48 @@ class TestAddedDefenses:
         )
         assert any(p.building_type == "spelltower" for p in placements)
         assert any(p.building_type == "eagle" for p in placements)
+
+    def test_wiki_counts_exact_per_th(self) -> None:
+        catalog = _fake_catalog()
+        for th_level in (15, 16, 17, 18):
+            placements = generate_random_layout(
+                random.Random(th_level), town_hall_level=th_level, catalog=catalog
+            )
+            by_type: dict[str, int] = {}
+            for placement in placements:
+                if placement.building_type == "wall":
+                    continue
+                by_type[placement.building_type] = by_type.get(placement.building_type, 0) + 1
+            for name, expected in WIKI_COUNT_BY_TH.items():
+                want = expected[th_level]
+                got = by_type.get(name, 0)
+                assert got == want, f"TH{th_level} {name}: {got} != {want}"
+
+    def test_non_wall_buildings_keep_one_tile_gap(self) -> None:
+        catalog = _fake_catalog()
+        placements = generate_random_layout(
+            random.Random(15), town_hall_level=15, catalog=catalog
+        )
+        occupied: dict[tuple[int, int], str] = {}
+        for placement in placements:
+            if placement.building_type == "wall":
+                continue
+            size = catalog.occupancy_size(placement.building_type, placement.level)
+            for cell in occupied_cells(placement.x, placement.y, size):
+                occupied[cell] = placement.building_type
+        for placement in placements:
+            if placement.building_type == "wall":
+                continue
+            size = catalog.occupancy_size(placement.building_type, placement.level)
+            dilated = occupied_cells(
+                placement.x - BUILDING_GAP_TILES,
+                placement.y - BUILDING_GAP_TILES,
+                size + 2 * BUILDING_GAP_TILES,
+            )
+            own = occupied_cells(placement.x, placement.y, size)
+            for cell in dilated - own:
+                other = occupied.get(cell)
+                assert other is None, f"gap missing at {cell} vs {other}"
 
     def test_sourced_gap_defenses_by_th(self) -> None:
         catalog = _fake_catalog()
@@ -631,15 +682,16 @@ class TestAddedDefenses:
             for wall in walls:
                 assert (wall.x, wall.y) not in occupied_buildings
 
-    def test_multi_archer_footprint_is_larger_than_archer(self) -> None:
-        assert TILE_FOOTPRINTS["archertower"] == 3
-        assert TILE_FOOTPRINTS["multi-archer_tower"] == 4
-        assert TILE_FOOTPRINTS["bombtower"] == 3
-        assert TILE_FOOTPRINTS["spelltower"] == 3
-        assert TILE_FOOTPRINTS["firespitter"] == 4
-        assert TILE_FOOTPRINTS["wall"] == 1
+    def test_multi_archer_footprint_matches_coc_editor(self) -> None:
+        assert occupancy_tiles("archertower") == 3
+        assert occupancy_tiles("multi-archer_tower") == 3
+        assert occupancy_tiles("bombtower") == 3
+        assert occupancy_tiles("spelltower") == 3
+        assert occupancy_tiles("firespitter") == 3
+        assert occupancy_tiles("wall") == 1
         assert occupancy_tiles("wall", 72, 70) == 1
-        assert occupancy_tiles("town_hall") == TILE_FOOTPRINTS["town_hall"] + OCCUPANCY_PAD_TILES
+        assert occupancy_tiles("town_hall") == 4
+        assert occupancy_tiles("super_wizard_tower") == 4
 
 
 @pytest.mark.skipif(
@@ -691,30 +743,36 @@ class TestTh18EraPreviews:
             assert levels[wizard_type]["level"] == wizard_lv
             assert levels[wizard_type]["sprite"] == wizard_sprite
             if th >= 16:
-                assert "canon" not in levels
-                assert "archertower" not in levels
+                assert "ricochet_cannon" in levels
                 assert "multi-archer_tower" in levels
             if th == 15:
                 assert "archertower" in levels
+                assert levels["archertower"]["count"] == 8
+                assert levels["canon"]["count"] == 7
                 assert "multi-archer_tower" not in levels
                 assert "ricochet_cannon" not in levels
                 assert "eagle" in levels
                 assert "firespitter" not in levels
-                assert "spelltower" not in levels
+                assert "spelltower" in levels
+                assert levels["spelltower"]["count"] == 2
                 assert "monolith" in levels
             if th == 16:
                 assert "eagle" in levels
                 assert "firespitter" not in levels
                 assert "spelltower" in levels
-                assert 1 <= levels["spelltower"]["count"] <= 2
+                assert levels["spelltower"]["count"] == 2
+                assert "canon" in levels
+                assert levels["canon"]["count"] == 3
+                assert "archertower" in levels
             if th >= 17:
                 assert "eagle" not in levels
                 assert "firespitter" in levels
                 assert "multi-gear_tower" in levels
                 assert "spelltower" in levels
-                assert 1 <= levels["spelltower"]["count"] <= 2
+                assert levels["spelltower"]["count"] == 2
             if th == 18:
-                assert "wizztower" not in levels
+                assert "wizztower" in levels
+                assert levels["wizztower"]["count"] == 2
                 assert "revenge_tower" in levels
 
 
@@ -741,26 +799,31 @@ class TestSceneryPreviews:
         assert "multi-archer_tower" in levels
         assert "super_wizard_tower" in levels
         assert "spelltower" in levels
-        assert 1 <= levels["spelltower"]["count"] <= 2
+        assert levels["spelltower"]["count"] == 2
         assert "revenge_tower" in levels
         assert "monolith" in levels
         assert "wall" in levels
         assert levels["wall"]["count"] >= MIN_WALL_SEGMENTS
+        assert "wizztower" in levels
+        assert levels["wizztower"]["count"] == 2
 
         if "preview_bg_th16.png" in by_file:
             th16 = by_file["preview_bg_th16.png"]["sprite_levels"]
             assert "spelltower" in th16
-            assert 1 <= th16["spelltower"]["count"] <= 2
+            assert th16["spelltower"]["count"] == 2
             assert "eagle" in th16
             assert th16["eagle"]["sprite"] == "eagle_artillery/level_7.webp"
             assert "firespitter" not in th16
+            assert "canon" in th16
+            assert th16["canon"]["count"] == 3
 
         if "preview_bg_th15.png" in by_file:
             th15 = by_file["preview_bg_th15.png"]["sprite_levels"]
             assert th15["town_hall"]["sprite"] == "town_hall/level_15.webp"
             assert "eagle" in th15
             assert th15["eagle"]["sprite"] == "eagle_artillery/level_6.webp"
-            assert "spelltower" not in th15
+            assert "spelltower" in th15
+            assert th15["spelltower"]["count"] == 2
             assert "firespitter" not in th15
             assert "ricochet_cannon" not in th15
             assert "monolith" in th15

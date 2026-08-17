@@ -111,6 +111,10 @@ def _slug_for_building_type(building_type: str, type_map: Mapping[str, Any]) -> 
 
 
 def _yolo_class_for_building_type(building_type: str, type_map: Mapping[str, Any]) -> str:
+    overrides: Mapping[str, str] = type_map.get("yolo_label_overrides") or {}
+    if building_type in overrides:
+        return str(overrides[building_type])
+
     aliases: Mapping[str, str] = type_map.get("aliases") or {}
     town_hall: Mapping[str, str] = type_map.get("town_hall") or {}
 

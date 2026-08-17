@@ -21,6 +21,38 @@ aliases:
   monolith: monolith
   spelltower: spell_tower
 
+# Temporary YOLO aliases for merged defenses that keremberke's 16 classes
+# do not include. Sprites are still rendered for visual correctness.
+# User needs detection of "cannon-like" / "wizard-like" until dedicated
+# classes (`ricochet`, etc.) are added.
+yolo_label_overrides:
+  ricochet_cannon: canon  # merged cannon visual (2× maxed TH15 cannons)
+  super_wizard_tower: wizztower  # merged wizard visual (2× maxed TH17 wizard towers)
+
+# User-corrected merge rules (not the visual-tier-proxy heuristic).
+# Regular cannon files: cannon/level_1.webp … level_21.webp (no geared-up extras
+# in this folder). level_21 is the purple max; maxed at TH15 — do not show
+# regular cannons as upgradable past TH15.
+# TH16+: two maxed purple cannons → ricochet_cannon.
+# Wizard towers max at TH17 (wizard_tower/level_17.webp). TH15/16 = max-2 / max-1
+# relative to that. TH18: two wizard towers → super_wizard_tower.
+# firespitter is a separate TH17 defense, not the wizard merge.
+era_merges:
+  canon:
+    regular_slug: cannon
+    max_regular_th: 15
+    merged_slug: ricochet_cannon
+    merged_from_th: 16
+    yolo_class: canon
+    count_range: [2, 3]  # 2→1 merge; prefer 2–3 ricochets for visual density
+  wizztower:
+    regular_slug: wizard_tower
+    max_regular_th: 17
+    merged_slug: super_wizard_tower
+    merged_from_th: 18
+    yolo_class: wizztower
+    count_range: [1, 3]
+
 # Explicit slug = identity (for schema strings that match ClashKing names)
 identity:
   - air_defense

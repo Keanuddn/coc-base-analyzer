@@ -4,11 +4,17 @@ Layouts are random-but-plausible occupancy on the 44×44 editor grid.
 Count ranges and tile footprints are collision/variety parameters — not
 combat stats or wiki army tables.
 
-Sprite levels use a **visual-tier proxy** (not an official CoC cap):
-TH18 is the current max Town Hall (2026). Town hall uses exact
-``town_hall/level_{N}.webp``. Defenses use ClashKing max / max-1 / max-2 /
-max-3 for TH18 / 17 / 16 / 15. One sprite level per building type per
-image. See ``renderer/sprites/max_level_by_th.yaml``.
+Sprite levels use a **visual-tier proxy** (not an official CoC cap),
+with user-corrected merge exceptions:
+
+* Cannons max at TH15 (``cannon/level_21.webp`` purple). TH16–18 place
+  ``ricochet_cannon`` (2→1 merge). YOLO class remains ``canon``.
+* Wizard towers max at TH17 (``wizard_tower/level_17.webp``). TH18 places
+  ``super_wizard_tower``. YOLO class remains ``wizztower``.
+* Other defenses use ClashKing max / max-1 / max-2 / max-3 for
+  TH18 / 17 / 16 / 15. One sprite level per building type per image.
+  See ``renderer/sprites/max_level_by_th.yaml`` and
+  ``building_type_map.yaml`` ``era_merges``.
 """
 
 from __future__ import annotations
@@ -64,6 +70,11 @@ SYNTHETIC_BUILDING_TYPES: tuple[str, ...] = (
     "town_hall",
 )
 
+# Placement types used after era merges (not in the logical SYNTHETIC list).
+MERGED_PLACEMENT_TYPES: frozenset[str] = frozenset(
+    {"ricochet_cannon", "super_wizard_tower"}
+)
+
 # Layout-editor occupancy in tiles (collision only).
 TILE_FOOTPRINTS: dict[str, int] = {
     "town_hall": 4,
@@ -78,6 +89,8 @@ TILE_FOOTPRINTS: dict[str, int] = {
     "xbow": 3,
     "bombtower": 3,
     "scattershot": 3,
+    "ricochet_cannon": 3,
+    "super_wizard_tower": 3,
 }
 
 # How many of each type to try placing. Not TH unlock tables.
@@ -163,11 +176,54 @@ class SpriteLevelCatalog:
                     f"Town hall sprite level_{town_hall_level} not in catalog {levels}"
                 )
             return town_hall_level
+        merge = self._merge_rule(building_type)
+        era_max = self.era_max_town_hall
+        if merge is not None and town_hall_level < int(merge["merged_from_th"]):
+            era_max = int(merge["max_regular_th"])
         return visual_tier_level(
             self.levels_for(building_type),
             town_hall_level,
-            era_max=self.era_max_town_hall,
+            era_max=era_max,
         )
+
+    def _merge_rule(self, building_type: str) -> Mapping[str, Any] | None:
+        merges = self.type_map.get("era_merges") or {}
+        rule = merges.get(building_type)
+        if not isinstance(rule, Mapping):
+            return None
+        return rule
+
+    def resolve_for_th(self, building_type: str, town_hall_level: int) -> tuple[str, int] | None:
+        """Logical type → (placement type, sprite level) for this TH.
+
+        Merge rules (user): cannons become ricochet from TH16; wizard towers
+        become super_wizard_tower at TH18. Returns None to skip the type.
+        """
+        if building_type == "town_hall":
+            return building_type, self.sprite_level(building_type, town_hall_level)
+        merge = self._merge_rule(building_type)
+        if merge is None:
+            return building_type, self.sprite_level(building_type, town_hall_level)
+        merged_from = int(merge["merged_from_th"])
+        merged_slug = str(merge.get("merged_slug") or "").strip()
+        if town_hall_level >= merged_from:
+            if not merged_slug:
+                return None
+            level = visual_tier_level(
+                self.levels_for(merged_slug),
+                town_hall_level,
+                era_max=self.era_max_town_hall,
+            )
+            return merged_slug, level
+        return building_type, self.sprite_level(building_type, town_hall_level)
+
+    def count_range_for(self, building_type: str, town_hall_level: int) -> tuple[int, int]:
+        merge = self._merge_rule(building_type)
+        if merge is not None and town_hall_level >= int(merge["merged_from_th"]):
+            raw = merge.get("count_range")
+            if isinstance(raw, (list, tuple)) and len(raw) == 2:
+                return int(raw[0]), int(raw[1])
+        return COUNT_RANGES[building_type]
 
     def defense_level_for_th(self, building_type: str, town_hall_level: int) -> int:
         return self.sprite_level(building_type, town_hall_level)
@@ -197,18 +253,29 @@ class SpriteLevelCatalog:
         observed: dict[str, int] = {str(k): int(v) for k, v in (policy.get("sprite_max_observed") or {}).items()}
         root = sprites_root or CLASHKING_HOME_VILLAGE
         levels_by_type: dict[str, list[int]] = {}
-        for building_type in SYNTHETIC_BUILDING_TYPES:
-            slug = _slug_for_building_type(building_type, type_map)
+
+        def _levels_for_slug(building_type: str, slug: str | None) -> list[int]:
             disk = list_sprite_levels(slug, root) if slug else []
             if disk:
-                levels_by_type[building_type] = disk
-                continue
+                return disk
             mx = observed.get(slug or "") or observed.get(building_type)
             if mx is None:
                 raise RuntimeError(
                     f"No ClashKing sprites and no yaml snapshot for {building_type!r} (slug={slug})"
                 )
-            levels_by_type[building_type] = list(range(1, mx + 1))
+            return list(range(1, mx + 1))
+
+        for building_type in SYNTHETIC_BUILDING_TYPES:
+            slug = _slug_for_building_type(building_type, type_map)
+            levels_by_type[building_type] = _levels_for_slug(building_type, slug)
+        merges = type_map.get("era_merges") or {}
+        for rule in merges.values():
+            if not isinstance(rule, dict):
+                continue
+            merged_slug = str(rule.get("merged_slug") or "").strip()
+            if merged_slug and merged_slug not in levels_by_type:
+                slug = _slug_for_building_type(merged_slug, type_map) or merged_slug
+                levels_by_type[merged_slug] = _levels_for_slug(merged_slug, slug)
         requested = tuple(
             int(x) for x in (policy.get("town_hall_levels_generated") or REQUESTED_TOWN_HALL_LEVELS)
         )
@@ -290,8 +357,8 @@ def generate_random_layout(
 ) -> list[BuildingPlacement]:
     """Place a TH plus a random mix of active defenses without grid overlap.
 
-    Town hall sprite is exactly ``town_hall_level``. Every other building type
-    uses one visual-tier file (TH18 = max, down to TH15 = max-3).
+    Town hall sprite is exactly ``town_hall_level``. Other types use one
+    visual-tier file, with cannon/wizard era merges from ``era_merges``.
     """
     catalog = catalog or SpriteLevelCatalog.load()
 
@@ -309,16 +376,19 @@ def generate_random_layout(
     order = [name for name in SYNTHETIC_BUILDING_TYPES if name != "town_hall"]
     rng.shuffle(order)
     for building_type in order:
-        lo, hi = COUNT_RANGES[building_type]
+        resolved = catalog.resolve_for_th(building_type, town_hall_level)
+        if resolved is None:
+            continue
+        place_type, level = resolved
+        lo, hi = catalog.count_range_for(building_type, town_hall_level)
         count = rng.randint(lo, hi)
-        size = TILE_FOOTPRINTS[building_type]
-        level = catalog.sprite_level(building_type, town_hall_level)
+        size = TILE_FOOTPRINTS.get(place_type) or TILE_FOOTPRINTS[building_type]
         for _ in range(count):
             pos = _try_place(occupied, size, rng)
             if pos is None:
                 break
             _mark(occupied, pos[0], pos[1], size)
-            placements.append(BuildingPlacement(building_type, level=level, x=pos[0], y=pos[1]))
+            placements.append(BuildingPlacement(place_type, level=level, x=pos[0], y=pos[1]))
 
     return placements
 
@@ -498,7 +568,7 @@ generate_th_strict_previews = generate_th18era_previews
 
 def _print_preview_reports(reports: Sequence[Mapping[str, Any]]) -> None:
     print(json.dumps(reports, indent=2))
-    print("\nSprite levels (visual-tier proxy, not official CoC caps):")
+    print("\nSprite levels (visual-tier proxy + user merge exceptions):")
     for report in reports:
         th = report["town_hall_level"]
         if report.get("skipped"):
@@ -509,6 +579,25 @@ def _print_preview_reports(reports: Sequence[Mapping[str, Any]]) -> None:
             print(
                 f"    {name:12} level={info['level']:<3} {info['sprite']}  n={info['count']}"
             )
+    print("\nCannon / ricochet and wizard / merge sprites:")
+    highlight = (
+        "canon",
+        "ricochet_cannon",
+        "wizztower",
+        "super_wizard_tower",
+    )
+    for report in reports:
+        th = report["town_hall_level"]
+        if report.get("skipped"):
+            print(f"  TH{th}: SKIPPED")
+            continue
+        levels = report.get("sprite_levels") or {}
+        bits = []
+        for name in highlight:
+            info = levels.get(name)
+            if info:
+                bits.append(f"{name}={info['sprite']}")
+        print(f"  TH{th}: " + (", ".join(bits) if bits else "(none)"))
     written = [r["file"] for r in reports if r.get("file")]
     print("\nOpen previews:")
     for path in written:

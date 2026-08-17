@@ -8,6 +8,7 @@ from pathlib import Path
 import pytest
 
 from dataset.generate_synthetic import (
+    MERGED_PLACEMENT_TYPES,
     REQUESTED_TOWN_HALL_LEVELS,
     SYNTHETIC_BUILDING_TYPES,
     TILE_FOOTPRINTS,
@@ -34,7 +35,36 @@ _TYPE_MAP = {
         "wizztower": "wizard_tower",
         "xbow": "x-bow",
     },
+    "identity": [
+        "cannon",
+        "ricochet_cannon",
+        "super_wizard_tower",
+        "town_hall",
+        "wizard_tower",
+    ],
     "town_hall": {"sprite_slug": "town_hall", "yolo_class": "th13"},
+    "yolo_label_overrides": {
+        "ricochet_cannon": "canon",
+        "super_wizard_tower": "wizztower",
+    },
+    "era_merges": {
+        "canon": {
+            "regular_slug": "cannon",
+            "max_regular_th": 15,
+            "merged_slug": "ricochet_cannon",
+            "merged_from_th": 16,
+            "yolo_class": "canon",
+            "count_range": [2, 3],
+        },
+        "wizztower": {
+            "regular_slug": "wizard_tower",
+            "max_regular_th": 17,
+            "merged_slug": "super_wizard_tower",
+            "merged_from_th": 18,
+            "yolo_class": "wizztower",
+            "count_range": [1, 3],
+        },
+    },
 }
 
 
@@ -48,6 +78,8 @@ def _fake_catalog(**overrides: object) -> SpriteLevelCatalog:
         "xbow": list(range(1, 14)),
         "scattershot": list(range(1, 8)),
         "wizztower": list(range(1, 18)),
+        "ricochet_cannon": list(range(1, 5)),
+        "super_wizard_tower": list(range(1, 3)),
         "ad": list(range(1, 17)),
         "bombtower": list(range(1, 14)),
         "airsweeper": list(range(1, 8)),
@@ -74,7 +106,7 @@ class TestGenerateRandomLayout:
         )
         types = {p.building_type for p in placements}
         assert "town_hall" in types
-        assert types <= set(SYNTHETIC_BUILDING_TYPES)
+        assert types <= set(SYNTHETIC_BUILDING_TYPES) | MERGED_PLACEMENT_TYPES
         assert all(p.building_type != "kingpad" for p in placements)
         th = next(p for p in placements if p.building_type == "town_hall")
         assert th.level == 15
@@ -153,26 +185,6 @@ class TestVisualTierProxy:
         assert TOWN_HALL_LEVELS == (15, 16, 17, 18)
         assert REQUESTED_TOWN_HALL_LEVELS == (15, 16, 17, 18)
 
-    def test_th18_cannons_all_same_max_file(self) -> None:
-        catalog = _fake_catalog()
-        placements = generate_random_layout(
-            random.Random(0), town_hall_level=18, catalog=catalog
-        )
-        cannons = [p for p in placements if p.building_type == "canon"]
-        assert cannons
-        assert {p.level for p in cannons} == {21}
-        assert catalog.sprite_relpath("canon", 21) == "cannon/level_21.webp"
-
-    def test_th15_cannons_are_max_minus_3(self) -> None:
-        catalog = _fake_catalog()
-        assert len(catalog.levels_for("canon")) >= 4
-        placements = generate_random_layout(
-            random.Random(1), town_hall_level=15, catalog=catalog
-        )
-        cannons = [p for p in placements if p.building_type == "canon"]
-        assert cannons
-        assert {p.level for p in cannons} == {18}
-
     def test_one_sprite_level_per_building_type_per_image(self) -> None:
         catalog = _fake_catalog()
         for th_level in (15, 16, 17, 18):
@@ -187,9 +199,9 @@ class TestVisualTierProxy:
 
     def test_th_offsets_match_max_minus_n(self) -> None:
         catalog = _fake_catalog()
-        expected = {18: 21, 17: 20, 16: 19, 15: 18}
-        for th_level, cannon_level in expected.items():
-            assert catalog.defense_level_for_th("canon", th_level) == cannon_level
+        expected = {18: 18, 17: 17, 16: 16, 15: 15}
+        for th_level, mortar_level in expected.items():
+            assert catalog.defense_level_for_th("mortar", th_level) == mortar_level
 
     def test_clamp_at_one_and_lowest_available_not_wrap(self) -> None:
         assert visual_tier_level([1, 2, 3], town_hall_level=15) == 1
@@ -206,6 +218,76 @@ class TestVisualTierProxy:
         catalog.levels_by_type["town_hall"] = list(range(1, 17))
         assert catalog.available_town_hall_levels() == [15, 16]
         assert catalog.skipped_town_hall_levels() == [17, 18]
+
+
+class TestEraMerges:
+    """User-corrected merge rules: cannons max TH15, wizards max TH17."""
+
+    def test_th15_uses_highest_regular_cannon(self) -> None:
+        catalog = _fake_catalog()
+        assert catalog.resolve_for_th("canon", 15) == ("canon", 21)
+        placements = generate_random_layout(
+            random.Random(1), town_hall_level=15, catalog=catalog
+        )
+        cannons = [p for p in placements if p.building_type == "canon"]
+        assert cannons
+        assert {p.level for p in cannons} == {21}
+        assert catalog.sprite_relpath("canon", 21) == "cannon/level_21.webp"
+        assert not any(p.building_type == "ricochet_cannon" for p in placements)
+
+    def test_th16_plus_places_ricochet_not_regular_cannon(self) -> None:
+        catalog = _fake_catalog()
+        expected = {16: 2, 17: 3, 18: 4}
+        for th_level, ricochet_level in expected.items():
+            assert catalog.resolve_for_th("canon", th_level) == (
+                "ricochet_cannon",
+                ricochet_level,
+            )
+            placements = generate_random_layout(
+                random.Random(th_level), town_hall_level=th_level, catalog=catalog
+            )
+            regular = [p for p in placements if p.building_type == "canon"]
+            ricochets = [p for p in placements if p.building_type == "ricochet_cannon"]
+            assert not regular
+            assert ricochets
+            assert 2 <= len(ricochets) <= 3
+            assert {p.level for p in ricochets} == {ricochet_level}
+            assert catalog.sprite_relpath("ricochet_cannon", ricochet_level) == (
+                f"ricochet_cannon/level_{ricochet_level}.webp"
+            )
+
+    def test_wizard_towers_max_at_th17(self) -> None:
+        catalog = _fake_catalog()
+        expected = {15: 15, 16: 16, 17: 17}
+        for th_level, wizard_level in expected.items():
+            assert catalog.resolve_for_th("wizztower", th_level) == (
+                "wizztower",
+                wizard_level,
+            )
+            placements = generate_random_layout(
+                random.Random(th_level), town_hall_level=th_level, catalog=catalog
+            )
+            wizards = [p for p in placements if p.building_type == "wizztower"]
+            assert wizards
+            assert {p.level for p in wizards} == {wizard_level}
+            assert catalog.sprite_relpath("wizztower", wizard_level) == (
+                f"wizard_tower/level_{wizard_level}.webp"
+            )
+            assert not any(p.building_type == "super_wizard_tower" for p in placements)
+
+    def test_th18_places_super_wizard_not_wizard_tower(self) -> None:
+        catalog = _fake_catalog()
+        assert catalog.resolve_for_th("wizztower", 18) == ("super_wizard_tower", 2)
+        placements = generate_random_layout(
+            random.Random(18), town_hall_level=18, catalog=catalog
+        )
+        assert not any(p.building_type == "wizztower" for p in placements)
+        merged = [p for p in placements if p.building_type == "super_wizard_tower"]
+        assert merged
+        assert {p.level for p in merged} == {2}
+        assert catalog.sprite_relpath("super_wizard_tower", 2) == (
+            "super_wizard_tower/level_2.webp"
+        )
 
 
 @pytest.mark.skipif(
@@ -231,14 +313,32 @@ class TestTh18EraPreviews:
         assert len(reports) == 4
         generated = {r["town_hall_level"] for r in reports if not r.get("skipped")}
         assert generated | skipped == {15, 16, 17, 18}
+        expected_cannon = {
+            15: ("canon", 21, "cannon/level_21.webp"),
+            16: ("ricochet_cannon", 2, "ricochet_cannon/level_2.webp"),
+            17: ("ricochet_cannon", 3, "ricochet_cannon/level_3.webp"),
+            18: ("ricochet_cannon", 4, "ricochet_cannon/level_4.webp"),
+        }
+        expected_wizard = {
+            15: ("wizztower", 15, "wizard_tower/level_15.webp"),
+            16: ("wizztower", 16, "wizard_tower/level_16.webp"),
+            17: ("wizztower", 17, "wizard_tower/level_17.webp"),
+            18: ("super_wizard_tower", 2, "super_wizard_tower/level_2.webp"),
+        }
         for report in reports:
             if report.get("skipped"):
                 continue
-            cannons = report["sprite_levels"]["canon"]
             th = report["town_hall_level"]
+            levels = report["sprite_levels"]
+            cannon_type, cannon_lv, cannon_sprite = expected_cannon[th]
+            wizard_type, wizard_lv, wizard_sprite = expected_wizard[th]
+            assert cannon_type in levels
+            assert levels[cannon_type]["level"] == cannon_lv
+            assert levels[cannon_type]["sprite"] == cannon_sprite
+            assert wizard_type in levels
+            assert levels[wizard_type]["level"] == wizard_lv
+            assert levels[wizard_type]["sprite"] == wizard_sprite
+            if th >= 16:
+                assert "canon" not in levels
             if th == 18:
-                assert cannons["level"] == 21
-                assert cannons["sprite"] == "cannon/level_21.webp"
-            if th == 15:
-                assert cannons["level"] == 18
-                assert cannons["sprite"] == "cannon/level_18.webp"
+                assert "wizztower" not in levels

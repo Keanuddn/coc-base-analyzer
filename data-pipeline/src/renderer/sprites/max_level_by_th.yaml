@@ -8,19 +8,24 @@
 # TH18 is the current max Town Hall (2026). ClashKing ships
 # town_hall/level_18.webp. Treating TH16 as "highest sprite" is wrong.
 #
-# Policy (heuristic: visual-tier proxy, not official CoC cap):
+# Policy (heuristic: visual-tier proxy, not official CoC cap), with
+# user-corrected merge exceptions in building_type_map.yaml era_merges:
 #   - Generate TH in {15, 16, 17, 18} when town_hall/level_{N}.webp exists.
 #     Skip a TH (and report) if that exact hall sprite is missing.
 #   - town_hall sprite = exact town_hall/level_{N}.webp for that image.
-#   - Other buildings: one sprite level per type per image (no leftover mix):
+#   - Default defenses: one sprite level per type per image (no leftover mix):
 #       TH18 → highest ClashKing file for that building
 #       TH17 → max-1
 #       TH16 → max-2
 #       TH15 → max-3
 #   - Clamp at 1. If a building has fewer files than the offset needs,
 #     use the lowest available file — do not wrap into a higher-era sprite.
-#
-# Per-TH official max (cannon at TH15 vs TH16, etc.): TODO unverified.
+#   - Exceptions (user):
+#       canon: TH15 = highest regular cannon (cannon/level_21.webp, purple max).
+#         TH16–18 = ricochet_cannon (no regular cannons). YOLO class canon
+#         (temporary alias — merged cannon visual).
+#       wizztower: maxed at TH17 (wizard_tower/level_17.webp). TH15/16 = max-2 /
+#         max-1 relative to that. TH18 = super_wizard_tower. YOLO class wizztower.
 
 policy: visual-tier-proxy
 not_official_coc_cap: true
@@ -44,3 +49,5 @@ sprite_max_observed:
   bomb_tower: 13  # source: https://assets.clashk.ing/buildings/home-village/bomb_tower/level_13.webp
   air_sweeper: 7  # source: https://assets.clashk.ing/buildings/home-village/air_sweeper/level_7.webp
   clan_castle: 14  # source: https://assets.clashk.ing/buildings/home-village/clan_castle/level_14.webp
+  ricochet_cannon: 4  # source: https://assets.clashk.ing/buildings/home-village/ricochet_cannon/level_4.webp
+  super_wizard_tower: 2  # source: https://assets.clashk.ing/buildings/home-village/super_wizard_tower/level_2.webp

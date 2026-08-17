@@ -141,3 +141,17 @@ class TestIsometricRenderer:
         result = renderer.render(placements, seed=0)
         assert result.rendered_count == 0
         assert result.skipped_count == 1
+
+    def test_ricochet_and_super_wizard_label_as_pre_merge_classes(
+        self, renderer: IsometricRenderer
+    ) -> None:
+        placements = [
+            BuildingPlacement("ricochet_cannon", level=4, x=18, y=20),
+            BuildingPlacement("super_wizard_tower", level=2, x=24, y=22),
+        ]
+        result = renderer.render(placements, seed=0)
+        assert result.rendered_count == 2
+        names = {label.class_name for label in result.labels}
+        assert names == {"canon", "wizztower"}
+        assert "ricochet_cannon" not in names
+        assert "super_wizard_tower" not in names

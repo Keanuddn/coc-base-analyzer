@@ -33,10 +33,13 @@ yolo_label_overrides:
   multi-archer_tower: archertower  # merged archer visual (2× maxed TH15 archer towers)
 
 # Render these sprites but skip YOLO txt until a class exists in the 16-head model.
+# keremberke has no `wall` class — still composite wall sprites as scenery-like
+# context so the detector focuses on defenses.
 yolo_unlabeled:
   - archertower
   - firespitter
   - spelltower
+  - wall
 
 # ClashKing has no poison/rage/invisibility/lightning filenames.
 # The four designs are spell_tower/level_1.webp … level_4.webp.
@@ -53,14 +56,19 @@ random_sprite_variants:
 
 # TH windows (user): not visual-tier. Skip the type outside the range.
 # Eagle artillery exists only through TH16. Firespitter unlocks at TH17.
+# Spell towers exist at TH15 / TH17 / TH18 — not at TH16.
+# Eagle visual-tier uses max_th (16), not era_max 18, so TH16 = highest eagle
+# file and TH15 = max-1 (not leftover level_4/5 TH14-looking sprites).
 era_availability:
   eagle:
+    min_th: 15
     max_th: 16
     count_range: [1, 1]
   firespitter:
     min_th: 17
   spelltower:
     min_th: 15
+    skip_th: [16]
     count_range: [4, 4]
 
 # User-corrected merge rules (not the visual-tier-proxy heuristic).
@@ -118,6 +126,7 @@ identity:
   - spell_tower
   - super_wizard_tower
   - town_hall
+  - wall
   - wizard_tower
   - x-bow
 

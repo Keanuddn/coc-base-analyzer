@@ -30,11 +30,16 @@
 #         (purple max). TH16–18 = multi-archer_tower (no regular archer towers).
 #         YOLO class archertower is a placeholder (not in keremberke 16).
 #       bombtower: normal visual-tier (no merge).
-#       eagle: only TH15–16 (skip TH17/TH18). Visual-tier among eagle files.
+#       eagle: only TH15–16 (skip TH17/TH18). Visual-tier among eagle files
+#         relative to eagle max_th (16), not TH18: TH16 = highest file,
+#         TH15 = max-1. Avoids leftover level_4/5 (TH14-looking).
 #       firespitter: only TH17+ (skip TH15/TH16). Visual-tier among 3 files.
 #       spelltower: four ClashKing files (level_1…4). Place all four designs
-#         per layout (one of each) — not visual-tier, not random-one-only.
+#         per layout (one of each) on TH15 / TH17 / TH18 — not at TH16.
 #         If occupancy cannot fit 4, cycle remaining variants across a batch.
+#       wall: ClashKing wall/ folder. Visual-tier from maxed TH18:
+#         TH18 = highest wall file, TH17 = max-1, TH16 = max-2, TH15 = max-3.
+#         1×1 tiles around/between buildings. Rendered, not YOLO-labeled.
 
 policy: visual-tier-proxy
 not_official_coc_cap: true
@@ -64,3 +69,4 @@ sprite_max_observed:
   multi-archer_tower: 4  # source: https://assets.clashk.ing/buildings/home-village/multi-archer_tower/level_4.webp
   firespitter: 3  # source: https://assets.clashk.ing/buildings/home-village/firespitter/level_3.webp
   spell_tower: 4  # source: https://assets.clashk.ing/buildings/home-village/spell_tower/level_4.webp (four designs, not named spells)
+  wall: 19  # source: https://assets.clashk.ing/buildings/home-village/wall/level_19.webp

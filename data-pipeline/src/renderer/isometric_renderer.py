@@ -55,12 +55,13 @@ COC_TILE_FOOTPRINTS: dict[str, int] = {
     "firespitter": 3,
     "spelltower": 3,
     "spell_tower": 3,
+    "wall": 1,
 }
 
 # Occupancy AABB: max(CoC tiles, ceil(max ClashKing sprite width / TILE_WIDTH)).
 # Wide auras (max cannon, eagle, inferno) would otherwise stack visually.
 TILE_FOOTPRINTS: dict[str, int] = {
-    "town_hall": 5,
+    "town_hall": 6,
     "clancastle": 4,
     "eagle": 6,
     "inferno": 4,
@@ -80,7 +81,16 @@ TILE_FOOTPRINTS: dict[str, int] = {
     "firespitter": 4,  # ClashKing max 165px wide → ceil(165/44)=4
     "spelltower": 3,
     "spell_tower": 3,
+    "wall": 1,  # 1×1 editor tiles; adjacent walls may overlap each other on purpose
 }
+
+# Extra tiles reserved around each defense so sprite bodies (not just tile
+# squares) stay apart on photo scenery. Walls stay 1×1 and skip this pad.
+OCCUPANCY_PAD_TILES = 2
+# Screen-space gap between visual footprint AABBs (photo compositing).
+VISUAL_OVERLAP_GAP_PX = 8
+# 1×1 types that must not inflate from sprite pixel size (walls form a grid).
+UNIT_TILE_TYPES: frozenset[str] = frozenset({"wall"})
 
 # Extra pixels above the isometric footprint used when sprite height is unknown.
 SPRITE_NORTH_PAD_PX = 140
@@ -160,8 +170,12 @@ def _slug_for_building_type(building_type: str, type_map: Mapping[str, Any]) -> 
         return building_type
     if building_type in {"town_hall", "th13", town_hall.get("yolo_class", "th13")}:
         return town_hall.get("sprite_slug", "town_hall")
-    if building_type in {"monolith", "spelltower", "spell_tower"}:
-        return "monolith" if building_type == "monolith" else "spell_tower"
+    if building_type in {"monolith", "spelltower", "spell_tower", "wall"}:
+        if building_type == "monolith":
+            return "monolith"
+        if building_type == "wall":
+            return "wall"
+        return "spell_tower"
     return None
 
 
@@ -216,18 +230,71 @@ def footprint_size(building_type: str) -> int:
     return COC_TILE_FOOTPRINTS.get(building_type, 1)
 
 
-def occupancy_tiles(building_type: str, sprite_width: int | None = None) -> int:
-    """max(CoC editor size, ceil(sprite_width / TILE_WIDTH), conservative table)."""
+def occupancy_tiles(
+    building_type: str,
+    sprite_width: int | None = None,
+    sprite_height: int | None = None,
+) -> int:
+    """Tiles reserved for collision on the 44×44 diamond.
+
+    max(CoC editor size, conservative table, ceil(sprite_width / TILE_WIDTH),
+    ceil(0.5 * sprite_height / TILE_HEIGHT)) plus ``OCCUPANCY_PAD_TILES``.
+    Walls stay 1×1 so segments can sit on adjacent tiles.
+    """
+    if building_type in UNIT_TILE_TYPES:
+        return 1
     base = COC_TILE_FOOTPRINTS.get(building_type, 1)
     conservative = TILE_FOOTPRINTS.get(building_type, base)
     size = max(base, conservative)
     if sprite_width is not None and sprite_width > 0:
         size = max(size, math.ceil(sprite_width / TILE_WIDTH))
-    return size
+    if sprite_height is not None and sprite_height > 0:
+        # Lower half of the sprite is the building body that must not sit on neighbors.
+        size = max(size, math.ceil((sprite_height * 0.55) / TILE_HEIGHT))
+    return size + OCCUPANCY_PAD_TILES
 
 
 def occupied_cells(x: int, y: int, size: int) -> set[tuple[int, int]]:
     return {(x + dx, y + dy) for dx in range(size) for dy in range(size)}
+
+
+def occupancy_aabb(
+    x: int,
+    y: int,
+    size: int,
+    sprite_w: int,
+    sprite_h: int,
+    *,
+    origin_x: float,
+    origin_y: float,
+) -> tuple[float, float, float, float]:
+    """Screen AABB of the visual footprint (occupancy diamond + sprite body).
+
+    Roofs may still overlap slightly; the box covers the isometric diamond plus
+    a fraction of extra sprite height so neighboring feet do not sit on the art.
+    """
+    foot_x, foot_y = footprint_anchor(x, y, size, origin_x=origin_x, origin_y=origin_y)
+    diamond_half_w = size * TILE_WIDTH / 2.0
+    diamond_h = size * TILE_HEIGHT
+    half_w = max(diamond_half_w, sprite_w * 0.42)
+    extra = max(0.0, float(sprite_h) - diamond_h)
+    body_h = diamond_h + extra * 0.45
+    return (foot_x - half_w, foot_y - body_h, foot_x + half_w, foot_y)
+
+
+def aabbs_overlap(
+    a: tuple[float, float, float, float],
+    b: tuple[float, float, float, float],
+    *,
+    gap: float = VISUAL_OVERLAP_GAP_PX,
+) -> bool:
+    """True if two (left, top, right, bottom) boxes overlap after ``gap`` padding."""
+    return not (
+        a[2] + gap <= b[0]
+        or b[2] + gap <= a[0]
+        or a[3] + gap <= b[1]
+        or b[3] + gap <= a[1]
+    )
 
 
 def footprint_anchor(
@@ -544,7 +611,9 @@ class IsometricRenderer:
             if placement.rotation % 360 != 0:
                 sprite = sprite.rotate(-placement.rotation, expand=True, resample=Image.Resampling.BICUBIC)
 
-            size = occupancy_tiles(placement.building_type, sprite.size[0])
+            size = occupancy_tiles(
+                placement.building_type, sprite.size[0], sprite.size[1]
+            )
             foot_x, foot_y = footprint_anchor(
                 placement.x,
                 placement.y,

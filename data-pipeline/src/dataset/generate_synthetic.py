@@ -11,10 +11,15 @@ with user-corrected merge exceptions:
   ``ricochet_cannon`` (2→1 merge). YOLO class remains ``canon``.
 * Wizard towers max at TH17 (``wizard_tower/level_17.webp``). TH18 places
   ``super_wizard_tower``. YOLO class remains ``wizztower``.
-* Eagle artillery only through TH16 (skip TH17/TH18).
+* Eagle artillery only through TH16 (skip TH17/TH18). Visual-tier is
+  relative to eagle ``max_th`` (16), so TH16 uses the highest eagle file
+  and TH15 uses max-1 — not leftover ``level_4``/``level_5`` (TH14-looking).
 * Firespitter only from TH17 onward (skip TH15/TH16).
-* Spell towers (TH15+): place all four ClashKing designs
-  (``spell_tower/level_1.webp`` … ``level_4.webp``), one of each.
+* Spell towers: all four ClashKing designs on TH15 / TH17 / TH18
+  (``spell_tower/level_1.webp`` … ``level_4.webp``), one of each. **Not at TH16.**
+* Walls (``wall/``): visual-tier from maxed TH18 (highest / max-1 / max-2 /
+  max-3). 1×1 tiles around and between buildings. Rendered but not YOLO-labeled
+  (keremberke has no wall class).
 * Other defenses use ClashKing max / max-1 / max-2 / max-3 for
   TH18 / 17 / 16 / 15. One sprite level per building type per image.
   See ``renderer/sprites/max_level_by_th.yaml`` and
@@ -118,7 +123,16 @@ COUNT_RANGES: dict[str, tuple[int, int]] = {
 }
 
 # Place these before the shuffled remainder so TH-window uniques still fit.
-PRIORITY_TYPES: tuple[str, ...] = ("eagle", "clancastle", "firespitter", "spelltower")
+PRIORITY_TYPES: tuple[str, ...] = (
+    "eagle",
+    "clancastle",
+    "firespitter",
+    "spelltower",
+    "bombtower",
+    "canon",
+    "archertower",
+    "wizztower",
+)
 
 PREVIEW_SPECS: tuple[tuple[str, int, int], ...] = (
     ("preview_th18era_th15.png", 15, 1015),
@@ -132,7 +146,7 @@ SCENERY_PREVIEW_SPECS: tuple[tuple[str, int, int, str], ...] = (
     ("preview_bg_th15.png", 15, 3015, "classic_grass.png"),
     ("preview_bg_th16.png", 16, 3016, "ruins_temple.png"),
     ("preview_bg_th17.png", 17, 3017, "primal.png"),
-    ("preview_bg_war.png", 16, 3019, "clan_war.png"),
+    ("preview_bg_war.png", 18, 3019, "clan_war.png"),
 )
 
 
@@ -197,6 +211,9 @@ class SpriteLevelCatalog:
             return town_hall_level
         merge = self._merge_rule(building_type)
         era_max = self.era_max_town_hall
+        avail = self._availability(building_type)
+        if avail is not None and avail.get("max_th") is not None:
+            era_max = min(era_max, int(avail["max_th"]))
         if merge is not None and town_hall_level < int(merge["merged_from_th"]):
             era_max = int(merge["max_regular_th"])
         return visual_tier_level(
@@ -226,6 +243,9 @@ class SpriteLevelCatalog:
             return True
         min_th = rule.get("min_th")
         max_th = rule.get("max_th")
+        skip_th = {int(x) for x in (rule.get("skip_th") or rule.get("exclude_th") or [])}
+        if town_hall_level in skip_th:
+            return False
         if min_th is not None and town_hall_level < int(min_th):
             return False
         if max_th is not None and town_hall_level > int(max_th):
@@ -328,22 +348,23 @@ class SpriteLevelCatalog:
             return image.size
 
     def occupancy_size(self, building_type: str, level: int | None = None) -> int:
-        """Tiles reserved for collision: CoC footprint or sprite-width AABB."""
+        """Tiles reserved for collision: CoC footprint, sprite AABB, plus pad."""
         sprite_w: int | None = None
+        sprite_h: int | None = None
         if level is not None:
             dims = self.sprite_pixel_size(building_type, level)
             if dims is not None:
-                sprite_w = dims[0]
-        return occupancy_tiles(building_type, sprite_w)
+                sprite_w, sprite_h = dims
+        return occupancy_tiles(building_type, sprite_w, sprite_h)
 
     def visual_sprite_size(self, building_type: str, level: int) -> tuple[int, int]:
-        occ = self.occupancy_size(building_type, level)
         dims = self.sprite_pixel_size(building_type, level)
         if dims is not None:
             return dims
         from renderer.isometric_renderer import SPRITE_NORTH_PAD_PX, TILE_HEIGHT
 
-        return occ * TILE_WIDTH, occ * TILE_HEIGHT + SPRITE_NORTH_PAD_PX
+        tiles = TILE_FOOTPRINTS.get(building_type, 3)
+        return tiles * TILE_WIDTH, tiles * TILE_HEIGHT + SPRITE_NORTH_PAD_PX
 
     @classmethod
     def load(
@@ -373,6 +394,9 @@ class SpriteLevelCatalog:
         for building_type in SYNTHETIC_BUILDING_TYPES:
             slug = _slug_for_building_type(building_type, type_map)
             levels_by_type[building_type] = _levels_for_slug(building_type, slug)
+        if "wall" not in levels_by_type:
+            wall_slug = _slug_for_building_type("wall", type_map) or "wall"
+            levels_by_type["wall"] = _levels_for_slug("wall", wall_slug)
         merges = type_map.get("era_merges") or {}
         for rule in merges.values():
             if not isinstance(rule, dict):
@@ -417,6 +441,11 @@ def _fits(
         return False
     if occupied_cells(x, y, size) & occupied:
         return False
+    # One empty tile between occupancy squares so iso sprites do not sit on
+    # each other's feet. Walls may still fill that gap later.
+    dilated = occupied_cells(x - 1, y - 1, size + 2)
+    if dilated & occupied:
+        return False
     return sprite_stays_on_playable(x, y, size, sprite_w=sprite_w, sprite_h=sprite_h)
 
 
@@ -432,14 +461,21 @@ def _try_place(
     sprite_w: int,
     sprite_h: int,
     prefer_center: bool = False,
-    max_attempts: int = 200,
+    max_attempts: int = 400,
 ) -> tuple[int, int] | None:
     limit = GRID_SIZE - size
     if limit < 0:
         return None
 
     def _ok(x: int, y: int) -> bool:
-        return _fits(occupied, x, y, size, sprite_w=sprite_w, sprite_h=sprite_h)
+        return _fits(
+            occupied,
+            x,
+            y,
+            size,
+            sprite_w=sprite_w,
+            sprite_h=sprite_h,
+        )
 
     if prefer_center:
         cx = GRID_SIZE // 2 - size // 2
@@ -467,6 +503,156 @@ def _try_place(
     return None
 
 
+MIN_WALL_SEGMENTS = 40
+MAX_WALL_SEGMENTS = 110
+
+
+def _wall_cell_ok(x: int, y: int, occupied: set[tuple[int, int]]) -> bool:
+    """1×1 wall on the playable interior, not on a building footprint."""
+    if (x, y) in occupied:
+        return False
+    if x < 1 or y < 1 or x >= GRID_SIZE - 1 or y >= GRID_SIZE - 1:
+        return False
+    return placement_in_playable_grid(x, y, 1)
+
+
+def _try_add_wall(
+    x: int,
+    y: int,
+    occupied: set[tuple[int, int]],
+    placements: list[BuildingPlacement],
+    wall_level: int,
+    *,
+    cap: int = MAX_WALL_SEGMENTS,
+) -> bool:
+    if len(placements) >= cap:
+        return False
+    if not _wall_cell_ok(x, y, occupied):
+        return False
+    occupied.add((x, y))
+    placements.append(BuildingPlacement("wall", level=wall_level, x=x, y=y))
+    return True
+
+
+def _place_rect_ring(
+    x0: int,
+    y0: int,
+    x1: int,
+    y1: int,
+    occupied: set[tuple[int, int]],
+    placements: list[BuildingPlacement],
+    wall_level: int,
+    *,
+    gate: tuple[str, int] | None = None,
+) -> None:
+    """Draw a 1-tile rectangle; ``gate`` is ('x'|'y', coord) opening of 2 tiles."""
+    if x1 <= x0 or y1 <= y0:
+        return
+
+    def _gated(x: int, y: int) -> bool:
+        if gate is None:
+            return False
+        axis, coord = gate
+        if axis == "x" and x == coord and y0 + 1 < y < y1 - 1:
+            return abs(y - ((y0 + y1) // 2)) <= 1
+        if axis == "y" and y == coord and x0 + 1 < x < x1 - 1:
+            return abs(x - ((x0 + x1) // 2)) <= 1
+        return False
+
+    for x in range(x0, x1 + 1):
+        if not _gated(x, y0):
+            _try_add_wall(x, y0, occupied, placements, wall_level)
+        if not _gated(x, y1):
+            _try_add_wall(x, y1, occupied, placements, wall_level)
+    for y in range(y0 + 1, y1):
+        if not _gated(x0, y):
+            _try_add_wall(x0, y, occupied, placements, wall_level)
+        if not _gated(x1, y):
+            _try_add_wall(x1, y, occupied, placements, wall_level)
+
+
+def _place_walls(
+    occupied: set[tuple[int, int]],
+    buildings: Sequence[BuildingPlacement],
+    rng: random.Random,
+    *,
+    catalog: SpriteLevelCatalog,
+    town_hall_level: int,
+) -> list[BuildingPlacement]:
+    """Compartment-ish walls around/between buildings (1×1, no building overlap)."""
+    try:
+        wall_level = catalog.sprite_level("wall", town_hall_level)
+    except KeyError:
+        return []
+
+    walls: list[BuildingPlacement] = []
+    if not occupied:
+        return walls
+
+    xs = [c[0] for c in occupied]
+    ys = [c[1] for c in occupied]
+    margin = 2
+    x0 = max(1, min(xs) - margin)
+    y0 = max(1, min(ys) - margin)
+    x1 = min(GRID_SIZE - 2, max(xs) + margin)
+    y1 = min(GRID_SIZE - 2, max(ys) + margin)
+
+    gate_axis = rng.choice(("x", "y"))
+    gate_coord = x0 if gate_axis == "x" else y0
+    _place_rect_ring(
+        x0, y0, x1, y1, occupied, walls, wall_level, gate=(gate_axis, gate_coord)
+    )
+
+    if x1 - x0 >= 10:
+        splits_x = [(x0 + x1) // 2]
+        if x1 - x0 >= 18:
+            splits_x.append(x0 + (x1 - x0) // 3)
+        for mx in splits_x:
+            gap = rng.randint(y0 + 3, max(y0 + 4, y1 - 3))
+            for y in range(y0 + 1, y1):
+                if abs(y - gap) <= 1:
+                    continue
+                _try_add_wall(mx, y, occupied, walls, wall_level)
+    if y1 - y0 >= 10:
+        splits_y = [(y0 + y1) // 2]
+        if y1 - y0 >= 18:
+            splits_y.append(y0 + (y1 - y0) // 3)
+        for my in splits_y:
+            gap = rng.randint(x0 + 3, max(x0 + 4, x1 - 3))
+            for x in range(x0 + 1, x1):
+                if abs(x - gap) <= 1:
+                    continue
+                _try_add_wall(x, my, occupied, walls, wall_level)
+
+    # One inner ring around the town hall only (not every defense).
+    for building in buildings:
+        if building.building_type != "town_hall":
+            continue
+        size = catalog.occupancy_size(building.building_type, building.level)
+        bx0, by0 = building.x - 1, building.y - 1
+        bx1, by1 = building.x + size, building.y + size
+        side = rng.choice(("x", "y"))
+        coord = bx0 if side == "x" else by0
+        _place_rect_ring(
+            bx0, by0, bx1, by1, occupied, walls, wall_level, gate=(side, coord)
+        )
+
+    if len(walls) < MIN_WALL_SEGMENTS:
+        candidates = [
+            (x, y)
+            for x in range(x0, x1 + 1)
+            for y in range(y0, y1 + 1)
+            if _wall_cell_ok(x, y, occupied)
+        ]
+        rng.shuffle(candidates)
+        for x, y in candidates:
+            if len(walls) >= MIN_WALL_SEGMENTS:
+                break
+            _try_add_wall(x, y, occupied, walls, wall_level)
+
+    return walls
+
+
 def generate_random_layout(
     rng: random.Random,
     town_hall_level: int,
@@ -479,10 +665,10 @@ def generate_random_layout(
     Town hall sprite is exactly ``town_hall_level``. Other types use one
     visual-tier file, with cannon/archer/wizard era merges from ``era_merges``.
     Eagle is TH15–16 only; firespitter is TH17+. Spell towers place all four
-    ClashKing files (one of each), cycling leftover variants across a batch
-    when occupancy cannot fit four. Buildings stay on the playable 44×44
-    checkerboard; occupied tiles are never reused. If a building cannot fit
-    after retries, it is skipped.
+    ClashKing files (one of each) on TH15/17/18, never TH16. Walls are 1×1
+    compartment rings around buildings (rendered, not YOLO-labeled). Occupied
+    tiles are never reused; screen-space footprint AABBs must not overlap.
+    If a building cannot fit after retries, it is skipped.
     """
     catalog = catalog or SpriteLevelCatalog.load()
 
@@ -493,7 +679,12 @@ def generate_random_layout(
     th_size = catalog.occupancy_size("town_hall", th_level)
     th_w, th_h = catalog.visual_sprite_size("town_hall", th_level)
     pos = _try_place(
-        occupied, th_size, rng, sprite_w=th_w, sprite_h=th_h, prefer_center=True
+        occupied,
+        th_size,
+        rng,
+        sprite_w=th_w,
+        sprite_h=th_h,
+        prefer_center=True,
     )
     if pos is None:
         raise RuntimeError("Could not place town hall on empty playable grid")
@@ -532,7 +723,13 @@ def generate_random_layout(
         for place_level in levels_to_place:
             size = catalog.occupancy_size(place_type, place_level)
             sprite_w, sprite_h = catalog.visual_sprite_size(place_type, place_level)
-            pos = _try_place(occupied, size, rng, sprite_w=sprite_w, sprite_h=sprite_h)
+            pos = _try_place(
+                occupied,
+                size,
+                rng,
+                sprite_w=sprite_w,
+                sprite_h=sprite_h,
+            )
             if pos is None:
                 if skip_on_miss:
                     break
@@ -542,6 +739,15 @@ def generate_random_layout(
                 BuildingPlacement(place_type, level=place_level, x=pos[0], y=pos[1])
             )
 
+    placements.extend(
+        _place_walls(
+            occupied,
+            placements,
+            rng,
+            catalog=catalog,
+            town_hall_level=town_hall_level,
+        )
+    )
     return placements
 
 
@@ -794,6 +1000,7 @@ def generate_scenery_previews(
             brightness_jitter=0.04,
             contrast_jitter=0.04,
             overlay_opacity=0.04,
+            position_jitter_px=0,
         )
         result = renderer.render(
             placements,
@@ -855,6 +1062,7 @@ def _print_preview_reports(reports: Sequence[Mapping[str, Any]]) -> None:
         "bombtower",
         "firespitter",
         "spelltower",
+        "wall",
     )
     for report in reports:
         th = report["town_hall_level"]
@@ -871,6 +1079,39 @@ def _print_preview_reports(reports: Sequence[Mapping[str, Any]]) -> None:
                     f"{name}={' + '.join(sprites) if len(sprites) > 1 else info['sprite']}"
                 )
         print(f"  TH{th}: " + (", ".join(bits) if bits else "(none)"))
+    print("\nTown hall / eagle / spells / walls:")
+    for report in reports:
+        th = report["town_hall_level"]
+        if report.get("skipped"):
+            print(f"  TH{th}: SKIPPED")
+            continue
+        levels = report.get("sprite_levels") or {}
+        th_info = levels.get("town_hall")
+        eagle_info = levels.get("eagle")
+        spell_info = levels.get("spelltower")
+        wall_info = levels.get("wall")
+        th_sprite = th_info["sprite"] if th_info else "(missing hall)"
+        eagle_sprite = (
+            eagle_info["sprite"]
+            if eagle_info
+            else ("(none — eagle skipped this TH)" if th >= 17 else "(none)")
+        )
+        if spell_info:
+            spell_sprites = list(dict.fromkeys(spell_info.get("sprites") or [spell_info["sprite"]]))
+            spell_txt = f"n={spell_info['count']} " + ", ".join(spell_sprites)
+        elif th == 16:
+            spell_txt = "(none — spell towers skipped at TH16)"
+        else:
+            spell_txt = "(none)"
+        wall_txt = (
+            f"{wall_info['sprite']} n={wall_info['count']}"
+            if wall_info
+            else "(none)"
+        )
+        print(f"  TH{th} hall={th_sprite}")
+        print(f"       eagle={eagle_sprite}")
+        print(f"       spells={spell_txt}")
+        print(f"       walls={wall_txt}")
     written = [r["file"] for r in reports if r.get("file")]
     print("\nOpen previews:")
     for path in written:

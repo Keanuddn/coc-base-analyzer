@@ -8,17 +8,34 @@ from pathlib import Path
 import pytest
 
 from dataset.generate_synthetic import (
+    REQUESTED_TOWN_HALL_LEVELS,
     SYNTHETIC_BUILDING_TYPES,
     TILE_FOOTPRINTS,
+    TOWN_HALL_LEVELS,
     SpriteLevelCatalog,
     generate_random_layout,
     generate_synthetic_dataset,
-    generate_th_strict_previews,
-    summarize_placement_levels,
+    generate_th18era_previews,
+    visual_tier_level,
 )
 from renderer.isometric_renderer import GRID_SIZE, IsometricRenderer, YOLO_CLASS_NAMES
 
-_LOW_LEVEL_TYPES = ("canon", "mortar", "wizztower", "ad", "xbow", "bombtower")
+_TYPE_MAP = {
+    "aliases": {
+        "ad": "air_defense",
+        "airsweeper": "air_sweeper",
+        "bombtower": "bomb_tower",
+        "canon": "cannon",
+        "clancastle": "clan_castle",
+        "eagle": "eagle_artillery",
+        "inferno": "inferno_tower",
+        "mortar": "mortar",
+        "scattershot": "scattershot",
+        "wizztower": "wizard_tower",
+        "xbow": "x-bow",
+    },
+    "town_hall": {"sprite_slug": "town_hall", "yolo_class": "th13"},
+}
 
 
 def _fake_catalog(**overrides: object) -> SpriteLevelCatalog:
@@ -39,8 +56,11 @@ def _fake_catalog(**overrides: object) -> SpriteLevelCatalog:
     }
     kwargs: dict[str, object] = {
         "levels_by_type": levels,
-        "policy": "sprite-max",
+        "era_max_town_hall": 18,
+        "requested_town_hall_levels": (15, 16, 17, 18),
+        "policy": "visual-tier-proxy",
         "not_official_coc_cap": True,
+        "type_map": _TYPE_MAP,
     }
     kwargs.update(overrides)
     return SpriteLevelCatalog(**kwargs)  # type: ignore[arg-type]
@@ -48,7 +68,10 @@ def _fake_catalog(**overrides: object) -> SpriteLevelCatalog:
 
 class TestGenerateRandomLayout:
     def test_includes_town_hall_and_only_allowed_types(self) -> None:
-        placements = generate_random_layout(random.Random(0), town_hall_level=15)
+        catalog = _fake_catalog()
+        placements = generate_random_layout(
+            random.Random(0), town_hall_level=15, catalog=catalog
+        )
         types = {p.building_type for p in placements}
         assert "town_hall" in types
         assert types <= set(SYNTHETIC_BUILDING_TYPES)
@@ -57,12 +80,24 @@ class TestGenerateRandomLayout:
         assert th.level == 15
 
     def test_th16_sets_town_hall_level(self) -> None:
-        placements = generate_random_layout(random.Random(1), town_hall_level=16)
+        placements = generate_random_layout(
+            random.Random(1), town_hall_level=16, catalog=_fake_catalog()
+        )
         th = next(p for p in placements if p.building_type == "town_hall")
         assert th.level == 16
 
+    def test_th17_and_th18_set_exact_town_hall_sprite(self) -> None:
+        for th_level in (17, 18):
+            placements = generate_random_layout(
+                random.Random(th_level), town_hall_level=th_level, catalog=_fake_catalog()
+            )
+            th = next(p for p in placements if p.building_type == "town_hall")
+            assert th.level == th_level
+
     def test_buildings_do_not_overlap_on_grid(self) -> None:
-        placements = generate_random_layout(random.Random(7), town_hall_level=16)
+        placements = generate_random_layout(
+            random.Random(7), town_hall_level=16, catalog=_fake_catalog()
+        )
         occupied: dict[tuple[int, int], str] = {}
         for placement in placements:
             size = TILE_FOOTPRINTS[placement.building_type]
@@ -77,8 +112,9 @@ class TestGenerateRandomLayout:
                     occupied[cell] = placement.building_type
 
     def test_seed_is_deterministic(self) -> None:
-        a = generate_random_layout(random.Random(42), town_hall_level=15)
-        b = generate_random_layout(random.Random(42), town_hall_level=15)
+        catalog = _fake_catalog()
+        a = generate_random_layout(random.Random(42), town_hall_level=15, catalog=catalog)
+        b = generate_random_layout(random.Random(42), town_hall_level=15, catalog=catalog)
         assert [(p.building_type, p.x, p.y, p.level) for p in a] == [
             (p.building_type, p.x, p.y, p.level) for p in b
         ]
@@ -109,86 +145,100 @@ class TestGenerateSyntheticDataset:
         generate_synthetic_dataset(count=4, output_dir=tmp_path, seed=3)
         pngs = list(tmp_path.rglob("*.png"))
         th_parts = {p.parent.name for p in pngs}
-        assert "th15" in th_parts
-        assert "th16" in th_parts
+        assert th_parts == {"th15", "th16", "th17", "th18"}
 
 
-class TestSpriteMaxLevelPolicy:
-    def test_th16_is_max_sprite_index_th15_is_max_minus_one(self) -> None:
+class TestVisualTierProxy:
+    def test_default_th_set_is_15_through_18(self) -> None:
+        assert TOWN_HALL_LEVELS == (15, 16, 17, 18)
+        assert REQUESTED_TOWN_HALL_LEVELS == (15, 16, 17, 18)
+
+    def test_th18_cannons_all_same_max_file(self) -> None:
         catalog = _fake_catalog()
-        assert catalog.sprite_level("canon", 16) == 21
-        assert catalog.sprite_level("canon", 15) == 20
-        assert catalog.sprite_level("town_hall", 15) == 15
-        assert catalog.sprite_level("town_hall", 16) == 16
+        placements = generate_random_layout(
+            random.Random(0), town_hall_level=18, catalog=catalog
+        )
+        cannons = [p for p in placements if p.building_type == "canon"]
+        assert cannons
+        assert {p.level for p in cannons} == {21}
+        assert catalog.sprite_relpath("canon", 21) == "cannon/level_21.webp"
 
-    def test_single_file_building_uses_same_level_for_both_ths(self) -> None:
+    def test_th15_cannons_are_max_minus_3(self) -> None:
         catalog = _fake_catalog()
-        catalog.levels_by_type["eagle"] = [7]
-        assert catalog.sprite_level("eagle", 15) == 7
-        assert catalog.sprite_level("eagle", 16) == 7
+        assert len(catalog.levels_for("canon")) >= 4
+        placements = generate_random_layout(
+            random.Random(1), town_hall_level=15, catalog=catalog
+        )
+        cannons = [p for p in placements if p.building_type == "canon"]
+        assert cannons
+        assert {p.level for p in cannons} == {18}
 
-    def test_all_cannons_share_one_level_per_th_and_ths_differ(self) -> None:
+    def test_one_sprite_level_per_building_type_per_image(self) -> None:
         catalog = _fake_catalog()
-        th15 = generate_random_layout(random.Random(0), town_hall_level=15, catalog=catalog)
-        th16 = generate_random_layout(random.Random(1), town_hall_level=16, catalog=catalog)
-        cannons15 = [p.level for p in th15 if p.building_type == "canon"]
-        cannons16 = [p.level for p in th16 if p.building_type == "canon"]
-        assert cannons15
-        assert cannons16
-        assert len(set(cannons15)) == 1
-        assert len(set(cannons16)) == 1
-        assert cannons15[0] == 20
-        assert cannons16[0] == 21
-        assert cannons15[0] != cannons16[0]
-
-    def test_every_building_type_is_one_file_and_no_leftovers(self) -> None:
-        catalog = _fake_catalog()
-        for th, seed in ((15, 3), (16, 4)):
+        for th_level in (15, 16, 17, 18):
             placements = generate_random_layout(
-                random.Random(seed), town_hall_level=th, catalog=catalog
+                random.Random(th_level), town_hall_level=th_level, catalog=catalog
             )
             by_type: dict[str, set[int]] = {}
             for placement in placements:
                 by_type.setdefault(placement.building_type, set()).add(placement.level)
-                assert placement.level == catalog.sprite_level(placement.building_type, th)
-            assert all(len(levels) == 1 for levels in by_type.values())
-            summary = summarize_placement_levels(placements, catalog)
-            assert summary["leftovers"] == []
+            for building_type, levels in by_type.items():
+                assert len(levels) == 1, f"TH{th_level} {building_type} mixed {levels}"
 
-    def test_th16_cannon_mortar_never_level_1_to_5(self) -> None:
+    def test_th_offsets_match_max_minus_n(self) -> None:
         catalog = _fake_catalog()
-        for seed in range(40):
-            placements = generate_random_layout(
-                random.Random(seed),
-                town_hall_level=16,
-                catalog=catalog,
-            )
-            for placement in placements:
-                if placement.building_type not in _LOW_LEVEL_TYPES:
-                    continue
-                assert placement.level > 5, placement
-                assert placement.level == catalog.sprite_level(placement.building_type, 16)
+        expected = {18: 21, 17: 20, 16: 19, 15: 18}
+        for th_level, cannon_level in expected.items():
+            assert catalog.defense_level_for_th("canon", th_level) == cannon_level
+
+    def test_clamp_at_one_and_lowest_available_not_wrap(self) -> None:
+        assert visual_tier_level([1, 2, 3], town_hall_level=15) == 1
+        assert visual_tier_level([6, 7], town_hall_level=15) == 6
+        assert visual_tier_level([7], town_hall_level=15) == 7
+        assert visual_tier_level([7], town_hall_level=18) == 7
+        catalog = _fake_catalog()
+        catalog.levels_by_type["airsweeper"] = [6, 7]
+        assert catalog.defense_level_for_th("airsweeper", 15) == 6
+        assert catalog.defense_level_for_th("airsweeper", 18) == 7
+
+    def test_skips_missing_town_hall_sprites(self) -> None:
+        catalog = _fake_catalog()
+        catalog.levels_by_type["town_hall"] = list(range(1, 17))
+        assert catalog.available_town_hall_levels() == [15, 16]
+        assert catalog.skipped_town_hall_levels() == [17, 18]
 
 
 @pytest.mark.skipif(
     not IsometricRenderer.sprites_available(),
     reason="ClashKing sprites not downloaded — run download_clashking_sprites.sh",
 )
-class TestThStrictPreviews:
+class TestTh18EraPreviews:
     def test_writes_four_named_preview_pngs(self, tmp_path: Path) -> None:
-        reports = generate_th_strict_previews(output_dir=tmp_path, seed=1)
+        reports = generate_th18era_previews(output_dir=tmp_path, seed=1)
         names = {
-            "preview_th_strict_th15_a.png",
-            "preview_th_strict_th15_b.png",
-            "preview_th_strict_th16_a.png",
-            "preview_th_strict_th16_b.png",
+            "preview_th18era_th15.png",
+            "preview_th18era_th16.png",
+            "preview_th18era_th17.png",
+            "preview_th18era_th18.png",
         }
-        assert {p.name for p in tmp_path.glob("*.png")} == names
+        written = {p.name for p in tmp_path.glob("*.png")}
+        skipped = {r["town_hall_level"] for r in reports if r.get("skipped")}
+        expected_written = {
+            f"preview_th18era_th{th}.png" for th in (15, 16, 17, 18) if th not in skipped
+        }
+        assert written == expected_written
+        assert written <= names
         assert len(reports) == 4
-        assert {r["town_hall_level"] for r in reports} == {15, 16}
+        generated = {r["town_hall_level"] for r in reports if not r.get("skipped")}
+        assert generated | skipped == {15, 16, 17, 18}
         for report in reports:
-            assert report["leftovers"] == []
+            if report.get("skipped"):
+                continue
+            cannons = report["sprite_levels"]["canon"]
             th = report["town_hall_level"]
-            assert report["sprite_level"]["town_hall"] == th
-            for name, level in report["sprite_level"].items():
-                assert set(report["sprite_levels"][name]) == {level}
+            if th == 18:
+                assert cannons["level"] == 21
+                assert cannons["sprite"] == "cannon/level_21.webp"
+            if th == 15:
+                assert cannons["level"] == 18
+                assert cannons["sprite"] == "cannon/level_18.webp"

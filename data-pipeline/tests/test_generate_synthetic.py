@@ -13,8 +13,8 @@ from dataset.generate_synthetic import (
     SpriteLevelCatalog,
     generate_random_layout,
     generate_synthetic_dataset,
-    generate_th_capped_previews,
-    top_third_levels,
+    generate_th_strict_previews,
+    summarize_placement_levels,
 )
 from renderer.isometric_renderer import GRID_SIZE, IsometricRenderer, YOLO_CLASS_NAMES
 
@@ -39,10 +39,6 @@ def _fake_catalog(**overrides: object) -> SpriteLevelCatalog:
     }
     kwargs: dict[str, object] = {
         "levels_by_type": levels,
-        "high_pool_size": 3,
-        "leftover_pool_size": 3,
-        "leftover_probability": 0.4,
-        "leftover_buildings_max": 2,
         "policy": "sprite-max",
         "not_official_coc_cap": True,
     }
@@ -118,30 +114,46 @@ class TestGenerateSyntheticDataset:
 
 
 class TestSpriteMaxLevelPolicy:
-    def test_cannon_high_pool_is_top_three_and_in_top_third(self) -> None:
+    def test_th16_is_max_sprite_index_th15_is_max_minus_one(self) -> None:
         catalog = _fake_catalog()
-        assert catalog.high_pool("canon") == [19, 20, 21]
-        assert catalog.leftover_pool("canon") == [16, 17, 18]
-        assert set(catalog.high_pool("canon")) <= set(top_third_levels(catalog.levels_for("canon")))
-        assert min(catalog.leftover_pool("canon")) > 5
+        assert catalog.sprite_level("canon", 16) == 21
+        assert catalog.sprite_level("canon", 15) == 20
+        assert catalog.sprite_level("town_hall", 15) == 15
+        assert catalog.sprite_level("town_hall", 16) == 16
 
-    def test_th16_sampled_levels_are_in_top_third_without_leftovers(self) -> None:
+    def test_single_file_building_uses_same_level_for_both_ths(self) -> None:
         catalog = _fake_catalog()
-        for seed in range(30):
+        catalog.levels_by_type["eagle"] = [7]
+        assert catalog.sprite_level("eagle", 15) == 7
+        assert catalog.sprite_level("eagle", 16) == 7
+
+    def test_all_cannons_share_one_level_per_th_and_ths_differ(self) -> None:
+        catalog = _fake_catalog()
+        th15 = generate_random_layout(random.Random(0), town_hall_level=15, catalog=catalog)
+        th16 = generate_random_layout(random.Random(1), town_hall_level=16, catalog=catalog)
+        cannons15 = [p.level for p in th15 if p.building_type == "canon"]
+        cannons16 = [p.level for p in th16 if p.building_type == "canon"]
+        assert cannons15
+        assert cannons16
+        assert len(set(cannons15)) == 1
+        assert len(set(cannons16)) == 1
+        assert cannons15[0] == 20
+        assert cannons16[0] == 21
+        assert cannons15[0] != cannons16[0]
+
+    def test_every_building_type_is_one_file_and_no_leftovers(self) -> None:
+        catalog = _fake_catalog()
+        for th, seed in ((15, 3), (16, 4)):
             placements = generate_random_layout(
-                random.Random(seed),
-                town_hall_level=16,
-                catalog=catalog,
-                leftover_probability=0.0,
+                random.Random(seed), town_hall_level=th, catalog=catalog
             )
-            th = next(p for p in placements if p.building_type == "town_hall")
-            assert th.level == 16
+            by_type: dict[str, set[int]] = {}
             for placement in placements:
-                if placement.building_type == "town_hall":
-                    continue
-                available = catalog.levels_for(placement.building_type)
-                assert placement.level in catalog.high_pool(placement.building_type)
-                assert placement.level in top_third_levels(available)
+                by_type.setdefault(placement.building_type, set()).add(placement.level)
+                assert placement.level == catalog.sprite_level(placement.building_type, th)
+            assert all(len(levels) == 1 for levels in by_type.values())
+            summary = summarize_placement_levels(placements, catalog)
+            assert summary["leftovers"] == []
 
     def test_th16_cannon_mortar_never_level_1_to_5(self) -> None:
         catalog = _fake_catalog()
@@ -150,46 +162,33 @@ class TestSpriteMaxLevelPolicy:
                 random.Random(seed),
                 town_hall_level=16,
                 catalog=catalog,
-                leftover_probability=1.0,
             )
             for placement in placements:
                 if placement.building_type not in _LOW_LEVEL_TYPES:
                     continue
                 assert placement.level > 5, placement
-                allowed = set(catalog.high_pool(placement.building_type)) | set(
-                    catalog.leftover_pool(placement.building_type)
-                )
-                assert placement.level in allowed
-
-    def test_leftover_count_is_at_most_two(self) -> None:
-        catalog = _fake_catalog()
-        placements = generate_random_layout(
-            random.Random(0),
-            town_hall_level=16,
-            catalog=catalog,
-            leftover_probability=1.0,
-        )
-        leftover_n = sum(
-            1
-            for p in placements
-            if p.building_type != "town_hall" and p.level not in catalog.high_pool(p.building_type)
-        )
-        assert 1 <= leftover_n <= 2
+                assert placement.level == catalog.sprite_level(placement.building_type, 16)
 
 
 @pytest.mark.skipif(
     not IsometricRenderer.sprites_available(),
     reason="ClashKing sprites not downloaded — run download_clashking_sprites.sh",
 )
-class TestThCappedPreviews:
+class TestThStrictPreviews:
     def test_writes_four_named_preview_pngs(self, tmp_path: Path) -> None:
-        reports = generate_th_capped_previews(output_dir=tmp_path, seed=1)
+        reports = generate_th_strict_previews(output_dir=tmp_path, seed=1)
         names = {
-            "preview_th_capped_th15_a.png",
-            "preview_th_capped_th15_b.png",
-            "preview_th_capped_th16_a.png",
-            "preview_th_capped_th16_b.png",
+            "preview_th_strict_th15_a.png",
+            "preview_th_strict_th15_b.png",
+            "preview_th_strict_th16_a.png",
+            "preview_th_strict_th16_b.png",
         }
         assert {p.name for p in tmp_path.glob("*.png")} == names
         assert len(reports) == 4
         assert {r["town_hall_level"] for r in reports} == {15, 16}
+        for report in reports:
+            assert report["leftovers"] == []
+            th = report["town_hall_level"]
+            assert report["sprite_level"]["town_hall"] == th
+            for name, level in report["sprite_level"].items():
+                assert set(report["sprite_levels"][name]) == {level}

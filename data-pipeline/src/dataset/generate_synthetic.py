@@ -5,8 +5,9 @@ Count ranges and tile footprints are collision/variety parameters — not
 combat stats or wiki army tables.
 
 Sprite levels use a **sprite-max** heuristic (not an official CoC cap):
-town hall matches the image TH; defenses sample the highest 2–3 ClashKing
-files for that building. See ``renderer/sprites/max_level_by_th.yaml``.
+one visual tier per image. TH16 = max ClashKing sprite index, TH15 = max-1.
+Town hall is exact (``level_15.webp`` / ``level_16.webp``). See
+``renderer/sprites/max_level_by_th.yaml``.
 """
 
 from __future__ import annotations
@@ -94,26 +95,11 @@ COUNT_RANGES: dict[str, tuple[int, int]] = {
 }
 
 PREVIEW_SPECS: tuple[tuple[str, int, int], ...] = (
-    ("preview_th_capped_th15_a.png", 15, 1015),
-    ("preview_th_capped_th15_b.png", 15, 2015),
-    ("preview_th_capped_th16_a.png", 16, 1016),
-    ("preview_th_capped_th16_b.png", 16, 2016),
+    ("preview_th_strict_th15_a.png", 15, 1015),
+    ("preview_th_strict_th15_b.png", 15, 2015),
+    ("preview_th_strict_th16_a.png", 16, 1016),
+    ("preview_th_strict_th16_b.png", 16, 2016),
 )
-
-
-def top_third_levels(levels: Sequence[int]) -> list[int]:
-    """Highest third of a sorted level list (ceil). Empty in → empty out."""
-    if not levels:
-        return []
-    n = max(1, (len(levels) + 2) // 3)
-    return list(levels)[-n:]
-
-
-def _highest_n(levels: Sequence[int], n: int) -> list[int]:
-    if not levels:
-        return []
-    k = min(max(n, 1), len(levels))
-    return list(levels)[-k:]
 
 
 @dataclass
@@ -121,12 +107,10 @@ class SpriteLevelCatalog:
     """Available sprite levels per synthetic building_type (disk, else yaml snapshot)."""
 
     levels_by_type: dict[str, list[int]]
-    high_pool_size: int = 3
-    leftover_pool_size: int = 3
-    leftover_probability: float = 0.4
-    leftover_buildings_max: int = 2
     policy: str = "sprite-max"
     not_official_coc_cap: bool = True
+    th16_visual_tier: str = "max"
+    th15_visual_tier: str = "max-1"
     source_path: Path | None = None
 
     def levels_for(self, building_type: str) -> list[int]:
@@ -135,24 +119,24 @@ class SpriteLevelCatalog:
             raise KeyError(f"No sprite levels catalogued for {building_type!r}")
         return list(levels)
 
-    def high_pool(self, building_type: str) -> list[int]:
-        return _highest_n(self.levels_for(building_type), self.high_pool_size)
+    def sprite_level(self, building_type: str, town_hall_level: int) -> int:
+        """Exactly one ClashKing file for this building on a TH15/TH16 image.
 
-    def leftover_pool(self, building_type: str) -> list[int]:
+        Visual-tier proxy (not official CoC unlocks):
+        town hall is exact; TH16 = max sprite index; TH15 = max-1.
+        Buildings with fewer than 2 files use the only/highest file for both THs.
+        """
+        if building_type == "town_hall":
+            levels = self.levels_for("town_hall")
+            if town_hall_level not in levels:
+                raise RuntimeError(
+                    f"Town hall sprite level_{town_hall_level} not in catalog {levels}"
+                )
+            return town_hall_level
         levels = self.levels_for(building_type)
-        high = set(self.high_pool(building_type))
-        below = [lv for lv in levels if lv not in high]
-        if not below:
-            return []
-        return _highest_n(below, self.leftover_pool_size)
-
-    def sample_level(self, rng: random.Random, building_type: str, *, leftover: bool = False) -> int:
-        pool = self.leftover_pool(building_type) if leftover else self.high_pool(building_type)
-        if leftover and not pool:
-            pool = self.high_pool(building_type)
-        if not pool:
-            raise RuntimeError(f"Empty sprite pool for {building_type!r}")
-        return rng.choice(pool)
+        if town_hall_level >= 16 or len(levels) < 2:
+            return levels[-1]
+        return levels[-2]
 
     @classmethod
     def load(
@@ -181,12 +165,10 @@ class SpriteLevelCatalog:
             levels_by_type[building_type] = list(range(1, mx + 1))
         return cls(
             levels_by_type=levels_by_type,
-            high_pool_size=int(policy.get("high_pool_size", 3)),
-            leftover_pool_size=int(policy.get("leftover_pool_size", 3)),
-            leftover_probability=float(policy.get("leftover_probability", 0.4)),
-            leftover_buildings_max=int(policy.get("leftover_buildings_max", 2)),
             policy=str(policy.get("policy", "sprite-max")),
             not_official_coc_cap=bool(policy.get("not_official_coc_cap", True)),
+            th16_visual_tier=str(policy.get("th16_visual_tier", "max")),
+            th15_visual_tier=str(policy.get("th15_visual_tier", "max-1")),
             source_path=policy_path,
         )
 
@@ -254,16 +236,13 @@ def generate_random_layout(
     town_hall_level: int,
     *,
     catalog: SpriteLevelCatalog | None = None,
-    leftover_probability: float | None = None,
 ) -> list[BuildingPlacement]:
     """Place a TH plus a random mix of active defenses without grid overlap.
 
-    Town hall sprite level is exactly ``town_hall_level``. Other buildings
-    sample the catalog high pool (top 2–3 ClashKing files). With a small
-    chance, 1–2 non-TH buildings are re-rolled from the leftover pool.
+    Town hall sprite is exactly ``town_hall_level``. Every other building type
+    uses one file: TH16 = max sprite index, TH15 = max-1 (or the only file).
     """
     catalog = catalog or SpriteLevelCatalog.load()
-    leftover_p = catalog.leftover_probability if leftover_probability is None else leftover_probability
 
     occupied: set[tuple[int, int]] = set()
     placements: list[BuildingPlacement] = []
@@ -273,12 +252,8 @@ def generate_random_layout(
     if pos is None:
         raise RuntimeError("Could not place town hall on empty grid")
     _mark(occupied, pos[0], pos[1], th_size)
-    th_levels = catalog.levels_for("town_hall")
-    if town_hall_level not in th_levels:
-        raise RuntimeError(
-            f"Town hall sprite level_{town_hall_level} not in catalog {th_levels}"
-        )
-    placements.append(BuildingPlacement("town_hall", level=town_hall_level, x=pos[0], y=pos[1]))
+    th_level = catalog.sprite_level("town_hall", town_hall_level)
+    placements.append(BuildingPlacement("town_hall", level=th_level, x=pos[0], y=pos[1]))
 
     order = [name for name in SYNTHETIC_BUILDING_TYPES if name != "town_hall"]
     rng.shuffle(order)
@@ -286,24 +261,13 @@ def generate_random_layout(
         lo, hi = COUNT_RANGES[building_type]
         count = rng.randint(lo, hi)
         size = TILE_FOOTPRINTS[building_type]
+        level = catalog.sprite_level(building_type, town_hall_level)
         for _ in range(count):
             pos = _try_place(occupied, size, rng)
             if pos is None:
                 break
             _mark(occupied, pos[0], pos[1], size)
-            level = catalog.sample_level(rng, building_type, leftover=False)
             placements.append(BuildingPlacement(building_type, level=level, x=pos[0], y=pos[1]))
-
-    if leftover_p > 0 and rng.random() < leftover_p:
-        eligible = [
-            p
-            for p in placements
-            if p.building_type != "town_hall" and catalog.leftover_pool(p.building_type)
-        ]
-        if eligible:
-            n = rng.randint(1, min(catalog.leftover_buildings_max, len(eligible)))
-            for placement in rng.sample(eligible, n):
-                placement.level = catalog.sample_level(rng, placement.building_type, leftover=True)
 
     return placements
 
@@ -313,15 +277,17 @@ def summarize_placement_levels(
     catalog: SpriteLevelCatalog,
 ) -> dict[str, Any]:
     by_type: dict[str, list[int]] = defaultdict(list)
+    th = next(p for p in placements if p.building_type == "town_hall")
     leftovers: list[str] = []
     for placement in placements:
         by_type[placement.building_type].append(placement.level)
-        if placement.building_type == "town_hall":
-            continue
-        if placement.level not in catalog.high_pool(placement.building_type):
+        expected = catalog.sprite_level(placement.building_type, th.level)
+        if placement.level != expected:
             leftovers.append(f"{placement.building_type}@{placement.level}")
+    sprite_level = {name: vals[0] for name, vals in sorted(by_type.items())}
     return {
         "counts": {name: sorted(vals) for name, vals in sorted(by_type.items())},
+        "sprite_level": sprite_level,
         "leftovers": leftovers,
     }
 
@@ -390,14 +356,14 @@ def generate_synthetic_dataset(
     return summary
 
 
-def generate_th_capped_previews(
+def generate_th_strict_previews(
     output_dir: Path = DEFAULT_PREVIEW_DIR,
     seed: int = 42,
     *,
     catalog: SpriteLevelCatalog | None = None,
     village_background: bool = True,
 ) -> list[dict[str, Any]]:
-    """Write 4 review images (2× TH15, 2× TH16) with the new grass background."""
+    """Write 4 review images (2× TH15, 2× TH16) with one sprite tier per image."""
     catalog = catalog or SpriteLevelCatalog.load()
     renderer = IsometricRenderer(use_placeholders=True, village_background=village_background)
     output_dir.mkdir(parents=True, exist_ok=True)
@@ -420,21 +386,26 @@ def generate_th_capped_previews(
         report = {
             "file": str(out_png),
             "town_hall_level": th_level,
+            "sprite_level": level_info["sprite_level"],
             "sprite_levels": level_info["counts"],
             "leftovers": level_info["leftovers"],
             "level_policy": catalog.policy,
             "not_official_coc_cap": catalog.not_official_coc_cap,
+            "heuristic": "TH16 = max sprite index, TH15 = max-1",
         }
         reports.append(report)
         logging.info(
-            "%s TH=%s levels=%s leftovers=%s",
+            "%s TH=%s sprite_level=%s leftovers=%s",
             out_png.name,
             th_level,
-            level_info["counts"],
+            level_info["sprite_level"],
             level_info["leftovers"],
         )
 
     return reports
+
+
+generate_th_capped_previews = generate_th_strict_previews
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -451,9 +422,14 @@ def main(argv: list[str] | None = None) -> int:
         help="Legacy solid green fill instead of procedural village grass",
     )
     parser.add_argument(
+        "--preview-th-strict",
+        action="store_true",
+        help="Write 4 review images (2×TH15, 2×TH16) with one sprite tier per image; does not bulk-generate",
+    )
+    parser.add_argument(
         "--preview-th-capped",
         action="store_true",
-        help="Write 4 review images (2×TH15, 2×TH16) and print sprite levels; does not bulk-generate",
+        help="Alias for --preview-th-strict",
     )
     parser.add_argument(
         "--preview-dir",
@@ -469,13 +445,18 @@ def main(argv: list[str] | None = None) -> int:
         format="%(levelname)s %(message)s",
     )
 
-    if args.preview_th_capped:
-        reports = generate_th_capped_previews(
+    if args.preview_th_strict or args.preview_th_capped:
+        reports = generate_th_strict_previews(
             output_dir=args.preview_dir,
             seed=args.seed,
             village_background=not args.flat_background,
         )
         print(json.dumps(reports, indent=2))
+        print("\nSprite level per building (one file per type):")
+        for report in reports:
+            print(f"  {Path(report['file']).name}  TH={report['town_hall_level']}")
+            for name, level in report["sprite_level"].items():
+                print(f"    {name}: {level}")
         print("\nOpen previews:")
         for report in reports:
             print(f"  open {report['file']}")

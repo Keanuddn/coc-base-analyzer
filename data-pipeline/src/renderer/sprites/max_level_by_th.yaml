@@ -29,9 +29,12 @@
 #       archertower: same merge as cannons. TH15 = archer_tower/level_21.webp
 #         (purple max). TH16–18 = multi-archer_tower (no regular archer towers).
 #         YOLO class archertower is a placeholder (not in keremberke 16).
-#       bombtower / firespitter: normal visual-tier (no merge).
-#       spelltower: four ClashKing files (level_1…4), picked at random per
-#         placement — not visual-tier. No poison/rage/invis/lightning names.
+#       bombtower: normal visual-tier (no merge).
+#       eagle: only TH15–16 (skip TH17/TH18). Visual-tier among eagle files.
+#       firespitter: only TH17+ (skip TH15/TH16). Visual-tier among 3 files.
+#       spelltower: four ClashKing files (level_1…4). Place all four designs
+#         per layout (one of each) — not visual-tier, not random-one-only.
+#         If occupancy cannot fit 4, cycle remaining variants across a batch.
 
 policy: visual-tier-proxy
 not_official_coc_cap: true

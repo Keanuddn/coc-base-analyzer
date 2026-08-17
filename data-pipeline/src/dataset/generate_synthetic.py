@@ -11,10 +11,14 @@ with user-corrected merge exceptions:
   ``ricochet_cannon`` (2→1 merge). YOLO class remains ``canon``.
 * Wizard towers max at TH17 (``wizard_tower/level_17.webp``). TH18 places
   ``super_wizard_tower``. YOLO class remains ``wizztower``.
+* Eagle artillery only through TH16 (skip TH17/TH18).
+* Firespitter only from TH17 onward (skip TH15/TH16).
+* Spell towers (TH15+): place all four ClashKing designs
+  (``spell_tower/level_1.webp`` … ``level_4.webp``), one of each.
 * Other defenses use ClashKing max / max-1 / max-2 / max-3 for
   TH18 / 17 / 16 / 15. One sprite level per building type per image.
   See ``renderer/sprites/max_level_by_th.yaml`` and
-  ``building_type_map.yaml`` ``era_merges``.
+  ``building_type_map.yaml`` ``era_merges`` / ``era_availability``.
 """
 
 from __future__ import annotations
@@ -93,10 +97,11 @@ SPELL_TOWER_VARIANT_FILES: tuple[str, ...] = (
 )
 
 # How many of each type to try placing. Not TH unlock tables.
+# Eagle / firespitter / spell towers also have era_availability windows.
 COUNT_RANGES: dict[str, tuple[int, int]] = {
     "town_hall": (1, 1),
     "clancastle": (1, 1),
-    "eagle": (0, 1),
+    "eagle": (1, 1),
     "scattershot": (1, 2),
     "inferno": (1, 3),
     "xbow": (2, 4),
@@ -107,9 +112,12 @@ COUNT_RANGES: dict[str, tuple[int, int]] = {
     "bombtower": (1, 2),
     "archertower": (2, 5),
     "firespitter": (1, 2),
-    "spelltower": (1, 2),
+    "spelltower": (4, 4),
     "airsweeper": (1, 2),
 }
+
+# Place these before the shuffled remainder so TH-window uniques still fit.
+PRIORITY_TYPES: tuple[str, ...] = ("eagle", "clancastle", "firespitter", "spelltower")
 
 PREVIEW_SPECS: tuple[tuple[str, int, int], ...] = (
     ("preview_th18era_th15.png", 15, 1015),
@@ -195,15 +203,38 @@ class SpriteLevelCatalog:
             return None
         return rule
 
+    def _availability(self, building_type: str) -> Mapping[str, Any] | None:
+        avail = self.type_map.get("era_availability") or {}
+        rule = avail.get(building_type)
+        if not isinstance(rule, Mapping):
+            return None
+        return rule
+
+    def available_at_th(self, building_type: str, town_hall_level: int) -> bool:
+        """False when era_availability excludes this type at this TH."""
+        rule = self._availability(building_type)
+        if rule is None:
+            return True
+        min_th = rule.get("min_th")
+        max_th = rule.get("max_th")
+        if min_th is not None and town_hall_level < int(min_th):
+            return False
+        if max_th is not None and town_hall_level > int(max_th):
+            return False
+        return True
+
     def resolve_for_th(self, building_type: str, town_hall_level: int) -> tuple[str, int] | None:
         """Logical type → (placement type, sprite level) for this TH.
 
         Merge rules (user): cannons become ricochet from TH16; archer towers
         become multi-archer_tower from TH16; wizard towers become
-        super_wizard_tower at TH18. Returns None to skip the type.
+        super_wizard_tower at TH18. Returns None to skip the type
+        (including era_availability windows: eagle ≤ TH16, firespitter ≥ TH17).
         """
         if building_type == "town_hall":
             return building_type, self.sprite_level(building_type, town_hall_level)
+        if not self.available_at_th(building_type, town_hall_level):
+            return None
         merge = self._merge_rule(building_type)
         if merge is None:
             return building_type, self.sprite_level(building_type, town_hall_level)
@@ -224,10 +255,36 @@ class SpriteLevelCatalog:
         variants = self.type_map.get("random_sprite_variants") or {}
         return building_type in variants
 
+    def places_all_variants(self, building_type: str) -> bool:
+        variants = self.type_map.get("random_sprite_variants") or {}
+        spec = variants.get(building_type)
+        if not isinstance(spec, Mapping):
+            return False
+        return bool(spec.get("place_all") or spec.get("place_all_variants"))
+
+    def variant_levels_for_layout(self, building_type: str, cycle: int) -> list[int] | None:
+        """Rotated ClashKing variant levels when place_all is set.
+
+        Cycle offset makes leftover variants even across a batch if occupancy
+        cannot fit every design on one layout.
+        """
+        if not self.places_all_variants(building_type):
+            return None
+        levels = self.levels_for(building_type)
+        if not levels:
+            return None
+        offset = cycle % len(levels)
+        return levels[offset:] + levels[:offset]
+
     def count_range_for(self, building_type: str, town_hall_level: int) -> tuple[int, int]:
         merge = self._merge_rule(building_type)
         if merge is not None and town_hall_level >= int(merge["merged_from_th"]):
             raw = merge.get("count_range")
+            if isinstance(raw, (list, tuple)) and len(raw) == 2:
+                return int(raw[0]), int(raw[1])
+        avail = self._availability(building_type)
+        if avail is not None:
+            raw = avail.get("count_range")
             if isinstance(raw, (list, tuple)) and len(raw) == 2:
                 return int(raw[0]), int(raw[1])
         return COUNT_RANGES[building_type]
@@ -406,14 +463,17 @@ def generate_random_layout(
     town_hall_level: int,
     *,
     catalog: SpriteLevelCatalog | None = None,
+    variant_cycle: int = 0,
 ) -> list[BuildingPlacement]:
     """Place a TH plus a random mix of active defenses without grid overlap.
 
     Town hall sprite is exactly ``town_hall_level``. Other types use one
     visual-tier file, with cannon/archer/wizard era merges from ``era_merges``.
-    Spell towers pick one of four ClashKing files at random per placement.
-    Buildings stay on the playable 44×44 checkerboard; occupied tiles are
-    never reused. If a building cannot fit after retries, it is skipped.
+    Eagle is TH15–16 only; firespitter is TH17+. Spell towers place all four
+    ClashKing files (one of each), cycling leftover variants across a batch
+    when occupancy cannot fit four. Buildings stay on the playable 44×44
+    checkerboard; occupied tiles are never reused. If a building cannot fit
+    after retries, it is skipped.
     """
     catalog = catalog or SpriteLevelCatalog.load()
 
@@ -431,8 +491,13 @@ def generate_random_layout(
     _mark(occupied, pos[0], pos[1], th_size)
     placements.append(BuildingPlacement("town_hall", level=th_level, x=pos[0], y=pos[1]))
 
-    order = [name for name in SYNTHETIC_BUILDING_TYPES if name != "town_hall"]
-    rng.shuffle(order)
+    rest = [
+        name
+        for name in SYNTHETIC_BUILDING_TYPES
+        if name != "town_hall" and name not in PRIORITY_TYPES
+    ]
+    rng.shuffle(rest)
+    order = [name for name in PRIORITY_TYPES if name in SYNTHETIC_BUILDING_TYPES] + rest
     for building_type in order:
         try:
             resolved = catalog.resolve_for_th(building_type, town_hall_level)
@@ -441,17 +506,28 @@ def generate_random_layout(
         if resolved is None:
             continue
         place_type, level = resolved
-        lo, hi = catalog.count_range_for(building_type, town_hall_level)
-        count = rng.randint(lo, hi)
-        for _ in range(count):
-            place_level = level
+        variant_order = catalog.variant_levels_for_layout(building_type, variant_cycle)
+        if variant_order is not None:
+            levels_to_place = variant_order
+            skip_on_miss = False
+        else:
+            lo, hi = catalog.count_range_for(building_type, town_hall_level)
+            count = rng.randint(lo, hi)
             if catalog.uses_random_variants(building_type):
-                place_level = rng.choice(catalog.levels_for(building_type))
+                levels_to_place = [
+                    rng.choice(catalog.levels_for(building_type)) for _ in range(count)
+                ]
+            else:
+                levels_to_place = [level] * count
+            skip_on_miss = True
+        for place_level in levels_to_place:
             size = catalog.occupancy_size(place_type, place_level)
             sprite_w, sprite_h = catalog.visual_sprite_size(place_type, place_level)
             pos = _try_place(occupied, size, rng, sprite_w=sprite_w, sprite_h=sprite_h)
             if pos is None:
-                break
+                if skip_on_miss:
+                    break
+                continue
             _mark(occupied, pos[0], pos[1], size)
             placements.append(
                 BuildingPlacement(place_type, level=place_level, x=pos[0], y=pos[1])
@@ -467,16 +543,23 @@ def summarize_placement_levels(
     by_type: dict[str, dict[str, Any]] = {}
     mixed: list[str] = []
     for placement in placements:
+        sprite = catalog.sprite_relpath(placement.building_type, placement.level)
         entry = by_type.get(placement.building_type)
         if entry is None:
             by_type[placement.building_type] = {
                 "level": placement.level,
-                "sprite": catalog.sprite_relpath(placement.building_type, placement.level),
+                "sprite": sprite,
                 "count": 1,
+                "levels": [placement.level],
+                "sprites": [sprite],
             }
             continue
         entry["count"] += 1
-        if placement.level != entry["level"]:
+        entry["levels"].append(placement.level)
+        entry["sprites"].append(sprite)
+        if placement.level != entry["level"] and not catalog.uses_random_variants(
+            placement.building_type
+        ):
             mixed.append(f"{placement.building_type}@{placement.level}")
     return {
         "by_type": dict(sorted(by_type.items())),
@@ -527,7 +610,10 @@ def generate_synthetic_dataset(
 
         layout_rng = random.Random(seed + idx * 1009 + th_level)
         placements = generate_random_layout(
-            layout_rng, town_hall_level=th_level, catalog=catalog
+            layout_rng,
+            town_hall_level=th_level,
+            catalog=catalog,
+            variant_cycle=idx,
         )
         dr_cfg = DomainRandomizationConfig(seed=seed + idx)
         result = renderer.render_to_files(
@@ -595,7 +681,10 @@ def generate_th18era_previews(
             continue
         layout_rng = random.Random(seed + seed_offset)
         placements = generate_random_layout(
-            layout_rng, town_hall_level=th_level, catalog=catalog
+            layout_rng,
+            town_hall_level=th_level,
+            catalog=catalog,
+            variant_cycle=th_level,
         )
         out_png = output_dir / filename
         dr_cfg = DomainRandomizationConfig(seed=seed + seed_offset)
@@ -621,7 +710,10 @@ def generate_th18era_previews(
             out_png.name,
             th_level,
             {
-                name: f"{info['sprite']} x{info['count']}"
+                name: (
+                    f"{'+'.join(dict.fromkeys(info.get('sprites') or [info['sprite']]))}"
+                    f" x{info['count']}"
+                )
                 for name, info in level_info["by_type"].items()
             },
         )
@@ -643,9 +735,13 @@ def _print_preview_reports(reports: Sequence[Mapping[str, Any]]) -> None:
             continue
         print(f"  TH{th}  {report['file']}")
         for name, info in (report.get("sprite_levels") or {}).items():
-            print(
-                f"    {name:12} level={info['level']:<3} {info['sprite']}  n={info['count']}"
-            )
+            sprites = list(dict.fromkeys(info.get("sprites") or [info["sprite"]]))
+            if len(sprites) > 1:
+                print(f"    {name:12} n={info['count']:<3} " + ", ".join(sprites))
+            else:
+                print(
+                    f"    {name:12} level={info['level']:<3} {info['sprite']}  n={info['count']}"
+                )
     print("\nCannon / archer / wizard merge sprites:")
     highlight = (
         "canon",
@@ -654,6 +750,7 @@ def _print_preview_reports(reports: Sequence[Mapping[str, Any]]) -> None:
         "multi-archer_tower",
         "wizztower",
         "super_wizard_tower",
+        "eagle",
         "bombtower",
         "firespitter",
         "spelltower",
@@ -668,7 +765,10 @@ def _print_preview_reports(reports: Sequence[Mapping[str, Any]]) -> None:
         for name in highlight:
             info = levels.get(name)
             if info:
-                bits.append(f"{name}={info['sprite']}")
+                sprites = list(dict.fromkeys(info.get("sprites") or [info["sprite"]]))
+                bits.append(
+                    f"{name}={' + '.join(sprites) if len(sprites) > 1 else info['sprite']}"
+                )
         print(f"  TH{th}: " + (", ".join(bits) if bits else "(none)"))
     written = [r["file"] for r in reports if r.get("file")]
     print("\nOpen previews:")

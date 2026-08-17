@@ -40,15 +40,28 @@ yolo_unlabeled:
 
 # ClashKing has no poison/rage/invisibility/lightning filenames.
 # The four designs are spell_tower/level_1.webp … level_4.webp.
-# Pick one at random per placement (not visual-tier).
+# Place all four per layout (TH15+), one of each file — not random-one-only.
 random_sprite_variants:
   spelltower:
     slug: spell_tower
+    place_all: true
     files:
       - spell_tower/level_1.webp
       - spell_tower/level_2.webp
       - spell_tower/level_3.webp
       - spell_tower/level_4.webp
+
+# TH windows (user): not visual-tier. Skip the type outside the range.
+# Eagle artillery exists only through TH16. Firespitter unlocks at TH17.
+era_availability:
+  eagle:
+    max_th: 16
+    count_range: [1, 1]
+  firespitter:
+    min_th: 17
+  spelltower:
+    min_th: 15
+    count_range: [4, 4]
 
 # User-corrected merge rules (not the visual-tier-proxy heuristic).
 # Regular cannon files: cannon/level_1.webp … level_21.webp (no geared-up extras

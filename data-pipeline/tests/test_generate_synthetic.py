@@ -60,6 +60,7 @@ _TYPE_MAP = {
     "random_sprite_variants": {
         "spelltower": {
             "slug": "spell_tower",
+            "place_all": True,
             "files": [
                 "spell_tower/level_1.webp",
                 "spell_tower/level_2.webp",
@@ -67,6 +68,11 @@ _TYPE_MAP = {
                 "spell_tower/level_4.webp",
             ],
         },
+    },
+    "era_availability": {
+        "eagle": {"max_th": 16, "count_range": [1, 1]},
+        "firespitter": {"min_th": 17},
+        "spelltower": {"min_th": 15, "count_range": [4, 4]},
     },
     "era_merges": {
         "canon": {
@@ -440,9 +446,15 @@ class TestAddedDefenses:
                 f"bomb_tower/level_{bomb_level}.webp"
             )
 
-    def test_firespitter_visual_tier_from_three_files(self) -> None:
+    def test_firespitter_only_from_th17(self) -> None:
         catalog = _fake_catalog()
-        expected = {15: 1, 16: 1, 17: 2, 18: 3}
+        for th_level in (15, 16):
+            assert catalog.resolve_for_th("firespitter", th_level) is None
+            placements = generate_random_layout(
+                random.Random(th_level), town_hall_level=th_level, catalog=catalog
+            )
+            assert not any(p.building_type == "firespitter" for p in placements)
+        expected = {17: 2, 18: 3}
         for th_level, spit_level in expected.items():
             assert catalog.resolve_for_th("firespitter", th_level) == (
                 "firespitter",
@@ -458,21 +470,50 @@ class TestAddedDefenses:
                 f"firespitter/level_{spit_level}.webp"
             )
 
-    def test_spell_tower_uses_one_of_four_verified_files(self) -> None:
+    def test_spell_tower_places_all_four_designs(self) -> None:
         catalog = _fake_catalog()
-        seen_files: set[str] = set()
-        for seed in range(40):
+        assert catalog.variant_levels_for_layout("spelltower", 0) == [1, 2, 3, 4]
+        assert catalog.variant_levels_for_layout("spelltower", 1) == [2, 3, 4, 1]
+        for th_level in (15, 16, 17, 18):
             placements = generate_random_layout(
-                random.Random(seed), town_hall_level=15, catalog=catalog
+                random.Random(th_level),
+                town_hall_level=th_level,
+                catalog=catalog,
+                variant_cycle=th_level,
             )
             towers = [p for p in placements if p.building_type == "spelltower"]
-            assert towers
-            for placement in towers:
-                rel = catalog.sprite_relpath(placement.building_type, placement.level)
-                assert rel in SPELL_TOWER_VARIANT_FILES
-                seen_files.add(rel)
-        assert seen_files <= set(SPELL_TOWER_VARIANT_FILES)
-        assert len(seen_files) >= 2
+            assert len(towers) == 4
+            levels = {p.level for p in towers}
+            assert levels == {1, 2, 3, 4}
+            files = {
+                catalog.sprite_relpath(p.building_type, p.level) for p in towers
+            }
+            assert files == set(SPELL_TOWER_VARIANT_FILES)
+
+    def test_spell_variant_cycle_even_when_only_two_fit(self) -> None:
+        catalog = _fake_catalog()
+        counts = {1: 0, 2: 0, 3: 0, 4: 0}
+        for cycle in range(8):
+            for level in catalog.variant_levels_for_layout("spelltower", cycle)[:2]:
+                counts[level] += 1
+        assert counts == {1: 4, 2: 4, 3: 4, 4: 4}
+
+    def test_eagle_only_through_th16(self) -> None:
+        catalog = _fake_catalog()
+        for th_level in (15, 16):
+            assert catalog.resolve_for_th("eagle", th_level) is not None
+            placements = generate_random_layout(
+                random.Random(th_level), town_hall_level=th_level, catalog=catalog
+            )
+            assert any(p.building_type == "eagle" for p in placements)
+            assert not any(p.building_type == "firespitter" for p in placements)
+        for th_level in (17, 18):
+            assert catalog.resolve_for_th("eagle", th_level) is None
+            placements = generate_random_layout(
+                random.Random(th_level), town_hall_level=th_level, catalog=catalog
+            )
+            assert not any(p.building_type == "eagle" for p in placements)
+            assert any(p.building_type == "firespitter" for p in placements)
 
     def test_multi_archer_footprint_is_larger_than_archer(self) -> None:
         assert TILE_FOOTPRINTS["archertower"] == 3
@@ -537,5 +578,18 @@ class TestTh18EraPreviews:
             if th == 15:
                 assert "archertower" in levels
                 assert "multi-archer_tower" not in levels
+                assert "ricochet_cannon" not in levels
+                assert "eagle" in levels
+                assert "firespitter" not in levels
+            if th == 16:
+                assert "eagle" in levels
+                assert "firespitter" not in levels
+            if th >= 17:
+                assert "eagle" not in levels
+                assert "firespitter" in levels
             if th == 18:
                 assert "wizztower" not in levels
+            spell = levels["spelltower"]
+            assert spell["count"] == 4
+            spell_sprites = set(spell.get("sprites") or [spell["sprite"]])
+            assert spell_sprites == set(SPELL_TOWER_VARIANT_FILES)

@@ -56,7 +56,7 @@ placeholders:
   - monolith      # TH14+
   - spelltower    # TH15+ (rendered unlabeled; ClashKing level_1…4)
   - archertower   # TH15 regular / TH16+ multi-archer merge
-  - firespitter   # visual-tier from 3 ClashKing files
+  - firespitter   # TH17+; visual-tier from 3 ClashKing files
   - th14
   - th15
   - th16

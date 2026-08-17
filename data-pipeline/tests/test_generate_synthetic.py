@@ -5,13 +5,49 @@ from __future__ import annotations
 import random
 from pathlib import Path
 
+import pytest
+
 from dataset.generate_synthetic import (
     SYNTHETIC_BUILDING_TYPES,
     TILE_FOOTPRINTS,
+    SpriteLevelCatalog,
     generate_random_layout,
     generate_synthetic_dataset,
+    generate_th_capped_previews,
+    top_third_levels,
 )
-from renderer.isometric_renderer import GRID_SIZE, YOLO_CLASS_NAMES
+from renderer.isometric_renderer import GRID_SIZE, IsometricRenderer, YOLO_CLASS_NAMES
+
+_LOW_LEVEL_TYPES = ("canon", "mortar", "wizztower", "ad", "xbow", "bombtower")
+
+
+def _fake_catalog(**overrides: object) -> SpriteLevelCatalog:
+    """Sprite coverage snapshot matching ClashKing folders — not official CoC caps."""
+    levels = {
+        "canon": list(range(1, 22)),
+        "mortar": list(range(1, 19)),
+        "inferno": list(range(1, 13)),
+        "eagle": list(range(1, 8)),
+        "xbow": list(range(1, 14)),
+        "scattershot": list(range(1, 8)),
+        "wizztower": list(range(1, 18)),
+        "ad": list(range(1, 17)),
+        "bombtower": list(range(1, 14)),
+        "airsweeper": list(range(1, 8)),
+        "clancastle": list(range(1, 15)),
+        "town_hall": list(range(1, 19)),
+    }
+    kwargs: dict[str, object] = {
+        "levels_by_type": levels,
+        "high_pool_size": 3,
+        "leftover_pool_size": 3,
+        "leftover_probability": 0.4,
+        "leftover_buildings_max": 2,
+        "policy": "sprite-max",
+        "not_official_coc_cap": True,
+    }
+    kwargs.update(overrides)
+    return SpriteLevelCatalog(**kwargs)  # type: ignore[arg-type]
 
 
 class TestGenerateRandomLayout:
@@ -79,3 +115,81 @@ class TestGenerateSyntheticDataset:
         th_parts = {p.parent.name for p in pngs}
         assert "th15" in th_parts
         assert "th16" in th_parts
+
+
+class TestSpriteMaxLevelPolicy:
+    def test_cannon_high_pool_is_top_three_and_in_top_third(self) -> None:
+        catalog = _fake_catalog()
+        assert catalog.high_pool("canon") == [19, 20, 21]
+        assert catalog.leftover_pool("canon") == [16, 17, 18]
+        assert set(catalog.high_pool("canon")) <= set(top_third_levels(catalog.levels_for("canon")))
+        assert min(catalog.leftover_pool("canon")) > 5
+
+    def test_th16_sampled_levels_are_in_top_third_without_leftovers(self) -> None:
+        catalog = _fake_catalog()
+        for seed in range(30):
+            placements = generate_random_layout(
+                random.Random(seed),
+                town_hall_level=16,
+                catalog=catalog,
+                leftover_probability=0.0,
+            )
+            th = next(p for p in placements if p.building_type == "town_hall")
+            assert th.level == 16
+            for placement in placements:
+                if placement.building_type == "town_hall":
+                    continue
+                available = catalog.levels_for(placement.building_type)
+                assert placement.level in catalog.high_pool(placement.building_type)
+                assert placement.level in top_third_levels(available)
+
+    def test_th16_cannon_mortar_never_level_1_to_5(self) -> None:
+        catalog = _fake_catalog()
+        for seed in range(40):
+            placements = generate_random_layout(
+                random.Random(seed),
+                town_hall_level=16,
+                catalog=catalog,
+                leftover_probability=1.0,
+            )
+            for placement in placements:
+                if placement.building_type not in _LOW_LEVEL_TYPES:
+                    continue
+                assert placement.level > 5, placement
+                allowed = set(catalog.high_pool(placement.building_type)) | set(
+                    catalog.leftover_pool(placement.building_type)
+                )
+                assert placement.level in allowed
+
+    def test_leftover_count_is_at_most_two(self) -> None:
+        catalog = _fake_catalog()
+        placements = generate_random_layout(
+            random.Random(0),
+            town_hall_level=16,
+            catalog=catalog,
+            leftover_probability=1.0,
+        )
+        leftover_n = sum(
+            1
+            for p in placements
+            if p.building_type != "town_hall" and p.level not in catalog.high_pool(p.building_type)
+        )
+        assert 1 <= leftover_n <= 2
+
+
+@pytest.mark.skipif(
+    not IsometricRenderer.sprites_available(),
+    reason="ClashKing sprites not downloaded — run download_clashking_sprites.sh",
+)
+class TestThCappedPreviews:
+    def test_writes_four_named_preview_pngs(self, tmp_path: Path) -> None:
+        reports = generate_th_capped_previews(output_dir=tmp_path, seed=1)
+        names = {
+            "preview_th_capped_th15_a.png",
+            "preview_th_capped_th15_b.png",
+            "preview_th_capped_th16_a.png",
+            "preview_th_capped_th16_b.png",
+        }
+        assert {p.name for p in tmp_path.glob("*.png")} == names
+        assert len(reports) == 4
+        assert {r["town_hall_level"] for r in reports} == {15, 16}

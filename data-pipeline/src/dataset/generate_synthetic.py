@@ -3,6 +3,10 @@
 Layouts are random-but-plausible occupancy on the 44×44 editor grid.
 Count ranges and tile footprints are collision/variety parameters — not
 combat stats or wiki army tables.
+
+Sprite levels use a **sprite-max** heuristic (not an official CoC cap):
+town hall matches the image TH; defenses sample the highest 2–3 ClashKing
+files for that building. See ``renderer/sprites/max_level_by_th.yaml``.
 """
 
 from __future__ import annotations
@@ -12,15 +16,32 @@ import json
 import logging
 import random
 import sys
+from collections import defaultdict
+from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
+from typing import Any, Sequence
+
+import yaml
 
 from link_decoder.schema import BuildingPlacement
 from renderer.domain_randomization import DomainRandomizationConfig
-from renderer.isometric_renderer import GRID_SIZE, IsometricRenderer
+from renderer.isometric_renderer import (
+    BUILDING_TYPE_MAP_PATH,
+    CLASHKING_HOME_VILLAGE,
+    GRID_SIZE,
+    IsometricRenderer,
+    list_sprite_levels,
+    _load_building_type_map,
+    _slug_for_building_type,
+)
 
 PIPELINE_ROOT = Path(__file__).resolve().parents[2]
+REPO_ROOT = PIPELINE_ROOT.parent
 DEFAULT_OUTPUT = PIPELINE_ROOT / "datasets" / "processed" / "synthetic_v1"
+DEFAULT_PREVIEW_DIR = REPO_ROOT / "ml" / "notebooks" / "phase2_output"
+LEVEL_POLICY_PATH = (
+    PIPELINE_ROOT / "src" / "renderer" / "sprites" / "max_level_by_th.yaml"
+)
 DEFAULT_COUNT = 200
 TOWN_HALL_LEVELS = (15, 16)
 
@@ -71,6 +92,111 @@ COUNT_RANGES: dict[str, tuple[int, int]] = {
     "bombtower": (1, 2),
     "airsweeper": (1, 2),
 }
+
+PREVIEW_SPECS: tuple[tuple[str, int, int], ...] = (
+    ("preview_th_capped_th15_a.png", 15, 1015),
+    ("preview_th_capped_th15_b.png", 15, 2015),
+    ("preview_th_capped_th16_a.png", 16, 1016),
+    ("preview_th_capped_th16_b.png", 16, 2016),
+)
+
+
+def top_third_levels(levels: Sequence[int]) -> list[int]:
+    """Highest third of a sorted level list (ceil). Empty in → empty out."""
+    if not levels:
+        return []
+    n = max(1, (len(levels) + 2) // 3)
+    return list(levels)[-n:]
+
+
+def _highest_n(levels: Sequence[int], n: int) -> list[int]:
+    if not levels:
+        return []
+    k = min(max(n, 1), len(levels))
+    return list(levels)[-k:]
+
+
+@dataclass
+class SpriteLevelCatalog:
+    """Available sprite levels per synthetic building_type (disk, else yaml snapshot)."""
+
+    levels_by_type: dict[str, list[int]]
+    high_pool_size: int = 3
+    leftover_pool_size: int = 3
+    leftover_probability: float = 0.4
+    leftover_buildings_max: int = 2
+    policy: str = "sprite-max"
+    not_official_coc_cap: bool = True
+    source_path: Path | None = None
+
+    def levels_for(self, building_type: str) -> list[int]:
+        levels = self.levels_by_type.get(building_type)
+        if not levels:
+            raise KeyError(f"No sprite levels catalogued for {building_type!r}")
+        return list(levels)
+
+    def high_pool(self, building_type: str) -> list[int]:
+        return _highest_n(self.levels_for(building_type), self.high_pool_size)
+
+    def leftover_pool(self, building_type: str) -> list[int]:
+        levels = self.levels_for(building_type)
+        high = set(self.high_pool(building_type))
+        below = [lv for lv in levels if lv not in high]
+        if not below:
+            return []
+        return _highest_n(below, self.leftover_pool_size)
+
+    def sample_level(self, rng: random.Random, building_type: str, *, leftover: bool = False) -> int:
+        pool = self.leftover_pool(building_type) if leftover else self.high_pool(building_type)
+        if leftover and not pool:
+            pool = self.high_pool(building_type)
+        if not pool:
+            raise RuntimeError(f"Empty sprite pool for {building_type!r}")
+        return rng.choice(pool)
+
+    @classmethod
+    def load(
+        cls,
+        *,
+        sprites_root: Path | None = None,
+        policy_path: Path = LEVEL_POLICY_PATH,
+        type_map_path: Path = BUILDING_TYPE_MAP_PATH,
+    ) -> SpriteLevelCatalog:
+        policy = _load_level_policy(policy_path)
+        type_map = _load_building_type_map(type_map_path)
+        observed: dict[str, int] = {str(k): int(v) for k, v in (policy.get("sprite_max_observed") or {}).items()}
+        root = sprites_root or CLASHKING_HOME_VILLAGE
+        levels_by_type: dict[str, list[int]] = {}
+        for building_type in SYNTHETIC_BUILDING_TYPES:
+            slug = _slug_for_building_type(building_type, type_map)
+            disk = list_sprite_levels(slug, root) if slug else []
+            if disk:
+                levels_by_type[building_type] = disk
+                continue
+            mx = observed.get(slug or "") or observed.get(building_type)
+            if mx is None:
+                raise RuntimeError(
+                    f"No ClashKing sprites and no yaml snapshot for {building_type!r} (slug={slug})"
+                )
+            levels_by_type[building_type] = list(range(1, mx + 1))
+        return cls(
+            levels_by_type=levels_by_type,
+            high_pool_size=int(policy.get("high_pool_size", 3)),
+            leftover_pool_size=int(policy.get("leftover_pool_size", 3)),
+            leftover_probability=float(policy.get("leftover_probability", 0.4)),
+            leftover_buildings_max=int(policy.get("leftover_buildings_max", 2)),
+            policy=str(policy.get("policy", "sprite-max")),
+            not_official_coc_cap=bool(policy.get("not_official_coc_cap", True)),
+            source_path=policy_path,
+        )
+
+
+def _load_level_policy(path: Path = LEVEL_POLICY_PATH) -> dict[str, Any]:
+    with path.open(encoding="utf-8") as fh:
+        data = yaml.safe_load(fh) or {}
+    if not isinstance(data, dict):
+        raise ValueError(f"Level policy must be a mapping: {path}")
+    return data
 
 
 def _fits(occupied: set[tuple[int, int]], x: int, y: int, size: int) -> bool:
@@ -123,8 +249,22 @@ def _try_place(
     return None
 
 
-def generate_random_layout(rng: random.Random, town_hall_level: int) -> list[BuildingPlacement]:
-    """Place a TH plus a random mix of active defenses without grid overlap."""
+def generate_random_layout(
+    rng: random.Random,
+    town_hall_level: int,
+    *,
+    catalog: SpriteLevelCatalog | None = None,
+    leftover_probability: float | None = None,
+) -> list[BuildingPlacement]:
+    """Place a TH plus a random mix of active defenses without grid overlap.
+
+    Town hall sprite level is exactly ``town_hall_level``. Other buildings
+    sample the catalog high pool (top 2–3 ClashKing files). With a small
+    chance, 1–2 non-TH buildings are re-rolled from the leftover pool.
+    """
+    catalog = catalog or SpriteLevelCatalog.load()
+    leftover_p = catalog.leftover_probability if leftover_probability is None else leftover_probability
+
     occupied: set[tuple[int, int]] = set()
     placements: list[BuildingPlacement] = []
 
@@ -133,6 +273,11 @@ def generate_random_layout(rng: random.Random, town_hall_level: int) -> list[Bui
     if pos is None:
         raise RuntimeError("Could not place town hall on empty grid")
     _mark(occupied, pos[0], pos[1], th_size)
+    th_levels = catalog.levels_for("town_hall")
+    if town_hall_level not in th_levels:
+        raise RuntimeError(
+            f"Town hall sprite level_{town_hall_level} not in catalog {th_levels}"
+        )
     placements.append(BuildingPlacement("town_hall", level=town_hall_level, x=pos[0], y=pos[1]))
 
     order = [name for name in SYNTHETIC_BUILDING_TYPES if name != "town_hall"]
@@ -146,10 +291,39 @@ def generate_random_layout(rng: random.Random, town_hall_level: int) -> list[Bui
             if pos is None:
                 break
             _mark(occupied, pos[0], pos[1], size)
-            # Sprite level is a visual hint; renderer caps to files on disk.
-            level = rng.randint(5, 20)
+            level = catalog.sample_level(rng, building_type, leftover=False)
             placements.append(BuildingPlacement(building_type, level=level, x=pos[0], y=pos[1]))
+
+    if leftover_p > 0 and rng.random() < leftover_p:
+        eligible = [
+            p
+            for p in placements
+            if p.building_type != "town_hall" and catalog.leftover_pool(p.building_type)
+        ]
+        if eligible:
+            n = rng.randint(1, min(catalog.leftover_buildings_max, len(eligible)))
+            for placement in rng.sample(eligible, n):
+                placement.level = catalog.sample_level(rng, placement.building_type, leftover=True)
+
     return placements
+
+
+def summarize_placement_levels(
+    placements: Sequence[BuildingPlacement],
+    catalog: SpriteLevelCatalog,
+) -> dict[str, Any]:
+    by_type: dict[str, list[int]] = defaultdict(list)
+    leftovers: list[str] = []
+    for placement in placements:
+        by_type[placement.building_type].append(placement.level)
+        if placement.building_type == "town_hall":
+            continue
+        if placement.level not in catalog.high_pool(placement.building_type):
+            leftovers.append(f"{placement.building_type}@{placement.level}")
+    return {
+        "counts": {name: sorted(vals) for name, vals in sorted(by_type.items())},
+        "leftovers": leftovers,
+    }
 
 
 def generate_synthetic_dataset(
@@ -159,9 +333,11 @@ def generate_synthetic_dataset(
     *,
     skip_existing: bool = True,
     village_background: bool = True,
+    catalog: SpriteLevelCatalog | None = None,
 ) -> dict[str, Any]:
     """Render ``count`` layouts to ``output_dir/th{15,16}/synthetic_XXXX.png`` + YOLO txt."""
     renderer = IsometricRenderer(use_placeholders=True, village_background=village_background)
+    catalog = catalog or SpriteLevelCatalog.load()
     output_dir.mkdir(parents=True, exist_ok=True)
 
     present = 0
@@ -181,7 +357,9 @@ def generate_synthetic_dataset(
             continue
 
         layout_rng = random.Random(seed + idx * 1009 + th_level)
-        placements = generate_random_layout(layout_rng, town_hall_level=th_level)
+        placements = generate_random_layout(
+            layout_rng, town_hall_level=th_level, catalog=catalog
+        )
         dr_cfg = DomainRandomizationConfig(seed=seed + idx)
         result = renderer.render_to_files(
             placements,
@@ -199,6 +377,8 @@ def generate_synthetic_dataset(
         "boxes": boxes,
         "output_dir": str(output_dir),
         "warning_count": len(warnings),
+        "level_policy": catalog.policy,
+        "not_official_coc_cap": catalog.not_official_coc_cap,
     }
     logging.info(
         "Synthetic dataset: %d images (%d skipped existing), %d new boxes → %s",
@@ -208,6 +388,53 @@ def generate_synthetic_dataset(
         output_dir,
     )
     return summary
+
+
+def generate_th_capped_previews(
+    output_dir: Path = DEFAULT_PREVIEW_DIR,
+    seed: int = 42,
+    *,
+    catalog: SpriteLevelCatalog | None = None,
+    village_background: bool = True,
+) -> list[dict[str, Any]]:
+    """Write 4 review images (2× TH15, 2× TH16) with the new grass background."""
+    catalog = catalog or SpriteLevelCatalog.load()
+    renderer = IsometricRenderer(use_placeholders=True, village_background=village_background)
+    output_dir.mkdir(parents=True, exist_ok=True)
+    reports: list[dict[str, Any]] = []
+
+    for filename, th_level, seed_offset in PREVIEW_SPECS:
+        layout_rng = random.Random(seed + seed_offset)
+        placements = generate_random_layout(
+            layout_rng, town_hall_level=th_level, catalog=catalog
+        )
+        out_png = output_dir / filename
+        dr_cfg = DomainRandomizationConfig(seed=seed + seed_offset)
+        result = renderer.render(
+            placements,
+            domain_randomization=dr_cfg,
+            seed=seed + seed_offset,
+        )
+        result.image.save(out_png, format="PNG")
+        level_info = summarize_placement_levels(placements, catalog)
+        report = {
+            "file": str(out_png),
+            "town_hall_level": th_level,
+            "sprite_levels": level_info["counts"],
+            "leftovers": level_info["leftovers"],
+            "level_policy": catalog.policy,
+            "not_official_coc_cap": catalog.not_official_coc_cap,
+        }
+        reports.append(report)
+        logging.info(
+            "%s TH=%s levels=%s leftovers=%s",
+            out_png.name,
+            th_level,
+            level_info["counts"],
+            level_info["leftovers"],
+        )
+
+    return reports
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -223,6 +450,17 @@ def main(argv: list[str] | None = None) -> int:
         action="store_true",
         help="Legacy solid green fill instead of procedural village grass",
     )
+    parser.add_argument(
+        "--preview-th-capped",
+        action="store_true",
+        help="Write 4 review images (2×TH15, 2×TH16) and print sprite levels; does not bulk-generate",
+    )
+    parser.add_argument(
+        "--preview-dir",
+        type=Path,
+        default=DEFAULT_PREVIEW_DIR,
+        help=f"Preview output dir (default: {DEFAULT_PREVIEW_DIR})",
+    )
     parser.add_argument("-v", "--verbose", action="store_true")
     args = parser.parse_args(argv)
 
@@ -230,6 +468,18 @@ def main(argv: list[str] | None = None) -> int:
         level=logging.DEBUG if args.verbose else logging.INFO,
         format="%(levelname)s %(message)s",
     )
+
+    if args.preview_th_capped:
+        reports = generate_th_capped_previews(
+            output_dir=args.preview_dir,
+            seed=args.seed,
+            village_background=not args.flat_background,
+        )
+        print(json.dumps(reports, indent=2))
+        print("\nOpen previews:")
+        for report in reports:
+            print(f"  open {report['file']}")
+        return 0
 
     if args.count < 1:
         parser.error("--count must be >= 1")

@@ -1,0 +1,43 @@
+# Sprite-max policy for synthetic renders — NOT official Clash of Clans caps.
+#
+# This repo has no verified per-TH upgrade table:
+#   - building_type_map.yaml: slug aliases only
+#   - ml/configs/th_classes.yaml: YOLO class names only
+#   - knowledge-base/: missing
+#
+# Policy (heuristic: sprite-max, not official CoC cap):
+#   - Each image uses a Town Hall in {15, 16}. TH17/18 sprites exist on disk
+#     (town_hall/level_17.webp, level_18.webp) but bulk generation stays 15/16
+#     until these previews are reviewed.
+#   - town_hall sprite level == that image's TH (exact).
+#   - Other buildings: random among the highest 2–3 ClashKing sprite files
+#     that exist for that building (top of the folder), not mixed low-level skins.
+#   - Optional leftover: 1–2 buildings may use the next 2–3 files below that band.
+#
+# Per-TH official max (cannon at TH15 vs TH16, etc.): TODO unverified.
+
+policy: sprite-max
+not_official_coc_cap: true
+town_hall_levels_generated: [15, 16]
+high_pool_size: 3
+leftover_pool_size: 3
+leftover_probability: 0.4
+leftover_buildings_max: 2
+
+# Highest level_*.webp observed in ClashKing Home Village folders (local download).
+# Rows cite the CDN object for that max file. This is sprite coverage, not a TH unlock table.
+# Atlas: https://github.com/ClashKingInc/ClashKingAssets
+# CDN template: https://assets.clashk.ing/buildings/home-village/{slug}/level_{n}.webp
+sprite_max_observed:
+  town_hall: 18  # source: https://assets.clashk.ing/buildings/home-village/town_hall/level_18.webp
+  cannon: 21  # source: https://assets.clashk.ing/buildings/home-village/cannon/level_21.webp
+  mortar: 18  # source: https://assets.clashk.ing/buildings/home-village/mortar/level_18.webp
+  inferno_tower: 12  # source: https://assets.clashk.ing/buildings/home-village/inferno_tower/level_12.webp
+  eagle_artillery: 7  # source: https://assets.clashk.ing/buildings/home-village/eagle_artillery/level_7.webp
+  x-bow: 13  # source: https://assets.clashk.ing/buildings/home-village/x-bow/level_13.webp
+  scattershot: 7  # source: https://assets.clashk.ing/buildings/home-village/scattershot/level_7.webp
+  wizard_tower: 17  # source: https://assets.clashk.ing/buildings/home-village/wizard_tower/level_17.webp
+  air_defense: 16  # source: https://assets.clashk.ing/buildings/home-village/air_defense/level_16.webp
+  bomb_tower: 13  # source: https://assets.clashk.ing/buildings/home-village/bomb_tower/level_13.webp
+  air_sweeper: 7  # source: https://assets.clashk.ing/buildings/home-village/air_sweeper/level_7.webp
+  clan_castle: 14  # source: https://assets.clashk.ing/buildings/home-village/clan_castle/level_14.webp

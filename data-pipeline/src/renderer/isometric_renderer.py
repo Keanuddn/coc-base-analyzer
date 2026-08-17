@@ -155,26 +155,33 @@ def _normalize_placement(raw: BuildingPlacement | Mapping[str, Any]) -> Building
     )
 
 
-def _sprite_path(slug: str, level: int) -> Path:
-    return CLASHKING_HOME_VILLAGE / slug / f"level_{level}.webp"
+def _sprite_path(slug: str, level: int, sprites_root: Path | None = None) -> Path:
+    root = sprites_root or CLASHKING_HOME_VILLAGE
+    return root / slug / f"level_{level}.webp"
 
 
-def _resolve_sprite_path(slug: str, level: int) -> Path | None:
-    direct = _sprite_path(slug, level)
+def list_sprite_levels(slug: str, sprites_root: Path | None = None) -> list[int]:
+    """Return sorted 1-based levels that exist as ``level_{n}.webp`` on disk."""
+    folder = (sprites_root or CLASHKING_HOME_VILLAGE) / slug
+    if not folder.is_dir():
+        return []
+    levels: list[int] = []
+    for path in folder.glob("level_*.webp"):
+        suffix = path.stem.split("_", 1)[1]
+        if suffix.isdigit():
+            levels.append(int(suffix))
+    return sorted(levels)
+
+
+def _resolve_sprite_path(slug: str, level: int, sprites_root: Path | None = None) -> Path | None:
+    direct = _sprite_path(slug, level, sprites_root)
     if direct.is_file():
         return direct
-    folder = CLASHKING_HOME_VILLAGE / slug
-    if not folder.is_dir():
-        return None
-    levels = sorted(
-        int(p.stem.split("_", 1)[1])
-        for p in folder.glob("level_*.webp")
-        if p.stem.startswith("level_")
-    )
+    levels = list_sprite_levels(slug, sprites_root)
     if not levels:
         return None
     capped = min(level, levels[-1])
-    return _sprite_path(slug, capped)
+    return _sprite_path(slug, capped, sprites_root)
 
 
 def _make_placeholder(size: tuple[int, int] = (64, 64)) -> Image.Image:

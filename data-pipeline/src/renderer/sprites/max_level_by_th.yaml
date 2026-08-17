@@ -26,6 +26,12 @@
 #         (temporary alias — merged cannon visual).
 #       wizztower: maxed at TH17 (wizard_tower/level_17.webp). TH15/16 = max-2 /
 #         max-1 relative to that. TH18 = super_wizard_tower. YOLO class wizztower.
+#       archertower: same merge as cannons. TH15 = archer_tower/level_21.webp
+#         (purple max). TH16–18 = multi-archer_tower (no regular archer towers).
+#         YOLO class archertower is a placeholder (not in keremberke 16).
+#       bombtower / firespitter: normal visual-tier (no merge).
+#       spelltower: four ClashKing files (level_1…4), picked at random per
+#         placement — not visual-tier. No poison/rage/invis/lightning names.
 
 policy: visual-tier-proxy
 not_official_coc_cap: true
@@ -51,3 +57,7 @@ sprite_max_observed:
   clan_castle: 14  # source: https://assets.clashk.ing/buildings/home-village/clan_castle/level_14.webp
   ricochet_cannon: 4  # source: https://assets.clashk.ing/buildings/home-village/ricochet_cannon/level_4.webp
   super_wizard_tower: 2  # source: https://assets.clashk.ing/buildings/home-village/super_wizard_tower/level_2.webp
+  archer_tower: 21  # source: https://assets.clashk.ing/buildings/home-village/archer_tower/level_21.webp
+  multi-archer_tower: 4  # source: https://assets.clashk.ing/buildings/home-village/multi-archer_tower/level_4.webp
+  firespitter: 3  # source: https://assets.clashk.ing/buildings/home-village/firespitter/level_3.webp
+  spell_tower: 4  # source: https://assets.clashk.ing/buildings/home-village/spell_tower/level_4.webp (four designs, not named spells)

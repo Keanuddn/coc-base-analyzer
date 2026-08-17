@@ -54,7 +54,9 @@ deprecated_notes: |
 # Placeholders for future manual labeling / fine-tuning rounds (not yet in model head).
 placeholders:
   - monolith      # TH14+
-  - spelltower    # TH15+
+  - spelltower    # TH15+ (rendered unlabeled; ClashKing level_1…4)
+  - archertower   # TH15 regular / TH16+ multi-archer merge
+  - firespitter   # visual-tier from 3 ClashKing files
   - th14
   - th15
   - th16
@@ -64,4 +66,4 @@ placeholders:
 notes: |
   The keremberke model only knows the 16 model_classes above (indices 0..15).
   TH14–TH18 town halls are visually distinct but share the th13 class slot in baseline weights.
-  Monolith and Spell Tower require new labels before they can be trained.
+  Monolith, Spell Tower, Archer Tower, and Firespitter require new labels before they can be trained.

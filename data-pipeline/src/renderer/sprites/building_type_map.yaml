@@ -20,20 +20,43 @@ aliases:
   xbow: x-bow
   monolith: monolith
   spelltower: spell_tower
+  archertower: archer_tower
+  firespitter: firespitter
 
 # Temporary YOLO aliases for merged defenses that keremberke's 16 classes
 # do not include. Sprites are still rendered for visual correctness.
-# User needs detection of "cannon-like" / "wizard-like" until dedicated
-# classes (`ricochet`, etc.) are added.
+# User needs detection of "cannon-like" / "wizard-like" / "archer-like"
+# until dedicated classes (`ricochet`, `archertower`, etc.) are added.
 yolo_label_overrides:
   ricochet_cannon: canon  # merged cannon visual (2× maxed TH15 cannons)
   super_wizard_tower: wizztower  # merged wizard visual (2× maxed TH17 wizard towers)
+  multi-archer_tower: archertower  # merged archer visual (2× maxed TH15 archer towers)
+
+# Render these sprites but skip YOLO txt until a class exists in the 16-head model.
+yolo_unlabeled:
+  - archertower
+  - firespitter
+  - spelltower
+
+# ClashKing has no poison/rage/invisibility/lightning filenames.
+# The four designs are spell_tower/level_1.webp … level_4.webp.
+# Pick one at random per placement (not visual-tier).
+random_sprite_variants:
+  spelltower:
+    slug: spell_tower
+    files:
+      - spell_tower/level_1.webp
+      - spell_tower/level_2.webp
+      - spell_tower/level_3.webp
+      - spell_tower/level_4.webp
 
 # User-corrected merge rules (not the visual-tier-proxy heuristic).
 # Regular cannon files: cannon/level_1.webp … level_21.webp (no geared-up extras
 # in this folder). level_21 is the purple max; maxed at TH15 — do not show
 # regular cannons as upgradable past TH15.
 # TH16+: two maxed purple cannons → ricochet_cannon.
+# Archer towers match cannons: archer_tower/level_21.webp is the purple TH15 max.
+# TH16+: multi-archer_tower only (no regular archer towers).
 # Wizard towers max at TH17 (wizard_tower/level_17.webp). TH15/16 = max-2 / max-1
 # relative to that. TH18: two wizard towers → super_wizard_tower.
 # firespitter is a separate TH17 defense, not the wizard merge.
@@ -45,6 +68,13 @@ era_merges:
     merged_from_th: 16
     yolo_class: canon
     count_range: [2, 3]  # 2→1 merge; prefer 2–3 ricochets for visual density
+  archertower:
+    regular_slug: archer_tower
+    max_regular_th: 15
+    merged_slug: multi-archer_tower
+    merged_from_th: 16
+    yolo_class: archertower
+    count_range: [2, 3]
   wizztower:
     regular_slug: wizard_tower
     max_regular_th: 17

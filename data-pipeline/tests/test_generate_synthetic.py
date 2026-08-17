@@ -10,6 +10,7 @@ import pytest
 from dataset.generate_synthetic import (
     MERGED_PLACEMENT_TYPES,
     REQUESTED_TOWN_HALL_LEVELS,
+    SPELL_TOWER_VARIANT_FILES,
     SYNTHETIC_BUILDING_TYPES,
     TILE_FOOTPRINTS,
     TOWN_HALL_LEVELS,
@@ -19,7 +20,7 @@ from dataset.generate_synthetic import (
     generate_th18era_previews,
     visual_tier_level,
 )
-from renderer.isometric_renderer import GRID_SIZE, IsometricRenderer, YOLO_CLASS_NAMES
+from renderer.isometric_renderer import GRID_SIZE, IsometricRenderer, YOLO_CLASS_NAMES, occupied_cells
 
 _TYPE_MAP = {
     "aliases": {
@@ -34,6 +35,9 @@ _TYPE_MAP = {
         "scattershot": "scattershot",
         "wizztower": "wizard_tower",
         "xbow": "x-bow",
+        "archertower": "archer_tower",
+        "firespitter": "firespitter",
+        "spelltower": "spell_tower",
     },
     "identity": [
         "cannon",
@@ -41,11 +45,28 @@ _TYPE_MAP = {
         "super_wizard_tower",
         "town_hall",
         "wizard_tower",
+        "archer_tower",
+        "multi-archer_tower",
+        "firespitter",
+        "spell_tower",
     ],
     "town_hall": {"sprite_slug": "town_hall", "yolo_class": "th13"},
     "yolo_label_overrides": {
         "ricochet_cannon": "canon",
         "super_wizard_tower": "wizztower",
+        "multi-archer_tower": "archertower",
+    },
+    "yolo_unlabeled": ["archertower", "firespitter", "spelltower"],
+    "random_sprite_variants": {
+        "spelltower": {
+            "slug": "spell_tower",
+            "files": [
+                "spell_tower/level_1.webp",
+                "spell_tower/level_2.webp",
+                "spell_tower/level_3.webp",
+                "spell_tower/level_4.webp",
+            ],
+        },
     },
     "era_merges": {
         "canon": {
@@ -54,6 +75,14 @@ _TYPE_MAP = {
             "merged_slug": "ricochet_cannon",
             "merged_from_th": 16,
             "yolo_class": "canon",
+            "count_range": [2, 3],
+        },
+        "archertower": {
+            "regular_slug": "archer_tower",
+            "max_regular_th": 15,
+            "merged_slug": "multi-archer_tower",
+            "merged_from_th": 16,
+            "yolo_class": "archertower",
             "count_range": [2, 3],
         },
         "wizztower": {
@@ -85,6 +114,10 @@ def _fake_catalog(**overrides: object) -> SpriteLevelCatalog:
         "airsweeper": list(range(1, 8)),
         "clancastle": list(range(1, 15)),
         "town_hall": list(range(1, 19)),
+        "archertower": list(range(1, 22)),
+        "multi-archer_tower": list(range(1, 5)),
+        "firespitter": list(range(1, 4)),
+        "spelltower": list(range(1, 5)),
     }
     kwargs: dict[str, object] = {
         "levels_by_type": levels,
@@ -96,6 +129,22 @@ def _fake_catalog(**overrides: object) -> SpriteLevelCatalog:
     }
     kwargs.update(overrides)
     return SpriteLevelCatalog(**kwargs)  # type: ignore[arg-type]
+
+
+def _assert_non_overlapping_in_bounds(
+    placements: list,
+    catalog: SpriteLevelCatalog,
+) -> None:
+    occupied: dict[tuple[int, int], str] = {}
+    for placement in placements:
+        size = catalog.occupancy_size(placement.building_type, placement.level)
+        assert 0 <= placement.x <= GRID_SIZE - size
+        assert 0 <= placement.y <= GRID_SIZE - size
+        assert placement.x + size <= GRID_SIZE
+        assert placement.y + size <= GRID_SIZE
+        for cell in occupied_cells(placement.x, placement.y, size):
+            assert cell not in occupied, f"overlap at {cell}"
+            occupied[cell] = placement.building_type
 
 
 class TestGenerateRandomLayout:
@@ -127,21 +176,42 @@ class TestGenerateRandomLayout:
             assert th.level == th_level
 
     def test_buildings_do_not_overlap_on_grid(self) -> None:
+        catalog = _fake_catalog()
         placements = generate_random_layout(
-            random.Random(7), town_hall_level=16, catalog=_fake_catalog()
+            random.Random(7), town_hall_level=16, catalog=catalog
         )
-        occupied: dict[tuple[int, int], str] = {}
-        for placement in placements:
-            size = TILE_FOOTPRINTS[placement.building_type]
-            assert 0 <= placement.x < GRID_SIZE
-            assert 0 <= placement.y < GRID_SIZE
-            assert placement.x + size <= GRID_SIZE
-            assert placement.y + size <= GRID_SIZE
-            for dx in range(size):
-                for dy in range(size):
-                    cell = (placement.x + dx, placement.y + dy)
-                    assert cell not in occupied, f"overlap at {cell}"
-                    occupied[cell] = placement.building_type
+        _assert_non_overlapping_in_bounds(placements, catalog)
+
+    def test_all_placements_inside_playable_grid_minus_size(self) -> None:
+        catalog = _fake_catalog()
+        for seed in (0, 7, 42, 99):
+            for th_level in (15, 16, 17, 18):
+                placements = generate_random_layout(
+                    random.Random(seed + th_level),
+                    town_hall_level=th_level,
+                    catalog=catalog,
+                )
+                assert placements
+                _assert_non_overlapping_in_bounds(placements, catalog)
+
+    def test_th18_layout_has_ricochet_and_super_wizard(self) -> None:
+        catalog = _fake_catalog()
+        placements = generate_random_layout(
+            random.Random(18), town_hall_level=18, catalog=catalog
+        )
+        types = {p.building_type for p in placements}
+        assert "ricochet_cannon" in types
+        assert "super_wizard_tower" in types
+        assert "multi-archer_tower" in types
+        assert "canon" not in types
+        assert "wizztower" not in types
+        assert "archertower" not in types
+        assert TILE_FOOTPRINTS["ricochet_cannon"] == 4
+        assert TILE_FOOTPRINTS["super_wizard_tower"] == 4
+        ricochets = [p for p in placements if p.building_type == "ricochet_cannon"]
+        wizards = [p for p in placements if p.building_type == "super_wizard_tower"]
+        assert ricochets and wizards
+        _assert_non_overlapping_in_bounds(placements, catalog)
 
     def test_seed_is_deterministic(self) -> None:
         catalog = _fake_catalog()
@@ -150,6 +220,13 @@ class TestGenerateRandomLayout:
         assert [(p.building_type, p.x, p.y, p.level) for p in a] == [
             (p.building_type, p.x, p.y, p.level) for p in b
         ]
+
+    def test_conservative_footprints_cover_coc_and_sprite_aabb(self) -> None:
+        assert TILE_FOOTPRINTS["town_hall"] == 5
+        assert TILE_FOOTPRINTS["eagle"] == 6
+        assert TILE_FOOTPRINTS["inferno"] == 4
+        assert TILE_FOOTPRINTS["canon"] == 5
+        assert TILE_FOOTPRINTS["super_wizard_tower"] >= TILE_FOOTPRINTS["wizztower"]
 
 
 class TestGenerateSyntheticDataset:
@@ -195,6 +272,8 @@ class TestVisualTierProxy:
             for placement in placements:
                 by_type.setdefault(placement.building_type, set()).add(placement.level)
             for building_type, levels in by_type.items():
+                if catalog.uses_random_variants(building_type):
+                    continue
                 assert len(levels) == 1, f"TH{th_level} {building_type} mixed {levels}"
 
     def test_th_offsets_match_max_minus_n(self) -> None:
@@ -290,6 +369,119 @@ class TestEraMerges:
         )
 
 
+class TestAddedDefenses:
+    """Archer merge, bomb tower, firespitter, spell tower variants."""
+
+    def test_th15_has_regular_cannon_and_archer_not_merged(self) -> None:
+        catalog = _fake_catalog()
+        placements = generate_random_layout(
+            random.Random(1), town_hall_level=15, catalog=catalog
+        )
+        types = {p.building_type for p in placements}
+        assert "canon" in types
+        assert "archertower" in types
+        assert "ricochet_cannon" not in types
+        assert "multi-archer_tower" not in types
+        archers = [p for p in placements if p.building_type == "archertower"]
+        assert {p.level for p in archers} == {21}
+        assert catalog.sprite_relpath("archertower", 21) == "archer_tower/level_21.webp"
+
+    def test_th16_has_ricochet_and_multi_archer_not_regular(self) -> None:
+        catalog = _fake_catalog()
+        expected = {16: 2, 17: 3, 18: 4}
+        for th_level, merged_level in expected.items():
+            assert catalog.resolve_for_th("archertower", th_level) == (
+                "multi-archer_tower",
+                merged_level,
+            )
+            placements = generate_random_layout(
+                random.Random(th_level), town_hall_level=th_level, catalog=catalog
+            )
+            types = {p.building_type for p in placements}
+            assert "ricochet_cannon" in types
+            assert "multi-archer_tower" in types
+            assert "canon" not in types
+            assert "archertower" not in types
+            merged = [p for p in placements if p.building_type == "multi-archer_tower"]
+            assert 2 <= len(merged) <= 3
+            assert {p.level for p in merged} == {merged_level}
+            assert catalog.sprite_relpath("multi-archer_tower", merged_level) == (
+                f"multi-archer_tower/level_{merged_level}.webp"
+            )
+
+    def test_th18_has_super_wizard_ricochet_multi_archer(self) -> None:
+        catalog = _fake_catalog()
+        placements = generate_random_layout(
+            random.Random(18), town_hall_level=18, catalog=catalog
+        )
+        types = {p.building_type for p in placements}
+        assert "super_wizard_tower" in types
+        assert "ricochet_cannon" in types
+        assert "multi-archer_tower" in types
+        assert "wizztower" not in types
+        assert "canon" not in types
+        assert "archertower" not in types
+
+    def test_bomb_tower_visual_tier_th15_to_18(self) -> None:
+        catalog = _fake_catalog()
+        expected = {15: 10, 16: 11, 17: 12, 18: 13}
+        for th_level, bomb_level in expected.items():
+            assert catalog.resolve_for_th("bombtower", th_level) == (
+                "bombtower",
+                bomb_level,
+            )
+            placements = generate_random_layout(
+                random.Random(th_level), town_hall_level=th_level, catalog=catalog
+            )
+            bombs = [p for p in placements if p.building_type == "bombtower"]
+            assert bombs
+            assert {p.level for p in bombs} == {bomb_level}
+            assert catalog.sprite_relpath("bombtower", bomb_level) == (
+                f"bomb_tower/level_{bomb_level}.webp"
+            )
+
+    def test_firespitter_visual_tier_from_three_files(self) -> None:
+        catalog = _fake_catalog()
+        expected = {15: 1, 16: 1, 17: 2, 18: 3}
+        for th_level, spit_level in expected.items():
+            assert catalog.resolve_for_th("firespitter", th_level) == (
+                "firespitter",
+                spit_level,
+            )
+            placements = generate_random_layout(
+                random.Random(th_level), town_hall_level=th_level, catalog=catalog
+            )
+            spitters = [p for p in placements if p.building_type == "firespitter"]
+            assert spitters
+            assert {p.level for p in spitters} == {spit_level}
+            assert catalog.sprite_relpath("firespitter", spit_level) == (
+                f"firespitter/level_{spit_level}.webp"
+            )
+
+    def test_spell_tower_uses_one_of_four_verified_files(self) -> None:
+        catalog = _fake_catalog()
+        seen_files: set[str] = set()
+        for seed in range(40):
+            placements = generate_random_layout(
+                random.Random(seed), town_hall_level=15, catalog=catalog
+            )
+            towers = [p for p in placements if p.building_type == "spelltower"]
+            assert towers
+            for placement in towers:
+                rel = catalog.sprite_relpath(placement.building_type, placement.level)
+                assert rel in SPELL_TOWER_VARIANT_FILES
+                seen_files.add(rel)
+        assert seen_files <= set(SPELL_TOWER_VARIANT_FILES)
+        assert len(seen_files) >= 2
+
+    def test_multi_archer_footprint_is_larger_than_archer(self) -> None:
+        assert TILE_FOOTPRINTS["archertower"] == 3
+        assert TILE_FOOTPRINTS["multi-archer_tower"] == 4
+        assert TILE_FOOTPRINTS["bombtower"] == 3
+        assert TILE_FOOTPRINTS["spelltower"] == 3
+        assert TILE_FOOTPRINTS["firespitter"] == 4
+
+
 @pytest.mark.skipif(
     not IsometricRenderer.sprites_available(),
     reason="ClashKing sprites not downloaded — run download_clashking_sprites.sh",
@@ -340,5 +532,10 @@ class TestTh18EraPreviews:
             assert levels[wizard_type]["sprite"] == wizard_sprite
             if th >= 16:
                 assert "canon" not in levels
+                assert "archertower" not in levels
+                assert "multi-archer_tower" in levels
+            if th == 15:
+                assert "archertower" in levels
+                assert "multi-archer_tower" not in levels
             if th == 18:
                 assert "wizztower" not in levels

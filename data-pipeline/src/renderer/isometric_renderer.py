@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+import math
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Mapping, Sequence
@@ -30,6 +31,58 @@ logger = logging.getLogger(__name__)
 GRID_SIZE = 44
 TILE_WIDTH = 44
 TILE_HEIGHT = 22
+
+# Official CoC editor footprints (tiles) — collision only, not combat stats.
+COC_TILE_FOOTPRINTS: dict[str, int] = {
+    "town_hall": 4,
+    "clancastle": 3,
+    "eagle": 4,
+    "inferno": 2,
+    "canon": 3,
+    "mortar": 3,
+    "wizztower": 3,
+    "ad": 3,
+    "airsweeper": 2,
+    "xbow": 3,
+    "bombtower": 3,
+    "scattershot": 3,
+    "ricochet_cannon": 3,
+    "super_wizard_tower": 4,  # larger than a regular wizard tower
+    "archertower": 3,
+    "archer_tower": 3,
+    "multi-archer_tower": 3,
+    "firespitter": 3,
+    "spelltower": 3,
+    "spell_tower": 3,
+}
+
+# Occupancy AABB: max(CoC tiles, ceil(max ClashKing sprite width / TILE_WIDTH)).
+# Wide auras (max cannon, eagle, inferno) would otherwise stack visually.
+TILE_FOOTPRINTS: dict[str, int] = {
+    "town_hall": 5,
+    "clancastle": 4,
+    "eagle": 6,
+    "inferno": 4,
+    "canon": 5,
+    "mortar": 3,
+    "wizztower": 3,
+    "ad": 3,
+    "airsweeper": 3,
+    "xbow": 4,
+    "bombtower": 3,
+    "scattershot": 4,
+    "ricochet_cannon": 4,
+    "super_wizard_tower": 4,
+    "archertower": 3,
+    "archer_tower": 3,
+    "multi-archer_tower": 4,  # bulkier merged sprite (132×175) vs archer 3×3
+    "firespitter": 4,  # ClashKing max 165px wide → ceil(165/44)=4
+    "spelltower": 3,
+    "spell_tower": 3,
+}
+
+# Extra pixels above the isometric footprint used when sprite height is unknown.
+SPRITE_NORTH_PAD_PX = 140
 
 # YOLOv5 label order from docs/ARCHITECTURE.md (keremberke model).
 YOLO_CLASS_NAMES: tuple[str, ...] = (
@@ -140,11 +193,112 @@ def _yolo_class_id(class_name: str) -> int | None:
         return None
 
 
-def tile_to_screen(x: int, y: int, *, origin_x: float, origin_y: float) -> tuple[float, float]:
-    """Map grid tile (x, y) to screen coordinates (footpoint)."""
+def tile_to_screen(x: float, y: float, *, origin_x: float, origin_y: float) -> tuple[float, float]:
+    """Map grid tile (x, y) to screen coordinates (tile center)."""
     screen_x = origin_x + (x - y) * (TILE_WIDTH / 2)
     screen_y = origin_y + (x + y) * (TILE_HEIGHT / 2)
     return screen_x, screen_y
+
+
+def screen_to_tile(sx: float, sy: float, *, origin_x: float, origin_y: float) -> tuple[float, float]:
+    """Inverse of ``tile_to_screen`` — fractional tile coordinates."""
+    u = (sx - origin_x) / (TILE_WIDTH / 2)
+    v = (sy - origin_y) / (TILE_HEIGHT / 2)
+    return (u + v) / 2.0, (v - u) / 2.0
+
+
+def footprint_size(building_type: str) -> int:
+    """Occupancy AABB in tiles (conservative ClashKing width, else CoC editor size)."""
+    if building_type in TILE_FOOTPRINTS:
+        return TILE_FOOTPRINTS[building_type]
+    return COC_TILE_FOOTPRINTS.get(building_type, 1)
+
+
+def occupancy_tiles(building_type: str, sprite_width: int | None = None) -> int:
+    """max(CoC editor size, ceil(sprite_width / TILE_WIDTH), conservative table)."""
+    base = COC_TILE_FOOTPRINTS.get(building_type, 1)
+    conservative = TILE_FOOTPRINTS.get(building_type, base)
+    size = max(base, conservative)
+    if sprite_width is not None and sprite_width > 0:
+        size = max(size, math.ceil(sprite_width / TILE_WIDTH))
+    return size
+
+
+def occupied_cells(x: int, y: int, size: int) -> set[tuple[int, int]]:
+    return {(x + dx, y + dy) for dx in range(size) for dy in range(size)}
+
+
+def footprint_anchor(
+    x: int,
+    y: int,
+    size: int,
+    *,
+    origin_x: float,
+    origin_y: float,
+) -> tuple[float, float]:
+    """Bottom-center of the size×size isometric diamond (south vertex).
+
+    Sprites are pasted with their image bottom at this footpoint so the art
+    sits on the occupied tiles instead of the northwest corner tile.
+    """
+    south_x = x + size - 1
+    south_y = y + size - 1
+    sx, sy = tile_to_screen(south_x, south_y, origin_x=origin_x, origin_y=origin_y)
+    return sx, sy + TILE_HEIGHT / 2
+
+
+def estimated_sprite_size(size: int, sprite_w: int | None = None, sprite_h: int | None = None) -> tuple[int, int]:
+    width = sprite_w if sprite_w is not None else size * TILE_WIDTH
+    height = sprite_h if sprite_h is not None else size * TILE_HEIGHT + SPRITE_NORTH_PAD_PX
+    return width, height
+
+
+def placement_in_playable_grid(x: int, y: int, size: int) -> bool:
+    """True if the occupancy square sits on the 44×44 checkerboard."""
+    return x >= 0 and y >= 0 and x + size <= GRID_SIZE and y + size <= GRID_SIZE
+
+
+def sprite_stays_on_playable(
+    x: int,
+    y: int,
+    size: int,
+    *,
+    sprite_w: int,
+    sprite_h: int,
+    origin_x: float | None = None,
+    origin_y: float | None = None,
+    canvas_size: tuple[int, int] | None = None,
+) -> bool:
+    """Keep the building base on the grass diamond and the sprite on-canvas.
+
+    Occupied tiles must already sit on the 44×44 checkerboard. Tall roofs may
+    stick up; they are pushed south so they do not sit on the forest rim or
+    hang off the canvas.
+    """
+    if not placement_in_playable_grid(x, y, size):
+        return False
+    if origin_x is None or origin_y is None:
+        origin_x, origin_y = village_origin()
+    foot_x, foot_y = footprint_anchor(x, y, size, origin_x=origin_x, origin_y=origin_y)
+    width, height = estimated_sprite_size(size, sprite_w, sprite_h)
+    left = foot_x - width / 2
+    right = foot_x + width / 2
+    top = foot_y - height
+    cw, ch = canvas_size or village_canvas_size()
+    if left < 0 or top < 0 or right > cw or foot_y > ch:
+        return False
+    extra_north = max(0, math.ceil((height - size * TILE_HEIGHT) / TILE_HEIGHT))
+    if x + y < extra_north:
+        return False
+    # Widest part of the isometric footprint (not the south tip — that AABB is transparent).
+    mid_y = foot_y - size * TILE_HEIGHT / 2.0
+    diamond_lo = -0.5
+    diamond_hi = GRID_SIZE - 0.5
+    for px in (left, right):
+        tx, ty = screen_to_tile(px, mid_y, origin_x=origin_x, origin_y=origin_y)
+        if tx < diamond_lo or ty < diamond_lo or tx > diamond_hi or ty > diamond_hi:
+            return False
+    return True
 
 
 def _normalize_placement(raw: BuildingPlacement | Mapping[str, Any]) -> BuildingPlacement:
@@ -330,9 +484,11 @@ class IsometricRenderer:
             if placement.rotation % 360 != 0:
                 sprite = sprite.rotate(-placement.rotation, expand=True, resample=Image.Resampling.BICUBIC)
 
-            foot_x, foot_y = tile_to_screen(
+            size = occupancy_tiles(placement.building_type, sprite.size[0])
+            foot_x, foot_y = footprint_anchor(
                 placement.x,
                 placement.y,
+                size,
                 origin_x=origin_x,
                 origin_y=origin_y,
             )
@@ -349,7 +505,7 @@ class IsometricRenderer:
                     sprite=sprite,
                     screen_x=foot_x,
                     screen_y=foot_y,
-                    depth=placement.x + placement.y,
+                    depth=placement.x + placement.y + 2 * (size - 1),
                     yolo_class=yolo_class,
                     building_type=placement.building_type,
                 )
@@ -406,12 +562,14 @@ class IsometricRenderer:
             bbox = _paste_sprite(scratch, item.sprite, item.screen_x, item.screen_y)
             bboxes.append(bbox)
 
-        pad = 40 if self.village_background else 24
-        crop = _crop_from_bboxes(bboxes, temp_size, pad=pad)
-        cropped = scratch.crop(crop)
         if self.village_background:
-            canvas = cropped
+            # Keep the full diamond + forest rim so buildings are judged in-bounds.
+            crop = (0, 0, temp_size[0], temp_size[1])
+            canvas = scratch
         else:
+            pad = 24
+            crop = _crop_from_bboxes(bboxes, temp_size, pad=pad)
+            cropped = scratch.crop(crop)
             canvas = Image.new("RGBA", cropped.size, (*bg, 255))
             canvas.alpha_composite(cropped)
 
@@ -427,6 +585,11 @@ class IsometricRenderer:
                 continue
             class_id = _yolo_class_id(item.yolo_class)
             if class_id is None:
+                unlabeled = {
+                    str(name) for name in (self.type_map.get("yolo_unlabeled") or [])
+                }
+                if item.yolo_class in unlabeled or item.building_type in unlabeled:
+                    continue
                 warnings.append(f"No YOLO class id for {item.yolo_class!r} ({item.building_type})")
                 continue
             cx = ((x1 + x2) / 2) / img_w

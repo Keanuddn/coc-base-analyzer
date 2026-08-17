@@ -23,10 +23,14 @@ with sourced merge windows:
   evenly so all four designs appear in the dataset.
 * Monolith TH15+; Hidden Tesla TH7+; weaponized Builder Hut TH14+.
 * Walls (``wall/``): visual-tier from maxed TH18. 1×1 tiles, unlabeled.
-  Walls may touch each other; non-wall buildings keep a 1-tile gap.
+  Walls may touch each other; non-wall buildings prefer a 1.25-tile gap
+  (ceil → two empty tiles) and fall back to one empty tile if a copy
+  would otherwise not fit. Town hall / walls stay a single sprite.
 * Other defenses use ClashKing max / max-1 / max-2 / max-3 for
-  TH18 / 17 / 16 / 15. One sprite level per building type per image
-  (spell towers excepted: two cycled designs).
+  TH18 / 17 / 16 / 15. When that TH has a previous ClashKing file
+  (e.g. ``ricochet_cannon/level_1.webp`` + ``level_2.webp`` at TH16),
+  copies round-robin max and previous so a layout is not 100% maxed.
+  Spell towers still cycle the four designs.
 """
 
 from __future__ import annotations
@@ -58,6 +62,7 @@ from renderer.isometric_renderer import (
     list_sprite_levels,
     occupancy_tiles,
     occupied_cells,
+    gap_pad_tiles,
     placement_in_playable_grid,
     scale_sprite_size,
     sprite_stays_on_playable,
@@ -265,6 +270,50 @@ class SpriteLevelCatalog:
             town_hall_level,
             era_max=era_max,
         )
+
+    def mixes_sprite_levels(self, building_type: str) -> bool:
+        """True when this type may show visual-tier max and the previous file."""
+        if building_type in {"town_hall", "wall"}:
+            return False
+        return not self.uses_random_variants(building_type)
+
+    def previous_sprite_level(self, building_type: str, level: int) -> int | None:
+        """Next-lower ClashKing file in the catalog, if any."""
+        below = [lv for lv in sorted(self.levels_for(building_type)) if lv < level]
+        return below[-1] if below else None
+
+    def sprite_levels_for_th(self, building_type: str, town_hall_level: int) -> list[int]:
+        """Visual-tier max plus previous ClashKing sprite when both exist at this TH.
+
+        Cites on-disk ``clashking/home-village/{slug}/level_{n}.webp`` (and
+        ``th_unlocks.yaml`` for which types exist at the TH). Does not invent
+        buildings or levels.
+        """
+        max_lv = self.sprite_level(building_type, town_hall_level)
+        prev = self.previous_sprite_level(building_type, max_lv)
+        if prev is None:
+            return [max_lv]
+        return [prev, max_lv]
+
+    def mixed_levels_for_layout(
+        self,
+        building_type: str,
+        town_hall_level: int,
+        count: int,
+        rng: random.Random,
+    ) -> list[int]:
+        """Round-robin max / previous sprite so a layout is not 100% maxed.
+
+        Random phase: first copy is max or previous with equal chance. Two
+        copies (TH16 ricochet) always show both ClashKing files.
+        """
+        available = self.sprite_levels_for_th(building_type, town_hall_level)
+        if count <= 0:
+            return []
+        if len(available) == 1:
+            return [available[0]] * count
+        start = rng.randrange(len(available))
+        return [available[(start + i) % len(available)] for i in range(count)]
 
     def _merge_rule(self, building_type: str) -> Mapping[str, Any] | None:
         merges = self.type_map.get("era_merges") or {}
@@ -543,14 +592,16 @@ def _fits(
     *,
     sprite_w: int,
     sprite_h: int,
+    pad: int | None = None,
 ) -> bool:
     if not placement_in_playable_grid(x, y, size):
         return False
     if occupied_cells(x, y, size) & occupied:
         return False
-    # One empty tile between non-wall occupancy squares. Walls may fill
-    # that gap later and may touch each other.
-    pad = BUILDING_GAP_TILES
+    # Prefer BUILDING_GAP_TILES (1.25 → 2 empty tiles). Callers may pass pad=1
+    # so leftover copies still fit and wiki counts stay exact. Walls ignore this.
+    if pad is None:
+        pad = gap_pad_tiles()
     dilated = occupied_cells(x - pad, y - pad, size + 2 * pad)
     if dilated & occupied:
         return False
@@ -570,10 +621,12 @@ def _try_place(
     sprite_h: int,
     prefer_center: bool = False,
     max_attempts: int = 400,
+    pad: int | None = None,
 ) -> tuple[int, int] | None:
     limit = GRID_SIZE - size
     if limit < 0:
         return None
+    use_pad = gap_pad_tiles() if pad is None else pad
 
     def _ok(x: int, y: int) -> bool:
         return _fits(
@@ -583,6 +636,7 @@ def _try_place(
             size,
             sprite_w=sprite_w,
             sprite_h=sprite_h,
+            pad=use_pad,
         )
 
     if prefer_center:
@@ -597,6 +651,17 @@ def _try_place(
                         candidates.append((x, y))
             if candidates:
                 return rng.choice(candidates)
+        if use_pad > 1:
+            return _try_place(
+                occupied,
+                size,
+                rng,
+                sprite_w=sprite_w,
+                sprite_h=sprite_h,
+                prefer_center=True,
+                max_attempts=max_attempts,
+                pad=1,
+            )
         return None
 
     for _ in range(max_attempts):
@@ -608,6 +673,17 @@ def _try_place(
         for y in range(0, limit + 1):
             if _ok(x, y):
                 return x, y
+    if use_pad > 1:
+        return _try_place(
+            occupied,
+            size,
+            rng,
+            sprite_w=sprite_w,
+            sprite_h=sprite_h,
+            prefer_center=False,
+            max_attempts=max_attempts,
+            pad=1,
+        )
     return None
 
 
@@ -775,9 +851,11 @@ def generate_random_layout(
     merged buildings from ``count_by_th``. Availability is
     ``th_unlocks.yaml``: eagle ≤ TH16, firespitter ≥ TH17, spell towers 2
     at TH15–18, remaining cannons/archers/wizards after merges as sourced.
-    Non-wall buildings keep a 1-tile gap; walls are 1×1 and may touch.
-    Occupied tiles are never reused. If a building cannot fit after retries,
-    as many copies as possible are placed and a warning is logged.
+    Non-wall buildings prefer a 1.25-tile gap (ceil → 2 empty tiles) and
+    fall back to 1 empty tile so wiki counts still fit; walls are 1×1 and
+    may touch. Occupied tiles are never reused. If a building cannot fit
+    after retries, as many copies as possible are placed and a warning is
+    logged.
     """
     catalog = catalog or SpriteLevelCatalog.load()
 
@@ -821,6 +899,10 @@ def generate_random_layout(
         if catalog.uses_random_variants(building_type):
             levels_to_place = catalog.cycled_variant_levels(
                 building_type, variant_cycle, count
+            )
+        elif catalog.mixes_sprite_levels(place_type):
+            levels_to_place = catalog.mixed_levels_for_layout(
+                place_type, town_hall_level, count, rng
             )
         else:
             levels_to_place = [level] * count
@@ -884,8 +966,9 @@ def summarize_placement_levels(
         entry["count"] += 1
         entry["levels"].append(placement.level)
         entry["sprites"].append(sprite)
-        if placement.level != entry["level"] and not catalog.uses_random_variants(
-            placement.building_type
+        if placement.level != entry["level"] and not (
+            catalog.uses_random_variants(placement.building_type)
+            or catalog.mixes_sprite_levels(placement.building_type)
         ):
             mixed.append(f"{placement.building_type}@{placement.level}")
     return {

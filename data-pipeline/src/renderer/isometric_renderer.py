@@ -100,10 +100,13 @@ TILE_FOOTPRINTS: dict[str, int] = {
 
 # Extra tiles reserved around each defense so sprite bodies (not just tile
 # squares) stay apart on photo scenery. Walls stay 1×1 and skip this pad.
-# Occupancy uses CoC editor size (see occupancy_tiles); the 1-tile gap is
-# enforced at placement time between non-wall buildings.
+# Occupancy uses CoC editor size (see occupancy_tiles); the preferred gap
+# below is enforced at placement time between non-wall buildings (ceil to
+# an integer Chebyshev ring — 1.25 → two empty tiles). Placement falls
+# back to one empty tile when a copy would not otherwise fit, so wiki
+# counts stay exact. Walls may still touch.
 OCCUPANCY_PAD_TILES = 0
-BUILDING_GAP_TILES = 1
+BUILDING_GAP_TILES = 1.25
 # Screen-space gap between visual footprint AABBs (photo compositing).
 VISUAL_OVERLAP_GAP_PX = 6
 # Draw ClashKing sprites smaller so a full TH defense set fits the diamond.
@@ -278,6 +281,11 @@ def occupancy_tiles(
 
 def occupied_cells(x: int, y: int, size: int) -> set[tuple[int, int]]:
     return {(x + dx, y + dy) for dx in range(size) for dy in range(size)}
+
+
+def gap_pad_tiles(gap: float | int = BUILDING_GAP_TILES) -> int:
+    """Integer empty-tile ring around non-wall occupancy. Fractional gaps ceil."""
+    return max(0, math.ceil(float(gap)))
 
 
 def occupancy_aabb(

@@ -36,6 +36,7 @@ import yaml
 
 from link_decoder.schema import BuildingPlacement
 from renderer.domain_randomization import DomainRandomizationConfig
+from renderer.photo_background import scenery_path_by_name
 from renderer.isometric_renderer import (
     BUILDING_TYPE_MAP_PATH,
     CLASHKING_HOME_VILLAGE,
@@ -124,6 +125,14 @@ PREVIEW_SPECS: tuple[tuple[str, int, int], ...] = (
     ("preview_th18era_th16.png", 16, 1016),
     ("preview_th18era_th17.png", 17, 1017),
     ("preview_th18era_th18.png", 18, 1018),
+)
+
+# Distinct home sceneries + clan_war for the photo-composite review set.
+SCENERY_PREVIEW_SPECS: tuple[tuple[str, int, int, str], ...] = (
+    ("preview_bg_th15.png", 15, 3015, "classic_grass.png"),
+    ("preview_bg_th16.png", 16, 3016, "ruins_temple.png"),
+    ("preview_bg_th17.png", 17, 3017, "primal.png"),
+    ("preview_bg_war.png", 16, 3019, "clan_war.png"),
 )
 
 
@@ -574,10 +583,15 @@ def generate_synthetic_dataset(
     *,
     skip_existing: bool = True,
     village_background: bool = True,
+    use_photo_backgrounds: bool = True,
     catalog: SpriteLevelCatalog | None = None,
 ) -> dict[str, Any]:
     """Render ``count`` layouts to ``output_dir/th{15,16,17,18}/synthetic_XXXX.png`` + YOLO txt."""
-    renderer = IsometricRenderer(use_placeholders=True, village_background=village_background)
+    renderer = IsometricRenderer(
+        use_placeholders=True,
+        village_background=village_background,
+        use_photo_backgrounds=use_photo_backgrounds,
+    )
     catalog = catalog or SpriteLevelCatalog.load()
     th_levels = catalog.available_town_hall_levels()
     skipped_th = catalog.skipped_town_hall_levels()
@@ -653,10 +667,15 @@ def generate_th18era_previews(
     *,
     catalog: SpriteLevelCatalog | None = None,
     village_background: bool = True,
+    use_photo_backgrounds: bool = True,
 ) -> list[dict[str, Any]]:
     """Write one review image per TH in {15,16,17,18}; skip missing hall sprites."""
     catalog = catalog or SpriteLevelCatalog.load()
-    renderer = IsometricRenderer(use_placeholders=True, village_background=village_background)
+    renderer = IsometricRenderer(
+        use_placeholders=True,
+        village_background=village_background,
+        use_photo_backgrounds=use_photo_backgrounds,
+    )
     output_dir.mkdir(parents=True, exist_ok=True)
     reports: list[dict[str, Any]] = []
     skipped_th = catalog.skipped_town_hall_levels()
@@ -703,6 +722,7 @@ def generate_th18era_previews(
             "mixed_levels": level_info["mixed_levels"],
             "level_policy": catalog.policy,
             "not_official_coc_cap": catalog.not_official_coc_cap,
+            "background": result.background_path.name if result.background_path else None,
         }
         reports.append(report)
         logging.info(
@@ -721,6 +741,85 @@ def generate_th18era_previews(
     return reports
 
 
+def generate_scenery_previews(
+    output_dir: Path = DEFAULT_PREVIEW_DIR,
+    seed: int = 42,
+    *,
+    catalog: SpriteLevelCatalog | None = None,
+) -> list[dict[str, Any]]:
+    """Write four composites on distinct user sceneries (war uses clan_war.png)."""
+    catalog = catalog or SpriteLevelCatalog.load()
+    renderer = IsometricRenderer(
+        use_placeholders=True,
+        village_background=True,
+        use_photo_backgrounds=True,
+    )
+    output_dir.mkdir(parents=True, exist_ok=True)
+    reports: list[dict[str, Any]] = []
+
+    for filename, th_level, seed_offset, scenery_name in SCENERY_PREVIEW_SPECS:
+        bg_path = scenery_path_by_name(scenery_name)
+        if bg_path is None:
+            reports.append(
+                {
+                    "file": None,
+                    "town_hall_level": th_level,
+                    "skipped": True,
+                    "reason": f"missing scenery {scenery_name}",
+                    "background": scenery_name,
+                }
+            )
+            continue
+        if th_level not in catalog.levels_for("town_hall"):
+            reports.append(
+                {
+                    "file": None,
+                    "town_hall_level": th_level,
+                    "skipped": True,
+                    "reason": f"missing town_hall/level_{th_level}.webp",
+                    "background": scenery_name,
+                }
+            )
+            continue
+        layout_rng = random.Random(seed + seed_offset)
+        placements = generate_random_layout(
+            layout_rng,
+            town_hall_level=th_level,
+            catalog=catalog,
+            variant_cycle=th_level,
+        )
+        out_png = output_dir / filename
+        dr_cfg = DomainRandomizationConfig(
+            seed=seed + seed_offset,
+            brightness_jitter=0.04,
+            contrast_jitter=0.04,
+            overlay_opacity=0.04,
+        )
+        result = renderer.render(
+            placements,
+            domain_randomization=dr_cfg,
+            seed=seed + seed_offset,
+            background_path=bg_path,
+        )
+        result.image.save(out_png, format="PNG")
+        level_info = summarize_placement_levels(placements, catalog)
+        reports.append(
+            {
+                "file": str(out_png),
+                "town_hall_level": th_level,
+                "skipped": False,
+                "background": bg_path.name,
+                "sprite_levels": level_info["by_type"],
+                "mixed_levels": level_info["mixed_levels"],
+                "level_policy": catalog.policy,
+                "not_official_coc_cap": catalog.not_official_coc_cap,
+            }
+        )
+        logging.info("%s TH=%s background=%s", out_png.name, th_level, bg_path.name)
+
+    return reports
+
+
 generate_th_capped_previews = generate_th18era_previews
 generate_th_strict_previews = generate_th18era_previews
 
@@ -733,7 +832,9 @@ def _print_preview_reports(reports: Sequence[Mapping[str, Any]]) -> None:
         if report.get("skipped"):
             print(f"  TH{th}: SKIPPED — {report.get('reason')}")
             continue
-        print(f"  TH{th}  {report['file']}")
+        print(f"  TH{th}  {report['file']}" + (
+            f"  bg={report['background']}" if report.get("background") else ""
+        ))
         for name, info in (report.get("sprite_levels") or {}).items():
             sprites = list(dict.fromkeys(info.get("sprites") or [info["sprite"]]))
             if len(sprites) > 1:
@@ -787,7 +888,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument(
         "--flat-background",
         action="store_true",
-        help="Legacy solid green fill instead of procedural village grass",
+        help="Procedural village grass instead of user scenery photos (also used if no PNGs exist)",
     )
     parser.add_argument(
         "--preview-th18era",
@@ -796,6 +897,11 @@ def main(argv: list[str] | None = None) -> int:
         dest="preview_th18era",
         action="store_true",
         help="Write 4 review images (TH15–18) and print sprite paths; does not bulk-generate",
+    )
+    parser.add_argument(
+        "--preview-scenery",
+        action="store_true",
+        help="Write 4 composites on distinct empty-village photos (war uses clan_war.png)",
     )
     parser.add_argument(
         "--preview-dir",
@@ -811,11 +917,17 @@ def main(argv: list[str] | None = None) -> int:
         format="%(levelname)s %(message)s",
     )
 
+    if args.preview_scenery:
+        reports = generate_scenery_previews(output_dir=args.preview_dir, seed=args.seed)
+        _print_preview_reports(reports)
+        return 0
+
     if args.preview_th18era:
         reports = generate_th18era_previews(
             output_dir=args.preview_dir,
             seed=args.seed,
-            village_background=not args.flat_background,
+            village_background=True,
+            use_photo_backgrounds=not args.flat_background,
         )
         _print_preview_reports(reports)
         return 0
@@ -828,7 +940,8 @@ def main(argv: list[str] | None = None) -> int:
         output_dir=args.output,
         seed=args.seed,
         skip_existing=not args.force,
-        village_background=not args.flat_background,
+        village_background=True,
+        use_photo_backgrounds=not args.flat_background,
     )
     print(json.dumps(summary, indent=2))
     return 0

@@ -107,6 +107,7 @@ class TestIsometricRenderer:
             sprites_root=SPRITES_ROOT,
             use_placeholders=False,
             village_background=False,
+            use_photo_backgrounds=False,
         )
         cfg = DomainRandomizationConfig(
             brightness_jitter=0,

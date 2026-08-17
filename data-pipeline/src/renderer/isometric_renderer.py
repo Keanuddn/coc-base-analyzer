@@ -18,6 +18,7 @@ from renderer.domain_randomization import (
     jitter_position,
     randomize_background,
 )
+from renderer.photo_background import paint_photo_background, pick_scenery_background
 from renderer.village_background import (
     paint_village_background,
     randomize_village_palette,
@@ -130,6 +131,7 @@ class RenderResult:
     warnings: list[str] = field(default_factory=list)
     rendered_count: int = 0
     skipped_count: int = 0
+    background_path: Path | None = None
 
 
 @dataclass(slots=True)
@@ -413,12 +415,16 @@ class IsometricRenderer:
         background: tuple[int, int, int] = DEFAULT_BACKGROUND,
         use_placeholders: bool = True,
         village_background: bool = True,
+        use_photo_backgrounds: bool = True,
+        backgrounds_dir: Path | None = None,
     ) -> None:
         self.sprites_root = sprites_root or CLASHKING_HOME_VILLAGE
         self.type_map = _load_building_type_map(type_map_path)
         self.background = background
         self.use_placeholders = use_placeholders
         self.village_background = village_background
+        self.use_photo_backgrounds = use_photo_backgrounds
+        self.backgrounds_dir = backgrounds_dir
 
     @staticmethod
     def sprites_available(sprites_root: Path | None = None) -> bool:
@@ -432,12 +438,60 @@ class IsometricRenderer:
             return 0
         return sum(1 for _ in root.rglob("*.webp"))
 
+    def _resolve_photo_background(
+        self,
+        rng: Any,
+        background_path: Path | None,
+    ) -> Path | None:
+        if not self.village_background or not self.use_photo_backgrounds:
+            return None
+        if background_path is not None:
+            return background_path if background_path.is_file() else None
+        return pick_scenery_background(rng, directory=self.backgrounds_dir)
+
+    def _paint_background(
+        self,
+        canvas: Image.Image,
+        *,
+        origin_x: float,
+        origin_y: float,
+        rng: Any,
+        dr_cfg: DomainRandomizationConfig,
+        photo_path: Path | None,
+    ) -> None:
+        if photo_path is not None:
+            paint_photo_background(
+                canvas,
+                photo_path,
+                origin_x=origin_x,
+                origin_y=origin_y,
+                rng=rng,
+                brightness_jitter=min(0.08, dr_cfg.background_brightness_jitter or 0.06),
+            )
+            return
+        if not self.village_background:
+            return
+        palette = randomize_village_palette(
+            rng,
+            hue_shift_deg=dr_cfg.background_hue_shift,
+            color_jitter=dr_cfg.background_color_jitter,
+            brightness_jitter=dr_cfg.background_brightness_jitter,
+        )
+        paint_village_background(
+            canvas,
+            origin_x=origin_x,
+            origin_y=origin_y,
+            rng=rng,
+            palette=palette,
+        )
+
     def render(
         self,
         placements: Sequence[BuildingPlacement | Mapping[str, Any]],
         *,
         domain_randomization: DomainRandomizationConfig | None = None,
         seed: int | None = None,
+        background_path: Path | None = None,
     ) -> RenderResult:
         import random
 
@@ -448,6 +502,7 @@ class IsometricRenderer:
             jitter=dr_cfg.background_color_jitter,
             rng=rng,
         )
+        photo_path = self._resolve_photo_background(rng, background_path)
 
         normalized = [_normalize_placement(p) for p in placements]
         if self.village_background:
@@ -519,18 +574,13 @@ class IsometricRenderer:
         if not placed:
             if self.village_background:
                 canvas = Image.new("RGBA", temp_size, (0, 0, 0, 0))
-                palette = randomize_village_palette(
-                    rng,
-                    hue_shift_deg=dr_cfg.background_hue_shift,
-                    color_jitter=dr_cfg.background_color_jitter,
-                    brightness_jitter=dr_cfg.background_brightness_jitter,
-                )
-                paint_village_background(
+                self._paint_background(
                     canvas,
                     origin_x=origin_x,
                     origin_y=origin_y,
                     rng=rng,
-                    palette=palette,
+                    dr_cfg=dr_cfg,
+                    photo_path=photo_path,
                 )
             else:
                 canvas = Image.new("RGBA", (512, 512), (*bg, 255))
@@ -541,26 +591,20 @@ class IsometricRenderer:
                 warnings=warnings,
                 rendered_count=0,
                 skipped_count=skipped,
+                background_path=photo_path,
             )
 
         bboxes: list[tuple[int, int, int, int]] = []
+        scratch = Image.new("RGBA", temp_size, (0, 0, 0, 0))
         if self.village_background:
-            scratch = Image.new("RGBA", temp_size, (0, 0, 0, 0))
-            palette = randomize_village_palette(
-                rng,
-                hue_shift_deg=dr_cfg.background_hue_shift,
-                color_jitter=dr_cfg.background_color_jitter,
-                brightness_jitter=dr_cfg.background_brightness_jitter,
-            )
-            paint_village_background(
+            self._paint_background(
                 scratch,
                 origin_x=origin_x,
                 origin_y=origin_y,
                 rng=rng,
-                palette=palette,
+                dr_cfg=dr_cfg,
+                photo_path=photo_path,
             )
-        else:
-            scratch = Image.new("RGBA", temp_size, (0, 0, 0, 0))
 
         sorted_placed = sorted(placed, key=lambda p: p.depth)
         for item in sorted_placed:
@@ -619,6 +663,7 @@ class IsometricRenderer:
             warnings=warnings,
             rendered_count=len(placed),
             skipped_count=skipped,
+            background_path=photo_path,
         )
 
     def render_to_files(
@@ -628,11 +673,13 @@ class IsometricRenderer:
         *,
         domain_randomization: DomainRandomizationConfig | None = None,
         seed: int | None = None,
+        background_path: Path | None = None,
     ) -> RenderResult:
         result = self.render(
             placements,
             domain_randomization=domain_randomization,
             seed=seed,
+            background_path=background_path,
         )
         output_png.parent.mkdir(parents=True, exist_ok=True)
         label_path = output_png.with_suffix(".txt")

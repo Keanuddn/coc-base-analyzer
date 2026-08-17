@@ -45,7 +45,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument(
         "--flat-background",
         action="store_true",
-        help="Legacy solid green fill instead of procedural village grass",
+        help="Procedural village grass instead of user scenery photos",
     )
     parser.add_argument("-v", "--verbose", action="store_true")
     args = parser.parse_args(argv)
@@ -69,7 +69,11 @@ def main(argv: list[str] | None = None) -> int:
     if not args.no_randomization:
         dr_cfg = DomainRandomizationConfig(seed=args.seed)
 
-    renderer = IsometricRenderer(use_placeholders=True, village_background=not args.flat_background)
+    renderer = IsometricRenderer(
+        use_placeholders=True,
+        village_background=True,
+        use_photo_backgrounds=not args.flat_background,
+    )
     result = renderer.render_to_files(
         DEMO_PLACEMENTS,
         args.output,

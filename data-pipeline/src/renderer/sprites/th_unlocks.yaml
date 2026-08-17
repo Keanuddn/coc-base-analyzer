@@ -197,12 +197,20 @@ buildings:
     min_th: 15
     max_th: 18
     count_by_th: {15: 1, 16: 1, 17: 1, 18: 1}
+    mix_levels: true
+    visual_levels_by_th: {15: [1, 2]}
     sources:
       - url: https://supercell.com/en/games/clashofclans/blog/release-notes/full-release-notes-2/
         summary: Official TH15 notes — Monolith is a new TH15 defense.
       - url: https://clashofclans.fandom.com/wiki/Town_Hall
         accessed: 2026-08-17
         summary: 1 Monolith at TH15–18.
+      - url: https://clashofclans.fandom.com/wiki/Monolith
+        accessed: 2026-08-17
+        summary: "L1 and L2 both require TH15; L3 → TH16; L4 → TH17; L5 → TH18. Mix L1+L2 only at TH15."
+      - url: https://www.clash.ninja/guides/max-levels-for-each-th
+        accessed: 2026-08-17
+        summary: Monolith max 2/3/4/5 at TH15–18.
 
   spelltower:
     min_th: 15
@@ -226,13 +234,15 @@ buildings:
     max_th: 18
     merge_of: canon
     count_by_th: {15: 0, 16: 2, 17: 3, 18: 3}
+    mix_levels: true
+    visual_levels_by_th: {16: [1, 2]}
     sources:
       - url: https://clashofclans.fandom.com/wiki/Town_Hall
         accessed: 2026-08-17
         summary: Ricochet Cannon 2 at TH16, 3 at TH17–18.
       - url: https://clashofclans.fandom.com/wiki/Ricochet_Cannon
         accessed: 2026-08-17
-        summary: Number Available 0 through TH15, then 2 / 3 / 3 at TH16 / 17 / 18.
+        summary: "L1 and L2 both require TH16; L3 → TH17; L4 → TH18. Mix L1+L2 only at TH16 (the example mix case)."
       - url: https://supercell.com/en/games/clashofclans/blog/release-notes/full-patch-notes-th16/
         summary: Ricochet Cannon added with TH16. 2× available at TH16.
 
@@ -241,10 +251,15 @@ buildings:
     max_th: 18
     merge_of: archertower
     count_by_th: {15: 0, 16: 2, 17: 3, 18: 3}
+    mix_levels: true
+    visual_levels_by_th: {16: [1, 2]}
     sources:
       - url: https://clashofclans.fandom.com/wiki/Town_Hall
         accessed: 2026-08-17
         summary: Multi-Archer Tower 2 at TH16, 3 at TH17–18.
+      - url: https://clashofclans.fandom.com/wiki/Multi-Archer_Tower
+        accessed: 2026-08-17
+        summary: "L1 and L2 both require TH16; L3 → TH17; L4 → TH18. Mix L1+L2 only at TH16."
       - url: https://supercell.com/en/games/clashofclans/blog/release-notes/full-patch-notes-th16/
         summary: Multi-Archer Tower added with TH16. 2× available at TH16.
 
@@ -252,12 +267,15 @@ buildings:
     min_th: 17
     max_th: 18
     count_by_th: {15: 0, 16: 0, 17: 2, 18: 2}
+    mix_levels: true
+    visual_levels_by_th: {17: [1, 2]}
     sources:
       - url: https://clashofclans.fandom.com/wiki/Town_Hall
         accessed: 2026-08-17
         summary: Firespitter 2 at TH17–18.
       - url: https://clashofclans.fandom.com/wiki/Firespitter
-        summary: Unlocked at TH17; players can only have two Firespitters.
+        accessed: 2026-08-17
+        summary: "Unlocked at TH17. L1 and L2 both require TH17; L3 → TH18. Mix L1+L2 only at TH17."
       - url: https://supercell.com/en/games/clashofclans/blog/game-updates/the-town-hall-17-update-is-here-2/
         summary: Official TH17 notes — new defense Firespitter.
 
@@ -265,12 +283,15 @@ buildings:
     min_th: 17
     max_th: 18
     count_by_th: {15: 0, 16: 0, 17: 1, 18: 1}
+    mix_levels: true
+    visual_levels_by_th: {17: [1, 2]}
     sources:
       - url: https://clashofclans.fandom.com/wiki/Town_Hall
         accessed: 2026-08-17
         summary: 1 Multi-Gear Tower at TH17–18.
-      - url: https://cocmap.com/coc/unit/buildings/multi-gear-tower-home-village
-        summary: Unlock TH17; merge geared-up Cannon + Archer Tower. Distinct from Ricochet.
+      - url: https://www.clasher.us/clash-of-clans/unit/multi-gear-tower-home-village
+        accessed: 2026-08-17
+        summary: "Unlock TH17. L1 and L2 both require TH17; L3 → TH18. Mix L1+L2 only at TH17."
       - url: https://clashofclans.fandom.com/wiki/Town_Hall/Unlocks
         summary: Multi-Gear Tower listed as a TH17 unlock.
 
@@ -279,10 +300,15 @@ buildings:
     max_th: 18
     merge_of: wizztower
     count_by_th: {15: 0, 16: 0, 17: 0, 18: 2}
+    mix_levels: true
+    visual_levels_by_th: {18: [1, 2]}
     sources:
       - url: https://clashofclans.fandom.com/wiki/Town_Hall
         accessed: 2026-08-17
         summary: Super Wizard Tower 2 at TH18.
+      - url: https://clashofclans.fandom.com/wiki/Super_Wizard_Tower/Home_Village
+        accessed: 2026-08-17
+        summary: "L1 and L2 both require TH18. Mix L1+L2 at TH18."
       - url: https://supercell.com/en/games/clashofclans/blog/release-notes/town-hall-18-crash-lands-update/
         summary: Official — merge two Wizard Towers at TH18.
       - url: https://www.clasher.us/clash-of-clans/unit/super-wizard-tower-home-village
@@ -292,10 +318,15 @@ buildings:
     min_th: 18
     max_th: 18
     count_by_th: {15: 0, 16: 0, 17: 0, 18: 1}
+    mix_levels: true
+    visual_levels_by_th: {18: [1, 2]}
     sources:
       - url: https://clashofclans.fandom.com/wiki/Town_Hall
         accessed: 2026-08-17
         summary: Revenge Tower 1 at TH18.
+      - url: https://clashofclans.fandom.com/wiki/Revenge_Tower
+        accessed: 2026-08-17
+        summary: "L1 and L2 both require TH18. Mix L1+L2 at TH18."
       - url: https://supercell.com/en/games/clashofclans/blog/release-notes/town-hall-18-crash-lands-update/
         summary: Official — Revenge Tower unlocks at Town Hall 18.
 

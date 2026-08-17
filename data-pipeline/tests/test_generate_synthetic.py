@@ -335,6 +335,14 @@ class TestVisualTierProxy:
     def test_defenses_mix_max_and_previous_clashking_sprite(self) -> None:
         catalog = _fake_catalog()
         assert catalog.sprite_levels_for_th("ricochet_cannon", 16) == [1, 2]
+        assert catalog.sprite_levels_for_th("ricochet_cannon", 17) == [3]
+        assert catalog.sprite_levels_for_th("canon", 15) == [21]
+        assert catalog.sprite_levels_for_th("archertower", 15) == [21]
+        assert catalog.sprite_levels_for_th("multi-archer_tower", 16) == [1, 2]
+        assert catalog.sprite_levels_for_th("super_wizard_tower", 18) == [1, 2]
+        assert catalog.sprite_levels_for_th("firespitter", 17) == [1, 2]
+        assert catalog.sprite_levels_for_th("firespitter", 18) == [3]
+        assert catalog.sprite_levels_for_th("monolith", 15) == [1, 2]
         assert catalog.sprite_relpath("ricochet_cannon", 1) == "ricochet_cannon/level_1.webp"
         assert catalog.sprite_relpath("ricochet_cannon", 2) == "ricochet_cannon/level_2.webp"
         placements = generate_random_layout(
@@ -343,6 +351,14 @@ class TestVisualTierProxy:
         ricochets = [p for p in placements if p.building_type == "ricochet_cannon"]
         assert len(ricochets) == 2
         assert {p.level for p in ricochets} == {1, 2}
+        th15 = generate_random_layout(
+            random.Random(15), town_hall_level=15, catalog=catalog
+        )
+        th15_cannons = [p for p in th15 if p.building_type == "canon"]
+        assert th15_cannons
+        assert {p.level for p in th15_cannons} == {21}
+        th15_archers = [p for p in th15 if p.building_type == "archertower"]
+        assert {p.level for p in th15_archers} == {21}
         for th_level in (15, 16, 17, 18):
             layout = generate_random_layout(
                 random.Random(th_level), town_hall_level=th_level, catalog=catalog
@@ -353,11 +369,14 @@ class TestVisualTierProxy:
             for building_type, levels in by_type.items():
                 if catalog.uses_random_variants(building_type):
                     continue
-                if catalog.mixes_sprite_levels(building_type):
+                if catalog.mixes_sprite_levels(building_type, th_level):
                     allowed = set(catalog.sprite_levels_for_th(building_type, th_level))
                     assert levels <= allowed, f"TH{th_level} {building_type} {levels}"
                     continue
                 assert len(levels) == 1, f"TH{th_level} {building_type} mixed {levels}"
+                assert levels == set(
+                    catalog.sprite_levels_for_th(building_type, th_level)
+                ), f"TH{th_level} {building_type} {levels}"
 
     def test_th_offsets_match_max_minus_n(self) -> None:
         catalog = _fake_catalog()
@@ -393,7 +412,7 @@ class TestEraMerges:
         )
         cannons = [p for p in placements if p.building_type == "canon"]
         assert cannons
-        assert {p.level for p in cannons} <= {20, 21}
+        assert {p.level for p in cannons} == {21}
         assert catalog.sprite_relpath("canon", 21) == "cannon/level_21.webp"
         assert not any(p.building_type == "ricochet_cannon" for p in placements)
 
@@ -409,11 +428,11 @@ class TestEraMerges:
             ricochets = [p for p in placements if p.building_type == "ricochet_cannon"]
             assert len(regular) == remaining[th_level]
             assert len(ricochets) == WIKI_COUNT_BY_TH["ricochet_cannon"][th_level]
-            assert {p.level for p in ricochets} <= set(
+            assert {p.level for p in ricochets} == set(
                 catalog.sprite_levels_for_th("ricochet_cannon", th_level)
             )
             if regular:
-                assert {p.level for p in regular} <= {20, 21}
+                assert {p.level for p in regular} == {21}
             assert catalog.sprite_relpath("ricochet_cannon", ricochet_level) == (
                 f"ricochet_cannon/level_{ricochet_level}.webp"
             )
@@ -431,9 +450,7 @@ class TestEraMerges:
             )
             wizards = [p for p in placements if p.building_type == "wizztower"]
             assert wizards
-            assert {p.level for p in wizards} <= set(
-                catalog.sprite_levels_for_th("wizztower", th_level)
-            )
+            assert {p.level for p in wizards} == {wizard_level}
             assert catalog.sprite_relpath("wizztower", wizard_level) == (
                 f"wizard_tower/level_{wizard_level}.webp"
             )
@@ -448,7 +465,7 @@ class TestEraMerges:
         regular = [p for p in placements if p.building_type == "wizztower"]
         merged = [p for p in placements if p.building_type == "super_wizard_tower"]
         assert len(regular) == 2
-        assert {p.level for p in regular} <= {16, 17}
+        assert {p.level for p in regular} == {17}
         assert len(merged) == 2
         assert {p.level for p in merged} == {1, 2}
         assert catalog.sprite_relpath("super_wizard_tower", 2) == (
@@ -473,7 +490,7 @@ class TestAddedDefenses:
         assert "ricochet_cannon" not in types
         assert "multi-archer_tower" not in types
         archers = [p for p in placements if p.building_type == "archertower"]
-        assert {p.level for p in archers} <= {20, 21}
+        assert {p.level for p in archers} == {21}
         assert catalog.sprite_relpath("archertower", 21) == "archer_tower/level_21.webp"
 
     def test_th16_has_remaining_regulars_plus_merged(self) -> None:
@@ -494,7 +511,7 @@ class TestAddedDefenses:
             assert len(cannons) == remaining_cannons[th_level]
             merged = [p for p in placements if p.building_type == "multi-archer_tower"]
             assert len(merged) == WIKI_COUNT_BY_TH["multi-archer_tower"][th_level]
-            assert {p.level for p in merged} <= set(
+            assert {p.level for p in merged} == set(
                 catalog.sprite_levels_for_th("multi-archer_tower", th_level)
             )
             assert catalog.sprite_relpath("multi-archer_tower", merged_level) == (
@@ -529,9 +546,7 @@ class TestAddedDefenses:
             )
             bombs = [p for p in placements if p.building_type == "bombtower"]
             assert bombs
-            assert {p.level for p in bombs} <= set(
-                catalog.sprite_levels_for_th("bombtower", th_level)
-            )
+            assert {p.level for p in bombs} == {bomb_level}
             assert catalog.sprite_relpath("bombtower", bomb_level) == (
                 f"bomb_tower/level_{bomb_level}.webp"
             )
@@ -555,7 +570,7 @@ class TestAddedDefenses:
             )
             spitters = [p for p in placements if p.building_type == "firespitter"]
             assert spitters
-            assert {p.level for p in spitters} <= set(
+            assert {p.level for p in spitters} == set(
                 catalog.sprite_levels_for_th("firespitter", th_level)
             )
             assert catalog.sprite_relpath("firespitter", spit_level) == (
@@ -682,9 +697,7 @@ class TestAddedDefenses:
             )
             eagles = [p for p in placements if p.building_type == "eagle"]
             assert eagles
-            assert {p.level for p in eagles} <= set(
-                catalog.sprite_levels_for_th("eagle", th_level)
-            )
+            assert {p.level for p in eagles} == {eagle_level}
 
     def test_th18_never_emits_eagle(self) -> None:
         catalog = _fake_catalog()
@@ -777,11 +790,11 @@ class TestTh18EraPreviews:
             wizard_type, wizard_lv, wizard_sprite = expected_wizard[th]
             assert cannon_type in levels
             used_cannon = set(levels[cannon_type].get("levels") or [levels[cannon_type]["level"]])
-            assert used_cannon <= set(catalog.sprite_levels_for_th(cannon_type, th))
+            assert used_cannon == set(catalog.sprite_levels_for_th(cannon_type, th))
             assert catalog.sprite_relpath(cannon_type, cannon_lv) == cannon_sprite
             assert wizard_type in levels
             used_wizard = set(levels[wizard_type].get("levels") or [levels[wizard_type]["level"]])
-            assert used_wizard <= set(catalog.sprite_levels_for_th(wizard_type, th))
+            assert used_wizard == set(catalog.sprite_levels_for_th(wizard_type, th))
             assert catalog.sprite_relpath(wizard_type, wizard_lv) == wizard_sprite
             if th >= 16:
                 assert "ricochet_cannon" in levels
@@ -853,13 +866,11 @@ class TestSceneryPreviews:
             assert "spelltower" in th16
             assert th16["spelltower"]["count"] == 2
             assert "eagle" in th16
-            assert th16["eagle"]["sprite"] in {
-                "eagle_artillery/level_6.webp",
-                "eagle_artillery/level_7.webp",
-            }
+            assert th16["eagle"]["sprite"] == "eagle_artillery/level_7.webp"
             assert "firespitter" not in th16
             assert "canon" in th16
             assert th16["canon"]["count"] == 3
+            assert set(th16["canon"].get("levels") or [th16["canon"]["level"]]) == {21}
             assert th16["ricochet_cannon"]["count"] == 2
             assert set(th16["ricochet_cannon"].get("levels") or []) == {1, 2}
 
@@ -867,15 +878,15 @@ class TestSceneryPreviews:
             th15 = by_file["preview_bg_th15.png"]["sprite_levels"]
             assert th15["town_hall"]["sprite"] == "town_hall/level_15.webp"
             assert "eagle" in th15
-            assert th15["eagle"]["sprite"] in {
-                "eagle_artillery/level_5.webp",
-                "eagle_artillery/level_6.webp",
-            }
+            assert th15["eagle"]["sprite"] == "eagle_artillery/level_6.webp"
             assert "spelltower" in th15
             assert th15["spelltower"]["count"] == 2
             assert "firespitter" not in th15
             assert "ricochet_cannon" not in th15
             assert "monolith" in th15
+            assert set(th15["canon"].get("levels") or [th15["canon"]["level"]]) == {21}
+            assert th15["canon"]["sprite"] == "cannon/level_21.webp"
+            assert set(th15["archertower"].get("levels") or [th15["archertower"]["level"]]) == {21}
 
 
 class TestWallYoloSkip:

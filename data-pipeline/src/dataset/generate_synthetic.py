@@ -27,10 +27,12 @@ with sourced merge windows:
   (ceil → two empty tiles) and fall back to one empty tile if a copy
   would otherwise not fit. Town hall / walls stay a single sprite.
 * Other defenses use ClashKing max / max-1 / max-2 / max-3 for
-  TH18 / 17 / 16 / 15. When that TH has a previous ClashKing file
-  (e.g. ``ricochet_cannon/level_1.webp`` + ``level_2.webp`` at TH16),
-  copies round-robin max and previous so a layout is not 100% maxed.
-  Spell towers still cycle the four designs.
+  TH18 / 17 / 16 / 15 — **one** TH-max sprite per type (TH15 cannons
+  are always ``cannon/level_21.webp``). Mix max and previous **only**
+  when the wiki documents two distinct building levels at that same TH
+  (Ricochet / Multi-Archer L1+L2 at TH16, Super Wizard L1+L2 at TH18,
+  Firespitter / Multi-Gear L1+L2 at TH17, Revenge L1+L2 at TH18,
+  Monolith L1+L2 at TH15). Spell towers still cycle the four designs.
 """
 
 from __future__ import annotations
@@ -155,6 +157,26 @@ WIKI_COUNT_BY_TH: dict[str, dict[int, int]] = {
     "revenge_tower": {15: 0, 16: 0, 17: 0, 18: 1},
 }
 
+# Wiki: two *building* levels both require this TH (not "previous TH max").
+# Accessed 2026-08-17. Default is exact TH-max sprite; mix only these.
+# https://clashofclans.fandom.com/wiki/Ricochet_Cannon (L1+L2 → TH16)
+# https://clashofclans.fandom.com/wiki/Multi-Archer_Tower (L1+L2 → TH16)
+# https://clashofclans.fandom.com/wiki/Super_Wizard_Tower/Home_Village (L1+L2 → TH18)
+# https://clashofclans.fandom.com/wiki/Firespitter (L1+L2 → TH17; L3 → TH18)
+# https://www.clasher.us/clash-of-clans/unit/multi-gear-tower-home-village (L1+L2 → TH17)
+# https://clashofclans.fandom.com/wiki/Revenge_Tower (L1+L2 → TH18)
+# https://clashofclans.fandom.com/wiki/Monolith (L1+L2 → TH15; L3 → TH16)
+# Cross-check: https://www.clash.ninja/guides/max-levels-for-each-th
+WIKI_MIX_LEVELS_BY_TH: dict[str, dict[int, tuple[int, ...]]] = {
+    "ricochet_cannon": {16: (1, 2)},
+    "multi-archer_tower": {16: (1, 2)},
+    "super_wizard_tower": {18: (1, 2)},
+    "firespitter": {17: (1, 2)},
+    "multi-gear_tower": {17: (1, 2)},
+    "revenge_tower": {18: (1, 2)},
+    "monolith": {15: (1, 2)},
+}
+
 # Occupancy fallbacks only — placement uses count_by_th / WIKI_COUNT_BY_TH.
 COUNT_RANGES: dict[str, tuple[int, int]] = {
     name: (counts.get(15, 0), max(counts.values()) if counts else 0)
@@ -271,29 +293,70 @@ class SpriteLevelCatalog:
             era_max=era_max,
         )
 
-    def mixes_sprite_levels(self, building_type: str) -> bool:
-        """True when this type may show visual-tier max and the previous file."""
+    def mixes_sprite_levels(self, building_type: str, town_hall_level: int) -> bool:
+        """True only when wiki documents two building levels at this TH."""
         if building_type in {"town_hall", "wall"}:
             return False
-        return not self.uses_random_variants(building_type)
+        if self.uses_random_variants(building_type):
+            return False
+        mix = self._mix_visual_levels(building_type, town_hall_level)
+        return mix is not None and len(mix) > 1
 
     def previous_sprite_level(self, building_type: str, level: int) -> int | None:
         """Next-lower ClashKing file in the catalog, if any."""
         below = [lv for lv in sorted(self.levels_for(building_type)) if lv < level]
         return below[-1] if below else None
 
-    def sprite_levels_for_th(self, building_type: str, town_hall_level: int) -> list[int]:
-        """Visual-tier max plus previous ClashKing sprite when both exist at this TH.
+    def _mix_visual_levels(
+        self, building_type: str, town_hall_level: int
+    ) -> list[int] | None:
+        """Wiki visual levels to mix at this TH, or None for exact TH-max.
 
-        Cites on-disk ``clashking/home-village/{slug}/level_{n}.webp`` (and
-        ``th_unlocks.yaml`` for which types exist at the TH). Does not invent
-        buildings or levels.
+        Prefer ``th_unlocks.yaml`` ``visual_levels_by_th`` / ``mix_levels``.
+        Fallback: ``WIKI_MIX_LEVELS_BY_TH``. ``mix_levels: true`` without a
+        per-TH map means mix max+previous **only at min_th** (unlock TH).
+        """
+        avail = self._availability(building_type)
+        by_th: Mapping[str, Any] | None = None
+        mix_flag = False
+        if isinstance(avail, Mapping):
+            raw = avail.get("visual_levels_by_th") or avail.get("mix_levels_by_th")
+            if isinstance(raw, Mapping):
+                by_th = raw
+            mix_flag = bool(avail.get("mix_levels"))
+        if by_th is not None:
+            levels = by_th.get(town_hall_level)
+            if levels is None:
+                levels = by_th.get(str(town_hall_level))
+            if levels is not None:
+                return [int(x) for x in levels]
+        fallback = WIKI_MIX_LEVELS_BY_TH.get(building_type)
+        if fallback is not None and town_hall_level in fallback:
+            return list(fallback[town_hall_level])
+        if mix_flag and isinstance(avail, Mapping):
+            min_th = avail.get("min_th")
+            if min_th is not None and int(min_th) == town_hall_level:
+                max_lv = self.sprite_level(building_type, town_hall_level)
+                prev = self.previous_sprite_level(building_type, max_lv)
+                if prev is not None:
+                    return [prev, max_lv]
+        return None
+
+    def sprite_levels_for_th(self, building_type: str, town_hall_level: int) -> list[int]:
+        """TH-max ClashKing sprite, plus previous only when wiki lists both.
+
+        Regular defenses (cannon, AT, mortar, …) return one level — the
+        visual-tier TH-max. Merge/new buildings listed in
+        ``WIKI_MIX_LEVELS_BY_TH`` / yaml return both wiki levels at that TH
+        (e.g. ``ricochet_cannon`` 1 and 2 at TH16).
         """
         max_lv = self.sprite_level(building_type, town_hall_level)
-        prev = self.previous_sprite_level(building_type, max_lv)
-        if prev is None:
+        mix = self._mix_visual_levels(building_type, town_hall_level)
+        if not mix:
             return [max_lv]
-        return [prev, max_lv]
+        catalog_levels = set(self.levels_for(building_type))
+        available = [lv for lv in mix if lv in catalog_levels]
+        return available or [max_lv]
 
     def mixed_levels_for_layout(
         self,
@@ -302,10 +365,10 @@ class SpriteLevelCatalog:
         count: int,
         rng: random.Random,
     ) -> list[int]:
-        """Round-robin max / previous sprite so a layout is not 100% maxed.
+        """Round-robin wiki visual levels when this TH has two of them.
 
-        Random phase: first copy is max or previous with equal chance. Two
-        copies (TH16 ricochet) always show both ClashKing files.
+        Two copies (TH16 ricochet) always show both ClashKing files.
+        Types without a wiki mix list use the single TH-max sprite.
         """
         available = self.sprite_levels_for_th(building_type, town_hall_level)
         if count <= 0:
@@ -900,7 +963,7 @@ def generate_random_layout(
             levels_to_place = catalog.cycled_variant_levels(
                 building_type, variant_cycle, count
             )
-        elif catalog.mixes_sprite_levels(place_type):
+        elif catalog.mixes_sprite_levels(place_type, town_hall_level):
             levels_to_place = catalog.mixed_levels_for_layout(
                 place_type, town_hall_level, count, rng
             )
@@ -948,6 +1011,7 @@ def generate_random_layout(
 def summarize_placement_levels(
     placements: Sequence[BuildingPlacement],
     catalog: SpriteLevelCatalog,
+    town_hall_level: int | None = None,
 ) -> dict[str, Any]:
     by_type: dict[str, dict[str, Any]] = {}
     mixed: list[str] = []
@@ -966,10 +1030,12 @@ def summarize_placement_levels(
         entry["count"] += 1
         entry["levels"].append(placement.level)
         entry["sprites"].append(sprite)
-        if placement.level != entry["level"] and not (
-            catalog.uses_random_variants(placement.building_type)
-            or catalog.mixes_sprite_levels(placement.building_type)
-        ):
+        allows_mix = catalog.uses_random_variants(placement.building_type)
+        if town_hall_level is not None:
+            allows_mix = allows_mix or catalog.mixes_sprite_levels(
+                placement.building_type, town_hall_level
+            )
+        if placement.level != entry["level"] and not allows_mix:
             mixed.append(f"{placement.building_type}@{placement.level}")
     return {
         "by_type": dict(sorted(by_type.items())),
@@ -1144,7 +1210,9 @@ def generate_th18era_previews(
             seed=seed + seed_offset,
         )
         result.image.save(out_png, format="PNG")
-        level_info = summarize_placement_levels(placements, catalog)
+        level_info = summarize_placement_levels(
+            placements, catalog, town_hall_level=th_level
+        )
         counts = compare_defense_counts(placements, catalog, th_level)
         report = {
             "file": str(out_png),
@@ -1236,7 +1304,9 @@ def generate_scenery_previews(
             background_path=bg_path,
         )
         result.image.save(out_png, format="PNG")
-        level_info = summarize_placement_levels(placements, catalog)
+        level_info = summarize_placement_levels(
+            placements, catalog, town_hall_level=th_level
+        )
         counts = compare_defense_counts(placements, catalog, th_level)
         reports.append(
             {

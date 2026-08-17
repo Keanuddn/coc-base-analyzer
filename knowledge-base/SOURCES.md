@@ -40,14 +40,7 @@ extracts of those URLs on 2026-08-17, cross-checked against SuperCell patch note
 
 ## Spell Tower vs TH15 (user correction)
 
-**Generator rule (2026-08-17):** do **not** place Spell Towers on TH15 layouts. User: “TH15 has NO spell towers.” TH15 scenery preview must show zero.
-
-**Sourced wiki / SuperCell (do not hide):** sources 1–4 list Spell Towers as **unlocked at TH15 with 2 available**, still 2 at TH16–18. Clash Ninja max-level table (source 15) also has Spell Tower levels at TH15 (max 3).
-
-The previous generator heuristic (`min_th: 15` + `skip_th: [16]`, “spell on TH15+”) was **not** wiki-accurate: it skipped TH16 even though wiki count is 2, and it treated TH15 as in-scope. Generator now:
-
-- **TH15:** skip (user override), documented here
-- **TH16–18:** place (wiki Number Available = 2; still present)
+**User confirmed 2026-08-17:** wiki is right — TH15 has Spell Towers (2 at TH15–18). Generator skip of TH15 removed; TH16 also keeps 2.
 
 ## Buildings we were missing (TH15–18 defense audit)
 

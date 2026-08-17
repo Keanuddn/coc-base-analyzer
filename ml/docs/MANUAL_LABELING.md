@@ -95,8 +95,12 @@ Synthetik erzeugen (Standard: 200 Layouts, gitignored unter `datasets/processed/
 
 ```bash
 cd coc-base-analyzer/data-pipeline
-.venv/bin/python -m dataset.generate_synthetic --count 200
+.venv/bin/python -m dataset.generate_synthetic --count 200 --force
 ```
+
+`--force` overwrites existing PNG+txt so village grass (not the old solid green) is on every
+image. Omit `--force` to skip files that already exist. `--flat-background` restores the
+legacy solid fill.
 
 Dann YOLO-Datensatz bauen:
 

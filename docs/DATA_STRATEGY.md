@@ -188,8 +188,9 @@ BuildingPlacement[]  →  IsometricRenderer  →  PNG + YOLO .txt (sidecar)
 
 | Modul | Zweck |
 |-------|-------|
-| `renderer/isometric_renderer.py` | PIL-Compositing auf 44×44-Kachelgitter (isometrisch) |
-| `renderer/domain_randomization.py` | Trainings-Diversität (Lighting/Position/Background-Jitter) |
+| `renderer/isometric_renderer.py` | PIL-Compositing auf 44×44-Kachelgitter; Gebäude über Village-Gras |
+| `renderer/village_background.py` | Prozedurales CoC-Gras (Checkerboard, Grid, Waldrand) — keine ClashKing-Scenery |
+| `renderer/domain_randomization.py` | Lighting/Position plus Gras-Hue/Helligkeit und Lighting-Overlay |
 | `renderer/demo_render.py` | CLI-Demo mit hardcodierten Test-Placements (ohne dekodierte Links) |
 
 **Demo ausführen:**
@@ -208,8 +209,21 @@ Fehlende Sprites: Warning + Magenta-Placeholder (Demo) bzw. Skip (Tests ohne Pla
    perfekt gelabelter Trainingspool für TH13–18-Verteidigungen (Monolith, Spell Tower, …).
 2. **Real (Regression):** Echte Scouting-Screenshots in `ml/tests/regression_set/` als
    Validierung und Misch-Training.
-3. **Domain Gap:** Synthetische Editor-Ansicht ≠ In-Game-Scouting (Zoom, UI, Schatten).
-   Domain Randomization + Fine-Tuning auf echten Bildern schließen die Lücke schrittweise.
+3. **Domain Gap:** Synthetische Editor-Sprites ≠ In-Game-Scouting (Zoom, UI, Schatten, Scenery).
+   Der Renderer legt die ClashKing-Gebäude auf ein **prozedurales Village-Gras** (44×44-Diamant,
+   Checkerboard, leichte Grid-Linien, dunkler Waldrand mit einfachen Ellipsen-Bäumen) — nicht
+   mehr auf eine flache Grünfläche. ClashKing liefert nur Gebäude-WebP, keine Gras-/Scenery-Tiles;
+   Screenshot-Plates wurden nicht committed (große Binaries, Gebäude verdecken das Gras).
+   Domain Randomization jittert Gras-Helligkeit/Hue plus ein leichtes Lighting-Overlay.
+   **YOLO-Labels bleiben nur Gebäude-Boxen** — Hintergrund wird nicht gelabelt.
+   Bulk-Set neu bauen (gitignored unter `datasets/processed/synthetic_v1/`):
+
+   ```bash
+   cd data-pipeline
+   python -m dataset.generate_synthetic --count 200 --force
+   ```
+
+   Legacy-Solid-Grün: `--flat-background`. Bestehende 200 Bilder ohne `--force` bleiben alt.
 4. **YOLO-Gap:** Keremberke-Modell kennt nur `th13`, nicht TH14–18 / Monolith / Spell Tower —
    neue Klassen beim Fine-Tuning ergänzen; Sprites sind bereits vorhanden.
 

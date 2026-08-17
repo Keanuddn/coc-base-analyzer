@@ -31,6 +31,9 @@ cd data-pipeline/src/renderer/sprites
 
 Requires `git`. Performs a sparse clone of `assets/buildings/home-village` (~4.8 MB, 472 WebP).
 
+**No scenery/grass tiles** in that tree. Synthetic renders use procedural village grass
+(`renderer/village_background.py`) — original checkerboard + forest ellipses, not game art.
+
 ## Building type mapping
 
 See `building_type_map.yaml` for mapping from:

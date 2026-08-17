@@ -17,6 +17,12 @@ from renderer.domain_randomization import (
     jitter_position,
     randomize_background,
 )
+from renderer.village_background import (
+    paint_village_background,
+    randomize_village_palette,
+    village_canvas_size,
+    village_origin,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -190,8 +196,40 @@ def _paste_sprite(
     w, h = sprite.size
     paste_x = int(round(foot_x - w / 2))
     paste_y = int(round(foot_y - h))
-    canvas.alpha_composite(sprite, dest=(paste_x, paste_y))
+    canvas_w, canvas_h = canvas.size
+    src_x = max(0, -paste_x)
+    src_y = max(0, -paste_y)
+    dst_x = max(0, paste_x)
+    dst_y = max(0, paste_y)
+    src_w = min(w - src_x, canvas_w - dst_x)
+    src_h = min(h - src_y, canvas_h - dst_y)
+    if src_w > 0 and src_h > 0:
+        visible = sprite if (src_x, src_y, src_w, src_h) == (0, 0, w, h) else sprite.crop(
+            (src_x, src_y, src_x + src_w, src_y + src_h)
+        )
+        canvas.alpha_composite(visible, dest=(dst_x, dst_y))
     return paste_x, paste_y, paste_x + w, paste_y + h
+
+
+def _crop_from_bboxes(
+    bboxes: Sequence[tuple[int, int, int, int]],
+    canvas_size: tuple[int, int],
+    *,
+    pad: int,
+) -> tuple[int, int, int, int]:
+    """Axis-aligned crop around building boxes (not the opaque grass fill)."""
+    if not bboxes:
+        return (0, 0, canvas_size[0], canvas_size[1])
+    x1 = min(b[0] for b in bboxes)
+    y1 = min(b[1] for b in bboxes)
+    x2 = max(b[2] for b in bboxes)
+    y2 = max(b[3] for b in bboxes)
+    return (
+        max(0, x1 - pad),
+        max(0, y1 - pad),
+        min(canvas_size[0], x2 + pad),
+        min(canvas_size[1], y2 + pad),
+    )
 
 
 class IsometricRenderer:
@@ -204,11 +242,13 @@ class IsometricRenderer:
         type_map_path: Path = BUILDING_TYPE_MAP_PATH,
         background: tuple[int, int, int] = DEFAULT_BACKGROUND,
         use_placeholders: bool = True,
+        village_background: bool = True,
     ) -> None:
         self.sprites_root = sprites_root or CLASHKING_HOME_VILLAGE
         self.type_map = _load_building_type_map(type_map_path)
         self.background = background
         self.use_placeholders = use_placeholders
+        self.village_background = village_background
 
     @staticmethod
     def sprites_available(sprites_root: Path | None = None) -> bool:
@@ -240,8 +280,13 @@ class IsometricRenderer:
         )
 
         normalized = [_normalize_placement(p) for p in placements]
-        origin_x = GRID_SIZE * (TILE_WIDTH / 2)
-        origin_y = TILE_HEIGHT * 2
+        if self.village_background:
+            origin_x, origin_y = village_origin()
+            temp_size = village_canvas_size()
+        else:
+            origin_x = GRID_SIZE * (TILE_WIDTH / 2)
+            origin_y = TILE_HEIGHT * 2
+            temp_size = (GRID_SIZE * TILE_WIDTH * 2, GRID_SIZE * TILE_HEIGHT * 2)
 
         placed: list[_PlacedSprite] = []
         warnings: list[str] = []
@@ -300,7 +345,23 @@ class IsometricRenderer:
             )
 
         if not placed:
-            canvas = Image.new("RGBA", (512, 512), (*bg, 255))
+            if self.village_background:
+                canvas = Image.new("RGBA", temp_size, (0, 0, 0, 0))
+                palette = randomize_village_palette(
+                    rng,
+                    hue_shift_deg=dr_cfg.background_hue_shift,
+                    color_jitter=dr_cfg.background_color_jitter,
+                    brightness_jitter=dr_cfg.background_brightness_jitter,
+                )
+                paint_village_background(
+                    canvas,
+                    origin_x=origin_x,
+                    origin_y=origin_y,
+                    rng=rng,
+                    palette=palette,
+                )
+            else:
+                canvas = Image.new("RGBA", (512, 512), (*bg, 255))
             result_img = apply_domain_randomization(canvas, config=dr_cfg, rng=rng)
             return RenderResult(
                 image=result_img,
@@ -311,37 +372,48 @@ class IsometricRenderer:
             )
 
         bboxes: list[tuple[int, int, int, int]] = []
-        temp_size = (GRID_SIZE * TILE_WIDTH * 2, GRID_SIZE * TILE_HEIGHT * 2)
-        scratch = Image.new("RGBA", temp_size, (0, 0, 0, 0))
+        if self.village_background:
+            scratch = Image.new("RGBA", temp_size, (0, 0, 0, 0))
+            palette = randomize_village_palette(
+                rng,
+                hue_shift_deg=dr_cfg.background_hue_shift,
+                color_jitter=dr_cfg.background_color_jitter,
+                brightness_jitter=dr_cfg.background_brightness_jitter,
+            )
+            paint_village_background(
+                scratch,
+                origin_x=origin_x,
+                origin_y=origin_y,
+                rng=rng,
+                palette=palette,
+            )
+        else:
+            scratch = Image.new("RGBA", temp_size, (0, 0, 0, 0))
 
         sorted_placed = sorted(placed, key=lambda p: p.depth)
         for item in sorted_placed:
             bbox = _paste_sprite(scratch, item.sprite, item.screen_x, item.screen_y)
             bboxes.append(bbox)
 
-        content_bbox = scratch.getbbox()
-        if content_bbox is None:
-            content_bbox = (0, 0, temp_size[0], temp_size[1])
-
-        pad = 24
-        crop = (
-            max(0, content_bbox[0] - pad),
-            max(0, content_bbox[1] - pad),
-            min(temp_size[0], content_bbox[2] + pad),
-            min(temp_size[1], content_bbox[3] + pad),
-        )
+        pad = 40 if self.village_background else 24
+        crop = _crop_from_bboxes(bboxes, temp_size, pad=pad)
         cropped = scratch.crop(crop)
-        canvas = Image.new("RGBA", cropped.size, (*bg, 255))
-        canvas.alpha_composite(cropped)
+        if self.village_background:
+            canvas = cropped
+        else:
+            canvas = Image.new("RGBA", cropped.size, (*bg, 255))
+            canvas.alpha_composite(cropped)
 
         img_w, img_h = canvas.size
         labels: list[YoloLabel] = []
         for item, bbox in zip(sorted_placed, bboxes, strict=False):
             x1, y1, x2, y2 = bbox
-            x1 -= crop[0]
-            y1 -= crop[1]
-            x2 -= crop[0]
-            y2 -= crop[1]
+            x1 = max(0, min(img_w, x1 - crop[0]))
+            y1 = max(0, min(img_h, y1 - crop[1]))
+            x2 = max(0, min(img_w, x2 - crop[0]))
+            y2 = max(0, min(img_h, y2 - crop[1]))
+            if x2 <= x1 or y2 <= y1:
+                continue
             class_id = _yolo_class_id(item.yolo_class)
             if class_id is None:
                 warnings.append(f"No YOLO class id for {item.yolo_class!r} ({item.building_type})")

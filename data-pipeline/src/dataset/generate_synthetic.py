@@ -158,9 +158,10 @@ def generate_synthetic_dataset(
     seed: int = 42,
     *,
     skip_existing: bool = True,
+    village_background: bool = True,
 ) -> dict[str, Any]:
     """Render ``count`` layouts to ``output_dir/th{15,16}/synthetic_XXXX.png`` + YOLO txt."""
-    renderer = IsometricRenderer(use_placeholders=True)
+    renderer = IsometricRenderer(use_placeholders=True, village_background=village_background)
     output_dir.mkdir(parents=True, exist_ok=True)
 
     present = 0
@@ -217,6 +218,11 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--output", type=Path, default=DEFAULT_OUTPUT, help=f"Output dir (default: {DEFAULT_OUTPUT})")
     parser.add_argument("--seed", type=int, default=42)
     parser.add_argument("--force", action="store_true", help="Overwrite existing PNG+txt pairs")
+    parser.add_argument(
+        "--flat-background",
+        action="store_true",
+        help="Legacy solid green fill instead of procedural village grass",
+    )
     parser.add_argument("-v", "--verbose", action="store_true")
     args = parser.parse_args(argv)
 
@@ -233,6 +239,7 @@ def main(argv: list[str] | None = None) -> int:
         output_dir=args.output,
         seed=args.seed,
         skip_existing=not args.force,
+        village_background=not args.flat_background,
     )
     print(json.dumps(summary, indent=2))
     return 0

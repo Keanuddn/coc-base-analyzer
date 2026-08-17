@@ -80,6 +80,62 @@ class TestIsometricRenderer:
         result = renderer.render(sample_placements, domain_randomization=cfg, seed=99)
         assert result.rendered_count == len(sample_placements)
 
+    def test_village_background_is_not_solid_green(
+        self,
+        renderer: IsometricRenderer,
+        sample_placements: list[BuildingPlacement],
+    ) -> None:
+        cfg = DomainRandomizationConfig(
+            brightness_jitter=0,
+            contrast_jitter=0,
+            position_jitter_px=0,
+            background_color_jitter=0,
+            background_hue_shift=0,
+            background_brightness_jitter=0,
+            overlay_opacity=0,
+            seed=0,
+        )
+        result = renderer.render(sample_placements, domain_randomization=cfg, seed=0)
+        colors = result.image.convert("RGB").getcolors(maxcolors=500_000)
+        assert colors is None or len(colors) > 80
+
+    def test_flat_background_corners_are_uniform(
+        self,
+        sample_placements: list[BuildingPlacement],
+    ) -> None:
+        renderer = IsometricRenderer(
+            sprites_root=SPRITES_ROOT,
+            use_placeholders=False,
+            village_background=False,
+        )
+        cfg = DomainRandomizationConfig(
+            brightness_jitter=0,
+            contrast_jitter=0,
+            position_jitter_px=0,
+            background_color_jitter=0,
+            background_hue_shift=0,
+            background_brightness_jitter=0,
+            overlay_opacity=0,
+            seed=0,
+        )
+        result = renderer.render(sample_placements, domain_randomization=cfg, seed=0)
+        rgb = result.image.convert("RGB")
+        corners = [rgb.getpixel((0, 0)), rgb.getpixel((rgb.size[0] - 1, 0))]
+        assert corners[0] == corners[1]
+
+    def test_labels_cover_buildings_only(
+        self,
+        renderer: IsometricRenderer,
+        sample_placements: list[BuildingPlacement],
+    ) -> None:
+        result = renderer.render(sample_placements, seed=0)
+        assert len(result.labels) == result.rendered_count
+        for label in result.labels:
+            assert 0.0 <= label.cx <= 1.0
+            assert 0.0 <= label.cy <= 1.0
+            assert 0.0 < label.w <= 1.0
+            assert 0.0 < label.h <= 1.0
+
     def test_missing_sprite_skipped_without_placeholder(self, renderer: IsometricRenderer) -> None:
         placements = [BuildingPlacement("nonexistent_building_xyz", level=1, x=10, y=10)]
         result = renderer.render(placements, seed=0)

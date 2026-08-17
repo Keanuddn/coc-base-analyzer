@@ -7,6 +7,13 @@ from dataclasses import dataclass
 
 from PIL import Image, ImageEnhance
 
+_OVERLAY_SWATCHES: tuple[tuple[int, int, int], ...] = (
+    (20, 32, 16),
+    (42, 30, 14),
+    (16, 26, 38),
+    (48, 52, 28),
+)
+
 
 @dataclass(slots=True)
 class DomainRandomizationConfig:
@@ -15,7 +22,10 @@ class DomainRandomizationConfig:
     brightness_jitter: float = 0.12
     contrast_jitter: float = 0.12
     position_jitter_px: float = 3.0
-    background_color_jitter: int = 18
+    background_color_jitter: int = 14
+    background_hue_shift: float = 8.0
+    background_brightness_jitter: float = 0.10
+    overlay_opacity: float = 0.08
     seed: int | None = None
 
 
@@ -53,6 +63,23 @@ def jitter_position(
     )
 
 
+def apply_color_overlay(
+    rgb: Image.Image,
+    *,
+    opacity: float,
+    rng: random.Random,
+) -> Image.Image:
+    """Blend a low-opacity lighting wash (shadow / warm / cool)."""
+    if opacity <= 0:
+        return rgb
+    amount = rng.uniform(0.0, opacity)
+    if amount < 0.01:
+        return rgb
+    color = _OVERLAY_SWATCHES[rng.randrange(len(_OVERLAY_SWATCHES))]
+    wash = Image.new("RGB", rgb.size, color)
+    return Image.blend(rgb.convert("RGB"), wash, amount)
+
+
 def apply_domain_randomization(
     image: Image.Image,
     *,
@@ -63,7 +90,7 @@ def apply_domain_randomization(
     cfg = config or DomainRandomizationConfig()
     local_rng = rng or random.Random(cfg.seed)
 
-    if cfg.brightness_jitter <= 0 and cfg.contrast_jitter <= 0:
+    if cfg.brightness_jitter <= 0 and cfg.contrast_jitter <= 0 and cfg.overlay_opacity <= 0:
         return image
 
     rgb = image.convert("RGB")
@@ -76,6 +103,9 @@ def apply_domain_randomization(
     if cfg.contrast_jitter > 0:
         factor = 1.0 + local_rng.uniform(-cfg.contrast_jitter, cfg.contrast_jitter)
         rgb = ImageEnhance.Contrast(rgb).enhance(factor)
+
+    if cfg.overlay_opacity > 0:
+        rgb = apply_color_overlay(rgb, opacity=cfg.overlay_opacity, rng=local_rng)
 
     if alpha is not None:
         out = rgb.convert("RGBA")

@@ -42,6 +42,11 @@ def main(argv: list[str] | None = None) -> int:
         action="store_true",
         help="Disable domain randomization (deterministic render)",
     )
+    parser.add_argument(
+        "--flat-background",
+        action="store_true",
+        help="Legacy solid green fill instead of procedural village grass",
+    )
     parser.add_argument("-v", "--verbose", action="store_true")
     args = parser.parse_args(argv)
 
@@ -64,7 +69,7 @@ def main(argv: list[str] | None = None) -> int:
     if not args.no_randomization:
         dr_cfg = DomainRandomizationConfig(seed=args.seed)
 
-    renderer = IsometricRenderer(use_placeholders=True)
+    renderer = IsometricRenderer(use_placeholders=True, village_background=not args.flat_background)
     result = renderer.render_to_files(
         DEMO_PLACEMENTS,
         args.output,

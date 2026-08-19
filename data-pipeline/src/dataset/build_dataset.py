@@ -75,7 +75,9 @@ class BuildDatasetConfig:
     render_synthetic_variants: bool = True
     holdout_real_to_val: bool = False
     real_val_holdout: int = 0
+    synthetic_val_holdout: int = 0
     oversample_real_train: int = 1
+    oversample_th17_th18: int = 1
 
 
 @dataclass(slots=True)
@@ -389,6 +391,7 @@ def assign_splits(
     seed: int,
     holdout_real_to_val: bool = False,
     real_val_holdout: int = 0,
+    synthetic_val_holdout: int = 0,
 ) -> None:
     """Assign train/val/test splits, stratified by TH where possible."""
     if holdout_real_to_val and real_val_holdout > 0:
@@ -420,6 +423,7 @@ def assign_splits(
                     sample.split = "train"
             else:
                 sample.split = "train"
+        holdout_synthetics_to_val(samples, synthetic_val_holdout, seed)
         return
 
     if holdout_real_to_val:
@@ -441,6 +445,7 @@ def assign_splits(
             raise ValueError(
                 "--holdout-real-val requires labeled real images, but none were collected"
             )
+        holdout_synthetics_to_val(samples, synthetic_val_holdout, seed)
         return
 
     total_ratio = train_ratio + val_ratio + test_ratio
@@ -486,6 +491,59 @@ def assign_splits(
         sample.split = "val" if idx % 2 == 0 else "test"
         sample.notes.append("included_unlabeled_for_inference_only")
 
+    holdout_synthetics_to_val(samples, synthetic_val_holdout, seed)
+
+
+def holdout_synthetics_to_val(
+    samples: list[DatasetSample],
+    n: int,
+    seed: int,
+) -> None:
+    """Move N labeled train synthetics to val, round-robin by TH so TH15–18 rare classes appear in mAP."""
+    if n <= 0:
+        return
+
+    train_synths = [
+        sample
+        for sample in samples
+        if sample.has_labels and sample.origin == "synthetic" and sample.split == "train"
+    ]
+    if len(train_synths) <= n:
+        raise ValueError(
+            f"--synthetic-val-holdout {n} requires more labeled train synthetics than the "
+            f"holdout (got {len(train_synths)}); keep at least one synthetic in train"
+        )
+
+    rng = random.Random(seed)
+    by_th: dict[int | None, list[DatasetSample]] = {}
+    for sample in train_synths:
+        by_th.setdefault(sample.town_hall_level, []).append(sample)
+    for group in by_th.values():
+        group.sort(key=lambda s: str(s.source_path))
+        rng.shuffle(group)
+
+    th_keys = sorted(by_th.keys(), key=lambda th: (th is None, th if th is not None else 0))
+    selected: list[DatasetSample] = []
+    pointers = dict.fromkeys(th_keys, 0)
+    while len(selected) < n:
+        progressed = False
+        for th in th_keys:
+            if len(selected) >= n:
+                break
+            idx = pointers[th]
+            group = by_th[th]
+            if idx < len(group):
+                selected.append(group[idx])
+                pointers[th] = idx + 1
+                progressed = True
+        if not progressed:
+            break
+
+    for sample in selected:
+        sample.split = "val"
+        if "synthetic_val_holdout" not in sample.notes:
+            sample.notes.append("synthetic_val_holdout")
+
 
 def oversample_labeled_real_train(
     samples: list[DatasetSample],
@@ -510,6 +568,42 @@ def oversample_labeled_real_train(
                         label_path=sample.label_path,
                         split=sample.split,
                         notes=[*sample.notes, f"oversample_copy_{copy_idx:02d}"],
+                    )
+                )
+        else:
+            expanded.append(sample)
+    return expanded
+
+
+def oversample_th17_th18_train(
+    samples: list[DatasetSample],
+    factor: int,
+) -> list[DatasetSample]:
+    """Repeat TH17/TH18 synthetic train files so rare-class boxes (SWT, Revenge, Multi-Gear) are seen more often.
+
+    Oversamples the file list only — one Multi-Gear (or SWT/Revenge) box per source image is not duplicated
+    inside the label file.
+    """
+    if factor <= 1:
+        return samples
+    expanded: list[DatasetSample] = []
+    for sample in samples:
+        if (
+            sample.origin == "synthetic"
+            and sample.has_labels
+            and sample.split == "train"
+            and sample.town_hall_level in (17, 18)
+        ):
+            for copy_idx in range(factor):
+                expanded.append(
+                    DatasetSample(
+                        source_path=sample.source_path,
+                        origin=sample.origin,
+                        town_hall_level=sample.town_hall_level,
+                        has_labels=sample.has_labels,
+                        label_path=sample.label_path,
+                        split=sample.split,
+                        notes=[*sample.notes, f"th17_th18_oversample_copy_{copy_idx:02d}"],
                     )
                 )
         else:
@@ -768,8 +862,10 @@ def build_yolo_dataset(config: BuildDatasetConfig) -> BuildDatasetResult:
         seed=config.seed,
         holdout_real_to_val=config.holdout_real_to_val,
         real_val_holdout=config.real_val_holdout,
+        synthetic_val_holdout=config.synthetic_val_holdout,
     )
     samples = oversample_labeled_real_train(samples, config.oversample_real_train)
+    samples = oversample_th17_th18_train(samples, config.oversample_th17_th18)
 
     config.output_dir.mkdir(parents=True, exist_ok=True)
     for split in ("train", "val", "test"):
@@ -889,7 +985,17 @@ def main(argv: list[str] | None = None) -> int:
         type=int,
         default=0,
         metavar="N",
-        help="Put N labeled reals in val; remaining labeled reals go to train (synthetics stay in train)",
+        help="Put N labeled reals in val; remaining labeled reals go to train",
+    )
+    parser.add_argument(
+        "--synthetic-val-holdout",
+        type=int,
+        default=0,
+        metavar="N",
+        help=(
+            "Move N labeled train synthetics to val, round-robin by TH "
+            "(so TH15–18 rare classes appear in mAP). Remaining synthetics stay in train"
+        ),
     )
     parser.add_argument(
         "--oversample-real-train",
@@ -897,6 +1003,16 @@ def main(argv: list[str] | None = None) -> int:
         default=1,
         metavar="N",
         help="Repeat each labeled real training image N times (no new labels; mosaic-friendly unique stems)",
+    )
+    parser.add_argument(
+        "--oversample-th17-th18",
+        type=int,
+        default=1,
+        metavar="N",
+        help=(
+            "Repeat each TH17/TH18 synthetic training image N times in the file list "
+            "(does not add extra Multi-Gear/SWT boxes inside an image)"
+        ),
     )
     parser.add_argument("-v", "--verbose", action="store_true")
     args = parser.parse_args(argv)
@@ -922,6 +1038,10 @@ def main(argv: list[str] | None = None) -> int:
         parser.error("Use either --holdout-real-val or --real-val-holdout, not both")
     if args.oversample_real_train < 1:
         parser.error("--oversample-real-train must be >= 1")
+    if args.oversample_th17_th18 < 1:
+        parser.error("--oversample-th17-th18 must be >= 1")
+    if args.synthetic_val_holdout < 0:
+        parser.error("--synthetic-val-holdout must be >= 0")
 
     config = BuildDatasetConfig(
         output_dir=args.output,
@@ -944,7 +1064,9 @@ def main(argv: list[str] | None = None) -> int:
         render_synthetic_variants=not args.no_render_variants,
         holdout_real_to_val=args.holdout_real_val,
         real_val_holdout=args.real_val_holdout,
+        synthetic_val_holdout=args.synthetic_val_holdout,
         oversample_real_train=args.oversample_real_train,
+        oversample_th17_th18=args.oversample_th17_th18,
     )
 
     try:

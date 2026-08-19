@@ -327,6 +327,68 @@ class TestManualLabels:
             assert lbl.is_file()
             assert lbl.read_text(encoding="utf-8").startswith("3 ")
 
+    def test_synthetic_val_holdout_and_th17_th18_oversample(self, tmp_path: Path) -> None:
+        from PIL import Image
+
+        bulk = tmp_path / "synthetic_v1"
+        for th in (15, 16, 17, 18):
+            folder = bulk / f"th{th}"
+            folder.mkdir(parents=True)
+            for i in range(8):
+                _write_minimal_yolo_pair(folder, f"synthetic_{th}_{i:02d}")
+
+        regression = tmp_path / "regression"
+        for i in range(4):
+            img_dir = regression / "th15"
+            lbl_dir = regression / "labels" / "th15"
+            img_dir.mkdir(parents=True, exist_ok=True)
+            lbl_dir.mkdir(parents=True, exist_ok=True)
+            Image.new("RGB", (64, 64), color=(10 + i, 20, 30)).save(img_dir / f"war_base_real_{i}.png")
+            (lbl_dir / f"war_base_real_{i}.txt").write_text("3 0.5 0.5 0.2 0.2\n", encoding="utf-8")
+
+        output = tmp_path / "yolo_th_oversample"
+        config = BuildDatasetConfig(
+            output_dir=output,
+            include_demo=False,
+            include_regression=True,
+            include_synthetic_bulk=True,
+            manual_labels_only=True,
+            synthetic_bulk_dir=bulk,
+            regression_dir=regression,
+            render_synthetic_variants=False,
+            real_val_holdout=1,
+            synthetic_val_holdout=8,
+            oversample_real_train=5,
+            oversample_th17_th18=3,
+            seed=3,
+        )
+        result = build_yolo_dataset(config)
+        report = json.loads(result.report_path.read_text(encoding="utf-8"))
+
+        # 8 unique synths/TH × 4 THs; 2/TH → val; remaining 6/TH in train; TH17/18 ×3
+        assert report["origin_by_split"]["synthetic"]["val"] == 8
+        assert report["origin_by_split"]["synthetic"]["train"] == 48  # 6+6 + 6*3 + 6*3
+        assert report["origin_by_split"]["real"]["val"] == 1
+        assert report["origin_by_split"]["real"]["train"] == 15
+
+        val_synths = list((output / "val" / "images").glob("synthetic_*.png"))
+        val_ths = {p.name.split("_")[2] for p in val_synths}
+        assert val_ths == {"15", "16", "17", "18"}
+
+        train_th17 = list((output / "train" / "images").glob("synthetic_synthetic_17_*.png"))
+        train_th18 = list((output / "train" / "images").glob("synthetic_synthetic_18_*.png"))
+        train_th15 = list((output / "train" / "images").glob("synthetic_synthetic_15_*.png"))
+        assert len(train_th15) == 6
+        assert len(train_th17) == 18
+        assert len(train_th18) == 18
+        # 6 unique source stems × 3 copies; one box per label file (no dual Multi-Gear)
+        assert len({p.name.rsplit("_", 1)[0] for p in train_th18}) == 6
+        for img in train_th18:
+            lbl = output / "train" / "labels" / f"{img.stem}.txt"
+            assert lbl.is_file()
+            lines = [ln for ln in lbl.read_text(encoding="utf-8").splitlines() if ln.strip()]
+            assert len(lines) == 1
+
 
 class TestRegistryDedupIntegration:
     def test_registry_content_dedup(self) -> None:

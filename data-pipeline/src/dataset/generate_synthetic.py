@@ -72,8 +72,10 @@ from renderer.isometric_renderer import (
     placement_in_playable_grid,
     scale_sprite_size,
     sprite_stays_on_playable,
+    town_hall_yolo_class,
     _load_building_type_map,
     _slug_for_building_type,
+    _yolo_class_id,
 )
 
 PIPELINE_ROOT = Path(__file__).resolve().parents[2]
@@ -1103,6 +1105,73 @@ def tally_yolo_label_dir(directory: Path) -> dict[str, Any]:
     }
 
 
+def _infer_th_from_path(path: Path) -> int | None:
+    """Infer TH level from ``th15/`` parent folder or ``th15_`` filename prefix."""
+    for part in path.parts:
+        lower = part.lower()
+        if lower.startswith("th") and lower[2:].isdigit():
+            return int(lower[2:])
+    stem = path.stem.lower()
+    if stem.startswith("th") and len(stem) >= 4 and stem[2:4].isdigit():
+        return int(stem[2:4])
+    return None
+
+
+def relabel_synthetic_town_halls(output_dir: Path) -> dict[str, Any]:
+    """Rewrite existing YOLO txts so the hall box matches the folder TH.
+
+    Only remaps class id 12 (``th13``) → ``th14``…``th18``. Box geometry is
+    unchanged so scenery and placements stay identical. Idempotent.
+    """
+    old_id = _yolo_class_id("th13")
+    if old_id is None:
+        raise RuntimeError("th13 missing from YOLO_CLASS_NAMES")
+
+    files_seen = 0
+    files_changed = 0
+    halls_relabeled = 0
+    skipped_no_th = 0
+    skipped_no_hall = 0
+
+    for txt in sorted(output_dir.rglob("*.txt")):
+        files_seen += 1
+        th_level = _infer_th_from_path(txt)
+        if th_level is None:
+            skipped_no_th += 1
+            continue
+        new_name = town_hall_yolo_class(th_level)
+        new_id = _yolo_class_id(new_name)
+        if new_id is None or new_id == old_id:
+            continue
+        original = txt.read_text(encoding="utf-8")
+        changed_here = 0
+        out_lines: list[str] = []
+        for line in original.splitlines():
+            parts = line.split()
+            if len(parts) >= 5 and int(parts[0]) == old_id:
+                parts[0] = str(new_id)
+                changed_here += 1
+                out_lines.append(" ".join(parts))
+            else:
+                out_lines.append(line)
+        if changed_here == 0:
+            skipped_no_hall += 1
+            continue
+        trailing = "\n" if original.endswith("\n") or not original else ""
+        txt.write_text("\n".join(out_lines) + trailing, encoding="utf-8")
+        files_changed += 1
+        halls_relabeled += changed_here
+
+    return {
+        "output_dir": str(output_dir),
+        "files_seen": files_seen,
+        "files_changed": files_changed,
+        "halls_relabeled": halls_relabeled,
+        "skipped_no_th": skipped_no_th,
+        "skipped_no_hall": skipped_no_hall,
+    }
+
+
 def generate_synthetic_dataset(
     count: int = DEFAULT_COUNT,
     output_dir: Path = DEFAULT_OUTPUT,
@@ -1505,6 +1574,14 @@ def main(argv: list[str] | None = None) -> int:
         default=DEFAULT_PREVIEW_DIR,
         help=f"Preview output dir (default: {DEFAULT_PREVIEW_DIR})",
     )
+    parser.add_argument(
+        "--relabel-town-halls",
+        action="store_true",
+        help=(
+            "Rewrite existing synthetic YOLO txts in --output so the hall box "
+            "uses th15–th18 from the folder name (no PNG re-render)"
+        ),
+    )
     parser.add_argument("-v", "--verbose", action="store_true")
     args = parser.parse_args(argv)
 
@@ -1526,6 +1603,11 @@ def main(argv: list[str] | None = None) -> int:
             use_photo_backgrounds=not args.flat_background,
         )
         _print_preview_reports(reports)
+        return 0
+
+    if args.relabel_town_halls:
+        summary = relabel_synthetic_town_halls(args.output)
+        print(json.dumps(summary, indent=2))
         return 0
 
     if args.count < 1:

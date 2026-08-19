@@ -16,11 +16,13 @@ def classify_base_type(detections: list[dict[str, Any]]) -> dict[str, Any]:
     total = sum(counts.values())
 
     th_guess = "unknown"
-    if counts.get("th13", 0) >= 1:
-        th_guess = "th13"
-    elif counts.get("scattershot", 0) >= 2:
+    for hall_name in ("th18", "th17", "th16", "th15", "th14", "th13"):
+        if counts.get(hall_name, 0) >= 1:
+            th_guess = hall_name
+            break
+    if th_guess == "unknown" and counts.get("scattershot", 0) >= 2:
         th_guess = "th13-th15"
-    elif counts.get("xbow", 0) >= 3:
+    elif th_guess == "unknown" and counts.get("xbow", 0) >= 3:
         th_guess = "th11-th13"
 
     return {

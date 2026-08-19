@@ -21,6 +21,7 @@ from dataset.generate_synthetic import (
     generate_scenery_previews,
     generate_synthetic_dataset,
     generate_th18era_previews,
+    relabel_synthetic_town_halls,
     visual_tier_level,
 )
 from renderer.isometric_renderer import (
@@ -329,6 +330,14 @@ class TestGenerateSyntheticDataset:
         assert "revengetower" in by_th["th18"]
         assert "superwizztower" in by_th["th18"]
         assert "archertower" in by_th["th18"]
+        assert "th15" in by_th["th15"]
+        assert "th13" not in by_th["th15"]
+        assert "th16" in by_th["th16"]
+        assert "th13" not in by_th["th16"]
+        assert "th17" in by_th["th17"]
+        assert "th13" not in by_th["th17"]
+        assert "th18" in by_th["th18"]
+        assert "th13" not in by_th["th18"]
 
     def test_varies_th_level_in_output_paths(self, tmp_path: Path) -> None:
         generate_synthetic_dataset(count=4, output_dir=tmp_path, seed=3)
@@ -926,3 +935,35 @@ class TestWallYoloSkip:
         result = renderer.render(placements, seed=0)
         assert result.rendered_count >= 1
         assert all(label.class_name != "wall" for label in result.labels)
+
+
+class TestRelabelSyntheticTownHalls:
+    def test_rewrites_th13_hall_id_from_folder_and_keeps_geometry(
+        self, tmp_path: Path
+    ) -> None:
+        th18 = tmp_path / "th18"
+        th18.mkdir()
+        (th18 / "synthetic_0003.png").write_bytes(b"fake")
+        original = "12 0.438676 0.487832 0.062304 0.130531\n23 0.5 0.5 0.1 0.1\n"
+        (th18 / "synthetic_0003.txt").write_text(original, encoding="utf-8")
+        th15 = tmp_path / "th15"
+        th15.mkdir()
+        (th15 / "synthetic_0000.png").write_bytes(b"fake")
+        (th15 / "synthetic_0000.txt").write_text(
+            "12 0.439067 0.484882 0.059953 0.134956\n4 0.6 0.6 0.05 0.05\n",
+            encoding="utf-8",
+        )
+
+        summary = relabel_synthetic_town_halls(tmp_path)
+        assert summary["files_changed"] == 2
+        assert summary["halls_relabeled"] == 2
+
+        th18_lines = (th18 / "synthetic_0003.txt").read_text(encoding="utf-8").splitlines()
+        assert th18_lines[0] == "31 0.438676 0.487832 0.062304 0.130531"
+        assert th18_lines[1] == "23 0.5 0.5 0.1 0.1"
+        th15_lines = (th15 / "synthetic_0000.txt").read_text(encoding="utf-8").splitlines()
+        assert th15_lines[0] == "28 0.439067 0.484882 0.059953 0.134956"
+        assert th15_lines[1] == "4 0.6 0.6 0.05 0.05"
+
+        again = relabel_synthetic_town_halls(tmp_path)
+        assert again["halls_relabeled"] == 0

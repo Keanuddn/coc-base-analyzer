@@ -149,5 +149,13 @@ identity:
 
 town_hall:
   sprite_slug: town_hall
-  # YOLO only has th13; renderer should use decoded town_hall_level for skin
+  # Class 12 stays th13 (keremberke slot; old real labels keep working).
+  # TH14–TH18 halls use appended YOLO IDs 27–31 from the sprite level.
   yolo_class: th13
+  yolo_class_by_level:
+    13: th13
+    14: th14
+    15: th15
+    16: th16
+    17: th17
+    18: th18

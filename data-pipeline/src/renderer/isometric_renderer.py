@@ -148,8 +148,16 @@ YOLO_CLASS_NAMES: tuple[str, ...] = (
     "revengetower",
     "superwizztower",
     "builderhut",
+    "th14",
+    "th15",
+    "th16",
+    "th17",
+    "th18",
 )
 KEREMBERKE_CLASS_COUNT = 16
+TOWN_HALL_YOLO_CLASSES: frozenset[str] = frozenset(
+    {"th13", "th14", "th15", "th16", "th17", "th18"}
+)
 
 SPRITES_DIR = Path(__file__).resolve().parent / "sprites"
 CLASHKING_HOME_VILLAGE = SPRITES_DIR / "clashking" / "home-village"
@@ -204,7 +212,8 @@ def _slug_for_building_type(building_type: str, type_map: Mapping[str, Any]) -> 
         return aliases[building_type]
     if building_type in identity:
         return building_type
-    if building_type in {"town_hall", "th13", town_hall.get("yolo_class", "th13")}:
+    hall_names = {town_hall.get("yolo_class", "th13"), *TOWN_HALL_YOLO_CLASSES, "town_hall"}
+    if building_type in hall_names:
         return town_hall.get("sprite_slug", "town_hall")
     if building_type in {"monolith", "spelltower", "spell_tower", "wall"}:
         if building_type == "monolith":
@@ -215,7 +224,36 @@ def _slug_for_building_type(building_type: str, type_map: Mapping[str, Any]) -> 
     return None
 
 
-def _yolo_class_for_building_type(building_type: str, type_map: Mapping[str, Any]) -> str:
+def town_hall_yolo_class(level: int | None, type_map: Mapping[str, Any] | None = None) -> str:
+    """Map a Town Hall sprite level to its YOLO class name.
+
+    Class 12 stays ``th13``. TH14–TH18 use appended IDs 27–31. Unknown or
+    pre-TH13 levels fall back to the type-map default (``th13``).
+    """
+    town_hall: Mapping[str, Any] = {}
+    if type_map:
+        raw = type_map.get("town_hall") or {}
+        if isinstance(raw, Mapping):
+            town_hall = raw
+    by_level = town_hall.get("yolo_class_by_level") or {}
+    if level is not None:
+        mapped = by_level.get(level)
+        if mapped is None:
+            mapped = by_level.get(str(level))
+        if mapped is not None:
+            return str(mapped)
+        candidate = f"th{level}"
+        if candidate in YOLO_CLASS_NAMES:
+            return candidate
+    return str(town_hall.get("yolo_class", "th13"))
+
+
+def _yolo_class_for_building_type(
+    building_type: str,
+    type_map: Mapping[str, Any],
+    *,
+    level: int | None = None,
+) -> str:
     overrides: Mapping[str, str] = type_map.get("yolo_label_overrides") or {}
     if building_type in overrides:
         return str(overrides[building_type])
@@ -226,9 +264,9 @@ def _yolo_class_for_building_type(building_type: str, type_map: Mapping[str, Any
     if building_type in aliases:
         return building_type
     if building_type in (town_hall.get("sprite_slug"), "town_hall"):
-        return town_hall.get("yolo_class", "th13")
-    if building_type == "th13":
-        return "th13"
+        return town_hall_yolo_class(level, type_map)
+    if building_type in TOWN_HALL_YOLO_CLASSES:
+        return building_type
     if building_type == "spell_tower":
         return "spelltower"
     # Reverse lookup: clashking slug → yolo alias
@@ -675,7 +713,9 @@ class IsometricRenderer:
                 rng=rng,
             )
 
-            yolo_class = _yolo_class_for_building_type(placement.building_type, self.type_map)
+            yolo_class = _yolo_class_for_building_type(
+                placement.building_type, self.type_map, level=placement.level
+            )
             placed.append(
                 _PlacedSprite(
                     sprite=sprite,

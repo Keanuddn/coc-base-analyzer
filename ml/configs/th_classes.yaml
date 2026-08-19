@@ -1,6 +1,6 @@
 # Versioned class list for CoC Base Analyzer YOLO training.
-# v2: keremberke 16-class head (indices 0–15 frozen) + appended TH15+ defenses.
-version: 2
+# v3: keremberke 0–15 frozen + TH15+ defenses 16–26 + Town Hall split 27–31.
+version: 3
 source_model: keremberke/yolov5m-clash-of-clans
 
 # Keremberke YOLOv5 head — fixed indices 0..15, do not reorder.
@@ -33,6 +33,11 @@ model_classes:
   - revengetower
   - superwizztower
   - builderhut
+  - th14
+  - th15
+  - th16
+  - th17
+  - th18
 
 # Classes still useful for detection on current TH15+ bases.
 # Hero pads stay in the head (unused) so real 16-class labels keep their IDs.
@@ -60,6 +65,11 @@ active_classes:
   - revengetower
   - superwizztower
   - builderhut
+  - th14
+  - th15
+  - th16
+  - th17
+  - th18
 
 # Hero altar pads — removed from CoC; baseline model mislabels TH15/16 screenshots.
 deprecated_classes:
@@ -76,17 +86,13 @@ deprecated_notes: |
   Use pseudo_label --include-deprecated to retain them (not recommended for review).
   IDs 7/9/10/13 stay reserved so the 4 user-labeled reals are not remapped.
 
-# Town-hall level classes would break the 4 real files (they use th13). Keep halls as th13.
-placeholders:
-  - th14
-  - th15
-  - th16
-  - th17
-  - th18
+# Class 12 stays th13 so old real labels keep working. TH14–TH18 halls
+# are appended after builderhut (IDs 27–31).
+placeholders: []
 
 notes: |
   Indices 0–15 match keremberke/yolov5m-clash-of-clans. Do not shuffle them.
-  TH14–TH18 town halls share the th13 slot (safer than a new hall class).
+  Class 12 remains th13. Town Halls TH14–TH18 are classes 27–31.
   Appended defenses (16–26) are trained from synthetic labels. Real GT for those
   buildings is incomplete until screenshots are relabeled. Walls are never labeled.
   ClashKing sprite folders: archer_tower, hidden_tesla, monolith, spell_tower,

@@ -7,7 +7,7 @@ model:
   # Alternative for Colab/GPU: yolo11n.pt
 
 data:
-  dataset_yaml: data-pipeline/datasets/processed/yolo_v4/data.yaml
+  dataset_yaml: data-pipeline/datasets/processed/yolo_v6/data.yaml
 
 training:
   epochs: 50
@@ -17,7 +17,7 @@ training:
   device: mps           # Apple Silicon; pick_device also maps auto → mps
   workers: 2
   project: ml/runs
-  name: coc_yolo_v4
+  name: coc_yolo_v6
   seed: 42
   cache: false
   plots: true

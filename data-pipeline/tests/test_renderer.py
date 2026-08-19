@@ -174,7 +174,17 @@ class TestIsometricRenderer:
             "revengetower",
             "superwizztower",
             "builderhut",
+            "th14",
+            "th15",
+            "th16",
+            "th17",
+            "th18",
         )
+        assert YOLO_CLASS_NAMES[12] == "th13"
+        assert YOLO_CLASS_NAMES[26] == "builderhut"
+        assert YOLO_CLASS_NAMES[27] == "th14"
+        assert YOLO_CLASS_NAMES[31] == "th18"
+        assert len(YOLO_CLASS_NAMES) == 32
 
     def test_th15_plus_defenses_get_dedicated_classes(
         self, renderer: IsometricRenderer
@@ -228,3 +238,23 @@ class TestIsometricRenderer:
         assert names == {"ricochetcannon", "superwizztower"}
         assert "canon" not in names
         assert "wizztower" not in names
+
+    def test_town_hall_sprite_level_gets_matching_yolo_class(
+        self, renderer: IsometricRenderer
+    ) -> None:
+        expected = {
+            13: ("th13", 12),
+            14: ("th14", 27),
+            15: ("th15", 28),
+            16: ("th16", 29),
+            17: ("th17", 30),
+            18: ("th18", 31),
+        }
+        for level, (name, class_id) in expected.items():
+            result = renderer.render(
+                [BuildingPlacement("town_hall", level=level, x=22, y=22)],
+                seed=0,
+            )
+            assert result.rendered_count == 1, level
+            assert result.labels[0].class_name == name, level
+            assert result.labels[0].class_id == class_id, level

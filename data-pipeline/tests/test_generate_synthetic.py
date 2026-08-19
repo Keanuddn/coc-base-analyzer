@@ -75,20 +75,14 @@ _TYPE_MAP = {
     ],
     "town_hall": {"sprite_slug": "town_hall", "yolo_class": "th13"},
     "yolo_label_overrides": {
-        "ricochet_cannon": "canon",
-        "super_wizard_tower": "wizztower",
-        "multi-archer_tower": "archertower",
+        "ricochet_cannon": "ricochetcannon",
+        "super_wizard_tower": "superwizztower",
+        "multi-archer_tower": "multiarchertower",
+        "multi-gear_tower": "multigeartower",
+        "revenge_tower": "revengetower",
     },
     "yolo_unlabeled": [
-        "archertower",
-        "firespitter",
-        "spelltower",
         "wall",
-        "monolith",
-        "tesla",
-        "builderhut",
-        "multi-gear_tower",
-        "revenge_tower",
     ],
     "random_sprite_variants": {
         "spelltower": {
@@ -122,7 +116,7 @@ _TYPE_MAP = {
             "max_regular_th": 15,
             "merged_slug": "ricochet_cannon",
             "merged_from_th": 16,
-            "yolo_class": "canon",
+            "yolo_class": "ricochetcannon",
             "count_range": [2, 3],
         },
         "archertower": {
@@ -130,7 +124,7 @@ _TYPE_MAP = {
             "max_regular_th": 15,
             "merged_slug": "multi-archer_tower",
             "merged_from_th": 16,
-            "yolo_class": "archertower",
+            "yolo_class": "multiarchertower",
             "count_range": [2, 3],
         },
         "wizztower": {
@@ -138,7 +132,7 @@ _TYPE_MAP = {
             "max_regular_th": 17,
             "merged_slug": "super_wizard_tower",
             "merged_from_th": 18,
-            "yolo_class": "wizztower",
+            "yolo_class": "superwizztower",
             "count_range": [1, 3],
         },
     },
@@ -307,6 +301,34 @@ class TestGenerateSyntheticDataset:
                 for val in parts[1:]:
                     f = float(val)
                     assert 0.0 <= f <= 1.0
+
+    def test_new_defense_class_ids_appear_and_walls_unlabeled(self, tmp_path: Path) -> None:
+        generate_synthetic_dataset(count=4, output_dir=tmp_path, seed=0)
+        by_th: dict[str, set[str]] = {}
+        for txt in tmp_path.rglob("*.txt"):
+            names: set[str] = set()
+            for line in txt.read_text(encoding="utf-8").splitlines():
+                parts = line.split()
+                if len(parts) < 5:
+                    continue
+                names.add(YOLO_CLASS_NAMES[int(parts[0])])
+            by_th[txt.parent.name] = names
+            assert "wall" not in names
+        assert "archertower" in by_th["th15"]
+        assert "tesla" in by_th["th15"]
+        assert "monolith" in by_th["th15"]
+        assert "spelltower" in by_th["th15"]
+        assert "builderhut" in by_th["th15"]
+        assert "ricochetcannon" not in by_th["th15"]
+        assert "firespitter" not in by_th["th15"]
+        assert "ricochetcannon" in by_th["th16"]
+        assert "multiarchertower" in by_th["th16"]
+        assert "monolith" in by_th["th16"]
+        assert "firespitter" in by_th["th17"]
+        assert "multigeartower" in by_th["th17"]
+        assert "revengetower" in by_th["th18"]
+        assert "superwizztower" in by_th["th18"]
+        assert "archertower" in by_th["th18"]
 
     def test_varies_th_level_in_output_paths(self, tmp_path: Path) -> None:
         generate_synthetic_dataset(count=4, output_dir=tmp_path, seed=3)

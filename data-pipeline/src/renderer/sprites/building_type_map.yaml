@@ -25,28 +25,25 @@ aliases:
   tesla: hidden_tesla
   builderhut: "builder's_hut"
 
-# Temporary YOLO aliases for merged defenses that keremberke's 16 classes
-# do not include. Sprites are still rendered for visual correctness.
-# User needs detection of "cannon-like" / "wizard-like" / "archer-like"
-# until dedicated classes (`ricochet`, `archertower`, etc.) are added.
+# Placement slugs that do not match the compact YOLO name (keremberke style:
+# no underscores). Indices 0–15 stay frozen; these names are IDs 16+.
+# Sprite folders under clashking/home-village/:
+#   ricochet_cannon/  multi-archer_tower/  super_wizard_tower/
+#   multi-gear_tower/  revenge_tower/
 yolo_label_overrides:
-  ricochet_cannon: canon  # merged cannon visual (2× maxed TH15 cannons)
-  super_wizard_tower: wizztower  # merged wizard visual (2× maxed TH17 wizard towers)
-  multi-archer_tower: archertower  # merged archer visual (2× maxed TH15 archer towers)
+  ricochet_cannon: ricochetcannon
+  super_wizard_tower: superwizztower
+  multi-archer_tower: multiarchertower
+  multi-gear_tower: multigeartower
+  revenge_tower: revengetower
 
-# Render these sprites but skip YOLO txt until a class exists in the 16-head model.
-# keremberke has no `wall` class — still composite wall sprites as scenery-like
-# context so the detector focuses on defenses.
+# Walls are scenery-like context only — no YOLO boxes (keremberke has no wall class).
+# Every other placed defense with a class in YOLO_CLASS_NAMES gets a box.
+# Sprite folders for appended classes:
+#   archer_tower/  hidden_tesla/  monolith/  spell_tower/  firespitter/
+#   builder's_hut/  plus the merge folders listed above.
 yolo_unlabeled:
-  - archertower
-  - firespitter
-  - spelltower
   - wall
-  - monolith
-  - tesla
-  - builderhut
-  - multi-gear_tower
-  - revenge_tower
 
 # ClashKing has no poison/rage/invisibility/lightning filenames.
 # The four designs are spell_tower/level_1.webp … level_4.webp.
@@ -106,21 +103,21 @@ era_merges:
     max_regular_th: 15
     merged_slug: ricochet_cannon
     merged_from_th: 16
-    yolo_class: canon
+    yolo_class: ricochetcannon
     count_range: [2, 3]  # 2→1 merge; prefer 2–3 ricochets for visual density
   archertower:
     regular_slug: archer_tower
     max_regular_th: 15
     merged_slug: multi-archer_tower
     merged_from_th: 16
-    yolo_class: archertower
+    yolo_class: multiarchertower
     count_range: [2, 3]
   wizztower:
     regular_slug: wizard_tower
     max_regular_th: 17
     merged_slug: super_wizard_tower
     merged_from_th: 18
-    yolo_class: wizztower
+    yolo_class: superwizztower
     count_range: [1, 3]
 
 # Explicit slug = identity (for schema strings that match ClashKing names)

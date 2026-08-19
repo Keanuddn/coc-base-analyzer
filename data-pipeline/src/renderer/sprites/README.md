@@ -68,8 +68,18 @@ See `building_type_map.yaml` for mapping from:
 | `bomb_tower` | 13 | `bombtower` |
 | `wizard_tower` | 17 | `wizztower` |
 | `clan_castle` | 14 | `clancastle` |
-| `town_hall` | 18 | `th13`…`th18` (by level) |
-| `firespitter` | 3 | — (TH17+) |
-| `ricochet_cannon` | 4 | — (TH17+) |
+| `town_hall` | 18 | `th13` (TH15–18 skins) |
+| `archer_tower` | 21 | `archertower` |
+| `hidden_tesla` | 17 | `tesla` |
+| `monolith` | 5 | `monolith` |
+| `spell_tower` | 4 | `spelltower` |
+| `firespitter` | 3 | `firespitter` |
+| `ricochet_cannon` | 4 | `ricochetcannon` |
+| `multi-archer_tower` | 4 | `multiarchertower` |
+| `multi-gear_tower` | 3 | `multigeartower` |
+| `revenge_tower` | 2 | `revengetower` |
+| `super_wizard_tower` | 2 | `superwizztower` |
+| `builder's_hut` | 8 | `builderhut` |
+| `wall` | 19 | unlabeled |
 
 Full catalogue: 512 files across all Home Village buildings.

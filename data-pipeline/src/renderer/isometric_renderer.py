@@ -117,7 +117,9 @@ UNIT_TILE_TYPES: frozenset[str] = frozenset({"wall"})
 # Extra pixels above the isometric footprint used when sprite height is unknown.
 SPRITE_NORTH_PAD_PX = 140
 
-# YOLOv5 label order from docs/ARCHITECTURE.md (keremberke model).
+# Keremberke YOLOv5 head (indices 0–15) is frozen — do not reorder.
+# TH15+ defenses that the renderer already draws are appended after xbow.
+# Town halls stay ``th13`` so the 4 real label files keep working.
 YOLO_CLASS_NAMES: tuple[str, ...] = (
     "ad",
     "airsweeper",
@@ -135,7 +137,19 @@ YOLO_CLASS_NAMES: tuple[str, ...] = (
     "wardenpad",
     "wizztower",
     "xbow",
+    "archertower",
+    "tesla",
+    "monolith",
+    "spelltower",
+    "ricochetcannon",
+    "multiarchertower",
+    "firespitter",
+    "multigeartower",
+    "revengetower",
+    "superwizztower",
+    "builderhut",
 )
+KEREMBERKE_CLASS_COUNT = 16
 
 SPRITES_DIR = Path(__file__).resolve().parent / "sprites"
 CLASHKING_HOME_VILLAGE = SPRITES_DIR / "clashking" / "home-village"

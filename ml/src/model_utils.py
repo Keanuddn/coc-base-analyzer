@@ -40,7 +40,7 @@ def load_class_config(config_path: Path | None = None) -> dict[str, Any]:
 
 
 def model_class_names(config_path: Path | None = None) -> list[str]:
-    """All keremberke model class names (indices 0..15 fixed)."""
+    """Training class names: keremberke 0..15 frozen, TH15+ defenses appended."""
     cfg = load_class_config(config_path)
     if "model_classes" in cfg:
         return list(cfg["model_classes"])

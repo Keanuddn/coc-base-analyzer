@@ -22,13 +22,14 @@
 #     use the lowest available file — do not wrap into a higher-era sprite.
 #   - Exceptions (user):
 #       canon: TH15 = highest regular cannon (cannon/level_21.webp, purple max).
-#         TH16–18 = ricochet_cannon (no regular cannons). YOLO class canon
-#         (temporary alias — merged cannon visual).
+#         TH16–18 remaining regulars plus ricochet_cannon. YOLO: remaining
+#         regulars = canon; ricochet = ricochetcannon (not aliased).
 #       wizztower: maxed at TH17 (wizard_tower/level_17.webp). TH15/16 = max-2 /
-#         max-1 relative to that. TH18 = super_wizard_tower. YOLO class wizztower.
+#         max-1 relative to that. TH18 remaining regulars plus super_wizard_tower.
+#         YOLO: remaining = wizztower; Super Wizard = superwizztower.
 #       archertower: same merge as cannons. TH15 = archer_tower/level_21.webp
-#         (purple max). TH16–18 = multi-archer_tower (no regular archer towers).
-#         YOLO class archertower is a placeholder (not in keremberke 16).
+#         (purple max). TH16–18 remaining regulars plus multi-archer_tower.
+#         YOLO: remaining = archertower; merged = multiarchertower.
 #       bombtower: normal visual-tier (no merge).
 #       eagle: only TH15–16 (skip TH17/TH18). Visual-tier among eagle files
 #         relative to eagle max_th (16), not TH18: TH16 = highest file,
@@ -37,7 +38,8 @@
 #       spelltower: wiki 2 at TH15–18 (user confirmed TH15 2026-08-17).
 #         Place two towers per layout; cycle ClashKing level_1…4 evenly.
 #       monolith / tesla / builderhut / multi-gear_tower / revenge_tower:
-#         sourced in th_unlocks.yaml; unlabeled until YOLO classes exist.
+#         sourced in th_unlocks.yaml; labeled as monolith, tesla, builderhut,
+#         multigeartower, revengetower (IDs 16+). Walls stay unlabeled.
 #       wall: ClashKing wall/ folder. Visual-tier from maxed TH18:
 #         TH18 = highest wall file, TH17 = max-1, TH16 = max-2, TH15 = max-3.
 #         1×1 tiles around/between buildings. Rendered, not YOLO-labeled.

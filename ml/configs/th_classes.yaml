@@ -1,9 +1,10 @@
 # Versioned class list for CoC Base Analyzer YOLO training.
-# v1: keremberke/yolov5m-clash-of-clans baseline (16 classes) + TH14+ placeholders.
-version: 1
+# v2: keremberke 16-class head (indices 0–15 frozen) + appended TH15+ defenses.
+version: 2
 source_model: keremberke/yolov5m-clash-of-clans
 
 # Keremberke YOLOv5 head — fixed indices 0..15, do not reorder.
+# IDs 16+ are synthetic-only until real screenshots are relabeled.
 model_classes:
   - ad
   - airsweeper
@@ -21,8 +22,20 @@ model_classes:
   - wardenpad
   - wizztower
   - xbow
+  - archertower
+  - tesla
+  - monolith
+  - spelltower
+  - ricochetcannon
+  - multiarchertower
+  - firespitter
+  - multigeartower
+  - revengetower
+  - superwizztower
+  - builderhut
 
-# Classes still useful for detection on current TH15+ bases (subset of model_classes).
+# Classes still useful for detection on current TH15+ bases.
+# Hero pads stay in the head (unused) so real 16-class labels keep their IDs.
 active_classes:
   - ad
   - airsweeper
@@ -36,6 +49,17 @@ active_classes:
   - th13
   - wizztower
   - xbow
+  - archertower
+  - tesla
+  - monolith
+  - spelltower
+  - ricochetcannon
+  - multiarchertower
+  - firespitter
+  - multigeartower
+  - revengetower
+  - superwizztower
+  - builderhut
 
 # Hero altar pads — removed from CoC; baseline model mislabels TH15/16 screenshots.
 deprecated_classes:
@@ -50,13 +74,10 @@ deprecated_notes: |
   current bases; the baseline model hallucinates them on ground tiles, decorations,
   and hero-altar-adjacent clutter. Pseudo-labels filter them out by default.
   Use pseudo_label --include-deprecated to retain them (not recommended for review).
+  IDs 7/9/10/13 stay reserved so the 4 user-labeled reals are not remapped.
 
-# Placeholders for future manual labeling / fine-tuning rounds (not yet in model head).
+# Town-hall level classes would break the 4 real files (they use th13). Keep halls as th13.
 placeholders:
-  - monolith      # TH14+
-  - spelltower    # TH15+ (rendered unlabeled; ClashKing level_1…4)
-  - archertower   # TH15 regular / TH16+ multi-archer merge
-  - firespitter   # TH17+; visual-tier from 3 ClashKing files
   - th14
   - th15
   - th16
@@ -64,6 +85,10 @@ placeholders:
   - th18
 
 notes: |
-  The keremberke model only knows the 16 model_classes above (indices 0..15).
-  TH14–TH18 town halls are visually distinct but share the th13 class slot in baseline weights.
-  Monolith, Spell Tower, Archer Tower, and Firespitter require new labels before they can be trained.
+  Indices 0–15 match keremberke/yolov5m-clash-of-clans. Do not shuffle them.
+  TH14–TH18 town halls share the th13 slot (safer than a new hall class).
+  Appended defenses (16–26) are trained from synthetic labels. Real GT for those
+  buildings is incomplete until screenshots are relabeled. Walls are never labeled.
+  ClashKing sprite folders: archer_tower, hidden_tesla, monolith, spell_tower,
+  ricochet_cannon, multi-archer_tower, firespitter, multi-gear_tower,
+  revenge_tower, super_wizard_tower, builder's_hut.

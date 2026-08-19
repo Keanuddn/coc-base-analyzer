@@ -6,6 +6,7 @@ from __future__ import annotations
 import argparse
 import json
 import logging
+import os
 import random
 import shutil
 import sys
@@ -72,6 +73,9 @@ class BuildDatasetConfig:
     approved_reviews_path: Path | None = None
     synthetic_variant_count: int = 8
     render_synthetic_variants: bool = True
+    holdout_real_to_val: bool = False
+    real_val_holdout: int = 0
+    oversample_real_train: int = 1
 
 
 @dataclass(slots=True)
@@ -383,8 +387,62 @@ def assign_splits(
     val_ratio: float,
     test_ratio: float,
     seed: int,
+    holdout_real_to_val: bool = False,
+    real_val_holdout: int = 0,
 ) -> None:
     """Assign train/val/test splits, stratified by TH where possible."""
+    if holdout_real_to_val and real_val_holdout > 0:
+        raise ValueError("Use either --holdout-real-val or --real-val-holdout, not both")
+
+    if real_val_holdout > 0:
+        labeled_real = [s for s in samples if s.has_labels and s.origin == "real"]
+        if len(labeled_real) <= real_val_holdout:
+            raise ValueError(
+                f"--real-val-holdout {real_val_holdout} requires more labeled reals than the "
+                f"holdout (got {len(labeled_real)}); keep at least one labeled real in train"
+            )
+        rng = random.Random(seed)
+        ordered = sorted(labeled_real, key=lambda s: str(s.source_path))
+        rng.shuffle(ordered)
+        val_ids = {id(sample) for sample in ordered[-real_val_holdout:]}
+        for sample in samples:
+            if not sample.has_labels:
+                sample.split = "val"
+                if "included_unlabeled_for_inference_only" not in sample.notes:
+                    sample.notes.append("included_unlabeled_for_inference_only")
+                continue
+            if sample.origin == "real":
+                if id(sample) in val_ids:
+                    sample.split = "val"
+                    if "real_val_holdout" not in sample.notes:
+                        sample.notes.append("real_val_holdout")
+                else:
+                    sample.split = "train"
+            else:
+                sample.split = "train"
+        return
+
+    if holdout_real_to_val:
+        labeled_real = 0
+        for sample in samples:
+            if not sample.has_labels:
+                sample.split = "val"
+                if "included_unlabeled_for_inference_only" not in sample.notes:
+                    sample.notes.append("included_unlabeled_for_inference_only")
+                continue
+            if sample.origin == "real":
+                sample.split = "val"
+                if "holdout_real_val" not in sample.notes:
+                    sample.notes.append("holdout_real_val")
+                labeled_real += 1
+            else:
+                sample.split = "train"
+        if labeled_real == 0:
+            raise ValueError(
+                "--holdout-real-val requires labeled real images, but none were collected"
+            )
+        return
+
     total_ratio = train_ratio + val_ratio + test_ratio
     if abs(total_ratio - 1.0) > 1e-6:
         raise ValueError(f"Split ratios must sum to 1.0, got {total_ratio}")
@@ -429,9 +487,53 @@ def assign_splits(
         sample.notes.append("included_unlabeled_for_inference_only")
 
 
+def oversample_labeled_real_train(
+    samples: list[DatasetSample],
+    factor: int,
+) -> list[DatasetSample]:
+    """Repeat labeled real training images so screenshot texture is not drowned by synthetics.
+
+    Copies share the source PNG/txt (mosaic still sees unique stems). Labels are not invented.
+    """
+    if factor <= 1:
+        return samples
+    expanded: list[DatasetSample] = []
+    for sample in samples:
+        if sample.origin == "real" and sample.has_labels and sample.split == "train":
+            for copy_idx in range(factor):
+                expanded.append(
+                    DatasetSample(
+                        source_path=sample.source_path,
+                        origin=sample.origin,
+                        town_hall_level=sample.town_hall_level,
+                        has_labels=sample.has_labels,
+                        label_path=sample.label_path,
+                        split=sample.split,
+                        notes=[*sample.notes, f"oversample_copy_{copy_idx:02d}"],
+                    )
+                )
+        else:
+            expanded.append(sample)
+    return expanded
+
+
 def _safe_stem(path: Path, origin: OriginName, index: int) -> str:
     stem = path.stem.replace(" ", "_")
     return f"{origin}_{stem}_{index:04d}"
+
+
+def _link_or_copy(src: Path, dest: Path) -> None:
+    """Hardlink when possible so bulky PNG copies do not fill the disk."""
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    if dest.exists() or dest.is_symlink():
+        dest.unlink()
+    try:
+        os.link(src, dest)
+    except OSError:
+        try:
+            dest.symlink_to(src.resolve())
+        except OSError:
+            shutil.copy2(src, dest)
 
 
 def materialize_yolo_dataset(
@@ -461,7 +563,7 @@ def materialize_yolo_dataset(
             lbl_dir.mkdir(parents=True, exist_ok=True)
             dest_img = img_dir / f"{stem}{sample.source_path.suffix.lower()}"
             dest_lbl = lbl_dir / f"{stem}.txt"
-            shutil.copy2(sample.source_path, dest_img)
+            _link_or_copy(sample.source_path, dest_img)
             if sample.label_path and sample.label_path.is_file():
                 if remap_manual_labels and "manual_label" in sample.notes:
                     lines = sample.label_path.read_text(encoding="utf-8").splitlines()
@@ -469,7 +571,7 @@ def materialize_yolo_dataset(
                     remapped = remap_active_class_indices(lines, active_names)
                     dest_lbl.write_text("\n".join(remapped) + ("\n" if remapped else ""), encoding="utf-8")
                 else:
-                    shutil.copy2(sample.label_path, dest_lbl)
+                    _link_or_copy(sample.label_path, dest_lbl)
             copied.append(
                 {
                     "stem": stem,
@@ -486,7 +588,7 @@ def materialize_yolo_dataset(
             img_dir = output_dir / unlabeled_split / "images_unlabeled"
             img_dir.mkdir(parents=True, exist_ok=True)
             dest_img = img_dir / f"{stem}{sample.source_path.suffix.lower()}"
-            shutil.copy2(sample.source_path, dest_img)
+            _link_or_copy(sample.source_path, dest_img)
             unlabeled_copied.append(
                 {
                     "stem": stem,
@@ -664,7 +766,10 @@ def build_yolo_dataset(config: BuildDatasetConfig) -> BuildDatasetResult:
         val_ratio=config.val_ratio,
         test_ratio=config.test_ratio,
         seed=config.seed,
+        holdout_real_to_val=config.holdout_real_to_val,
+        real_val_holdout=config.real_val_holdout,
     )
+    samples = oversample_labeled_real_train(samples, config.oversample_real_train)
 
     config.output_dir.mkdir(parents=True, exist_ok=True)
     for split in ("train", "val", "test"):
@@ -774,6 +879,25 @@ def main(argv: list[str] | None = None) -> int:
         default=None,
         help="Only include regression images approved in label review JSON",
     )
+    parser.add_argument(
+        "--holdout-real-val",
+        action="store_true",
+        help="Put all labeled real images in val and all synthetics in train (sim-to-real eval)",
+    )
+    parser.add_argument(
+        "--real-val-holdout",
+        type=int,
+        default=0,
+        metavar="N",
+        help="Put N labeled reals in val; remaining labeled reals go to train (synthetics stay in train)",
+    )
+    parser.add_argument(
+        "--oversample-real-train",
+        type=int,
+        default=1,
+        metavar="N",
+        help="Repeat each labeled real training image N times (no new labels; mosaic-friendly unique stems)",
+    )
     parser.add_argument("-v", "--verbose", action="store_true")
     args = parser.parse_args(argv)
 
@@ -794,6 +918,10 @@ def main(argv: list[str] | None = None) -> int:
         )
     if args.manual_labels_only and args.include_pseudo_labels:
         parser.error("Use either --manual-labels-only or --include-pseudo-labels, not both")
+    if args.holdout_real_val and args.real_val_holdout > 0:
+        parser.error("Use either --holdout-real-val or --real-val-holdout, not both")
+    if args.oversample_real_train < 1:
+        parser.error("--oversample-real-train must be >= 1")
 
     config = BuildDatasetConfig(
         output_dir=args.output,
@@ -814,6 +942,9 @@ def main(argv: list[str] | None = None) -> int:
         approved_reviews_path=args.approved_reviews,
         synthetic_variant_count=args.synthetic_variants,
         render_synthetic_variants=not args.no_render_variants,
+        holdout_real_to_val=args.holdout_real_val,
+        real_val_holdout=args.real_val_holdout,
+        oversample_real_train=args.oversample_real_train,
     )
 
     try:

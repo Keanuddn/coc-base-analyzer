@@ -135,7 +135,7 @@ Incomplete manual labels were accepted for the first fine-tune (`arbeite damit e
 ## Tipps
 
 - Rathaus (`th13`) = visuell TH15/TH16, im Baseline-Modell heißt die Klasse noch `th13`
-- Monolith, Spell Tower etc. sind **noch keine Klassen** — nicht labeln
+- Neue Verteidigungen (Monolith, Spell Tower, Tesla, Archer Tower, Ricochet, …) haben IDs 16+ in synthetischen Labels. Die 4 realen Dateien bleiben 0–15.
 - Bei Unsicherheit: Box weglassen statt raten
 
 ## Verwandte Tools

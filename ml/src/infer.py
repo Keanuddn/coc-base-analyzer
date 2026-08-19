@@ -56,8 +56,8 @@ def infer_keremberke(image_path: Path, *, conf: float, iou: float, imgsz: int) -
 def infer_ultralytics(weights: Path, image_path: Path, *, conf: float, iou: float, max_det: int) -> dict:
     from ultralytics import YOLO
 
-    class_names = model_class_names()
     model = YOLO(str(weights))
+    names = model.names or {i: n for i, n in enumerate(model_class_names())}
     results = model.predict(
         source=str(image_path),
         conf=conf,
@@ -76,7 +76,7 @@ def infer_ultralytics(weights: Path, image_path: Path, *, conf: float, iou: floa
             x1, y1, x2, y2 = box.xyxy[0].tolist()
             buildings.append(
                 {
-                    "class": class_names[cls_id] if cls_id < len(class_names) else str(cls_id),
+                    "class": names.get(cls_id, str(cls_id)),
                     "class_id": cls_id,
                     "confidence": round(score, 4),
                     "bbox_xyxy": [round(v, 2) for v in (x1, y1, x2, y2)],

@@ -12,10 +12,13 @@ with sourced merge windows:
 
 * Cannons max at TH15 (``cannon/level_21.webp`` purple). TH16 places
   remaining regular cannons **plus** ``ricochet_cannon`` (wiki 3+2).
-  TH17–18: 0 regular + 3 ricochet. YOLO class remains ``canon``.
-* Archer towers: remaining regulars plus ``multi-archer_tower`` per wiki.
+  TH17–18: 0 regular + 3 ricochet. Regulars stay YOLO ``canon``;
+  ricochet is ``ricochetcannon`` (not aliased to canon).
+* Archer towers: remaining regulars labeled ``archertower`` plus
+  ``multi-archer_tower`` (YOLO ``multiarchertower``) per wiki.
 * Wizard towers max at TH17. TH18 places remaining regulars **plus**
-  ``super_wizard_tower``. YOLO class remains ``wizztower``.
+  ``super_wizard_tower``. Regulars stay ``wizztower``; Super Wizard is
+  ``superwizztower`` (not aliased to wizztower).
 * Eagle artillery TH11–16; removed at TH17 (merged into Inferno Artillery).
 * Firespitter TH17+; Multi-Gear Tower TH17+; Revenge Tower TH18.
 * Spell towers: wiki Number Available is 2 at TH15–18 (user confirmed
@@ -60,6 +63,7 @@ from renderer.isometric_renderer import (
     SPRITE_RENDER_SCALE,
     TILE_FOOTPRINTS,
     TILE_WIDTH,
+    YOLO_CLASS_NAMES,
     IsometricRenderer,
     list_sprite_levels,
     occupancy_tiles,
@@ -1073,6 +1077,32 @@ def compare_defense_counts(
     }
 
 
+def tally_yolo_label_dir(directory: Path) -> dict[str, Any]:
+    """Count boxes per class from YOLO txt files under ``directory``."""
+    by_class: dict[str, int] = {name: 0 for name in YOLO_CLASS_NAMES}
+    unknown = 0
+    files = 0
+    if not directory.is_dir():
+        return {"files": 0, "by_class": by_class, "unknown_ids": 0, "total_boxes": 0}
+    for txt in sorted(directory.rglob("*.txt")):
+        files += 1
+        for line in txt.read_text(encoding="utf-8").splitlines():
+            parts = line.split()
+            if len(parts) < 5:
+                continue
+            class_id = int(parts[0])
+            if 0 <= class_id < len(YOLO_CLASS_NAMES):
+                by_class[YOLO_CLASS_NAMES[class_id]] += 1
+            else:
+                unknown += 1
+    return {
+        "files": files,
+        "by_class": by_class,
+        "unknown_ids": unknown,
+        "total_boxes": sum(by_class.values()) + unknown,
+    }
+
+
 def generate_synthetic_dataset(
     count: int = DEFAULT_COUNT,
     output_dir: Path = DEFAULT_OUTPUT,
@@ -1147,6 +1177,9 @@ def generate_synthetic_dataset(
         "skipped_town_hall_levels": skipped_th,
         "level_policy": catalog.policy,
         "not_official_coc_cap": catalog.not_official_coc_cap,
+        "class_counts": tally_yolo_label_dir(output_dir),
+        "nc": len(YOLO_CLASS_NAMES),
+        "class_names": list(YOLO_CLASS_NAMES),
     }
     logging.info(
         "Synthetic dataset: %d images (%d skipped existing), %d new boxes → %s",
@@ -1507,6 +1540,12 @@ def main(argv: list[str] | None = None) -> int:
         use_photo_backgrounds=not args.flat_background,
     )
     print(json.dumps(summary, indent=2))
+    class_counts = summary.get("class_counts") or {}
+    by_class = class_counts.get("by_class") or {}
+    print("\nPer-class YOLO boxes:")
+    for idx, name in enumerate(YOLO_CLASS_NAMES):
+        print(f"  {idx:2d} {name:20} {by_class.get(name, 0)}")
+    print(f"  files={class_counts.get('files', 0)} total_boxes={class_counts.get('total_boxes', 0)}")
     return 0
 
 

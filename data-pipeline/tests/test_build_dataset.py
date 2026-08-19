@@ -157,6 +157,8 @@ class TestWriteDataYaml:
         payload = yaml.safe_load(path.read_text(encoding="utf-8"))
         assert payload["names"][0] == "ad"
         assert payload["names"][12] == "th13"
+        assert payload["names"][16] == "archertower"
+        assert payload["nc"] == 27
 
 
 class TestManualLabels:
@@ -253,6 +255,77 @@ class TestManualLabels:
         assert report["totals"]["synthetic"] == 1
         assert report["totals"]["labeled"] == 1
         assert report["town_hall_balance"]["TH15"]["total"] == 1
+
+
+    def test_holdout_real_val_keeps_synthetics_in_train(self, synthetic_demo_dir: Path, tmp_path: Path) -> None:
+        from PIL import Image
+
+        regression = tmp_path / "regression"
+        img_dir = regression / "th15"
+        lbl_dir = regression / "labels" / "th15"
+        img_dir.mkdir(parents=True)
+        lbl_dir.mkdir(parents=True)
+        Image.new("RGB", (64, 64), color=(10, 20, 30)).save(img_dir / "war_base_real.png")
+        (lbl_dir / "war_base_real.txt").write_text("3 0.5 0.5 0.2 0.2\n", encoding="utf-8")
+
+        output = tmp_path / "yolo_holdout"
+        config = BuildDatasetConfig(
+            output_dir=output,
+            include_demo=True,
+            include_regression=True,
+            manual_labels_only=True,
+            demo_dir=synthetic_demo_dir,
+            regression_dir=regression,
+            render_synthetic_variants=False,
+            holdout_real_to_val=True,
+            seed=3,
+        )
+        result = build_yolo_dataset(config)
+        report = json.loads(result.report_path.read_text(encoding="utf-8"))
+        assert report["origin_by_split"]["synthetic"]["train"] == report["origin_by_split"]["synthetic"]["total"]
+        assert report["origin_by_split"]["real"]["val"] == report["origin_by_split"]["real"]["total"]
+        assert report["origin_by_split"]["real"]["train"] == 0
+        assert list((output / "val" / "images").glob("real_*.png"))
+        assert not list((output / "train" / "images").glob("real_*.png"))
+
+    def test_real_val_holdout_and_oversample_train(self, synthetic_demo_dir: Path, tmp_path: Path) -> None:
+        from PIL import Image
+
+        regression = tmp_path / "regression"
+        for i in range(4):
+            img_dir = regression / "th15"
+            lbl_dir = regression / "labels" / "th15"
+            img_dir.mkdir(parents=True, exist_ok=True)
+            lbl_dir.mkdir(parents=True, exist_ok=True)
+            Image.new("RGB", (64, 64), color=(10 + i, 20, 30)).save(img_dir / f"war_base_real_{i}.png")
+            (lbl_dir / f"war_base_real_{i}.txt").write_text("3 0.5 0.5 0.2 0.2\n", encoding="utf-8")
+
+        output = tmp_path / "yolo_oversample"
+        config = BuildDatasetConfig(
+            output_dir=output,
+            include_demo=True,
+            include_regression=True,
+            manual_labels_only=True,
+            demo_dir=synthetic_demo_dir,
+            regression_dir=regression,
+            render_synthetic_variants=False,
+            real_val_holdout=1,
+            oversample_real_train=5,
+            seed=3,
+        )
+        result = build_yolo_dataset(config)
+        report = json.loads(result.report_path.read_text(encoding="utf-8"))
+        assert report["origin_by_split"]["real"]["val"] == 1
+        assert report["origin_by_split"]["real"]["train"] == 15  # 3 unique × 5
+        assert report["origin_by_split"]["synthetic"]["train"] == report["origin_by_split"]["synthetic"]["total"]
+        train_reals = list((output / "train" / "images").glob("real_*.png"))
+        val_reals = list((output / "val" / "images").glob("real_*.png"))
+        assert len(train_reals) == 15
+        assert len(val_reals) == 1
+        for img in train_reals:
+            lbl = output / "train" / "labels" / f"{img.stem}.txt"
+            assert lbl.is_file()
+            assert lbl.read_text(encoding="utf-8").startswith("3 ")
 
 
 class TestRegistryDedupIntegration:

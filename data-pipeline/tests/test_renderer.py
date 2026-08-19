@@ -8,7 +8,7 @@ import pytest
 
 from link_decoder.schema import BuildingPlacement
 from renderer.domain_randomization import DomainRandomizationConfig
-from renderer.isometric_renderer import IsometricRenderer
+from renderer.isometric_renderer import IsometricRenderer, YOLO_CLASS_NAMES
 
 SPRITES_ROOT = (
     Path(__file__).resolve().parents[1]
@@ -66,7 +66,7 @@ class TestIsometricRenderer:
             parts = line.split()
             assert len(parts) == 5
             class_id, cx, cy, w, h = parts
-            assert 0 <= int(class_id) < 16
+            assert 0 <= int(class_id) < len(YOLO_CLASS_NAMES)
             for val in (cx, cy, w, h):
                 f = float(val)
                 assert 0.0 <= f <= 1.0
@@ -143,7 +143,79 @@ class TestIsometricRenderer:
         assert result.rendered_count == 0
         assert result.skipped_count == 1
 
-    def test_ricochet_and_super_wizard_label_as_pre_merge_classes(
+    def test_keremberke_ids_frozen_and_new_classes_appended(self) -> None:
+        assert YOLO_CLASS_NAMES[:16] == (
+            "ad",
+            "airsweeper",
+            "bombtower",
+            "canon",
+            "clancastle",
+            "eagle",
+            "inferno",
+            "kingpad",
+            "mortar",
+            "queenpad",
+            "rcpad",
+            "scattershot",
+            "th13",
+            "wardenpad",
+            "wizztower",
+            "xbow",
+        )
+        assert YOLO_CLASS_NAMES[16:] == (
+            "archertower",
+            "tesla",
+            "monolith",
+            "spelltower",
+            "ricochetcannon",
+            "multiarchertower",
+            "firespitter",
+            "multigeartower",
+            "revengetower",
+            "superwizztower",
+            "builderhut",
+        )
+
+    def test_th15_plus_defenses_get_dedicated_classes(
+        self, renderer: IsometricRenderer
+    ) -> None:
+        placements = [
+            BuildingPlacement("archertower", level=21, x=10, y=10),
+            BuildingPlacement("tesla", level=15, x=14, y=10),
+            BuildingPlacement("monolith", level=2, x=18, y=10),
+            BuildingPlacement("spelltower", level=1, x=22, y=10),
+            BuildingPlacement("ricochet_cannon", level=2, x=10, y=16),
+            BuildingPlacement("multi-archer_tower", level=2, x=14, y=16),
+            BuildingPlacement("firespitter", level=2, x=18, y=16),
+            BuildingPlacement("multi-gear_tower", level=2, x=22, y=16),
+            BuildingPlacement("revenge_tower", level=1, x=10, y=22),
+            BuildingPlacement("super_wizard_tower", level=2, x=16, y=22),
+            BuildingPlacement("builderhut", level=5, x=22, y=22),
+            BuildingPlacement("wall", level=19, x=8, y=8),
+        ]
+        result = renderer.render(placements, seed=0)
+        by_name = {label.class_name: label.class_id for label in result.labels}
+        expected = {
+            "archertower": 16,
+            "tesla": 17,
+            "monolith": 18,
+            "spelltower": 19,
+            "ricochetcannon": 20,
+            "multiarchertower": 21,
+            "firespitter": 22,
+            "multigeartower": 23,
+            "revengetower": 24,
+            "superwizztower": 25,
+            "builderhut": 26,
+        }
+        for name, class_id in expected.items():
+            assert by_name[name] == class_id, name
+        assert "canon" not in by_name
+        assert "wizztower" not in by_name
+        assert "wall" not in by_name
+        assert all(label.class_name != "wall" for label in result.labels)
+
+    def test_ricochet_and_super_wizard_use_dedicated_classes(
         self, renderer: IsometricRenderer
     ) -> None:
         placements = [
@@ -153,6 +225,6 @@ class TestIsometricRenderer:
         result = renderer.render(placements, seed=0)
         assert result.rendered_count == 2
         names = {label.class_name for label in result.labels}
-        assert names == {"canon", "wizztower"}
-        assert "ricochet_cannon" not in names
-        assert "super_wizard_tower" not in names
+        assert names == {"ricochetcannon", "superwizztower"}
+        assert "canon" not in names
+        assert "wizztower" not in names

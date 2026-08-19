@@ -47,6 +47,9 @@ def train(
     smoke_test: bool = False,
     data_yaml: Path | None = None,
     resume: str | None = None,
+    name: str | None = None,
+    epochs: int | None = None,
+    patience: int | None = None,
 ) -> dict:
     from ultralytics import YOLO
 
@@ -62,41 +65,45 @@ def train(
             "--include-pseudo-labels"
         )
 
-    epochs = train_cfg["epochs"]
+    n_epochs = epochs if epochs is not None else train_cfg["epochs"]
     batch = train_cfg["batch"]
     imgsz = train_cfg["imgsz"]
     if smoke_test:
         smoke = train_cfg.get("smoke_test", {})
-        epochs = smoke.get("epochs", 2)
+        n_epochs = smoke.get("epochs", 2)
         batch = smoke.get("batch", 4)
         imgsz = smoke.get("imgsz", imgsz)
-        logging.warning("Smoke test mode: epochs=%d batch=%d", epochs, batch)
+        logging.warning("Smoke test mode: epochs=%d batch=%d", n_epochs, batch)
 
     device = pick_device(train_cfg.get("device", "auto"))
     project = resolve_path(train_cfg["project"])
-    name = train_cfg["name"] + ("_smoke" if smoke_test else "")
+    run_name = name or train_cfg["name"]
+    if smoke_test:
+        run_name = f"{run_name}_smoke"
 
     model_source = resume or cfg["model"]["base"]
     model = YOLO(model_source)
 
     results = model.train(
         data=str(data_path),
-        epochs=epochs,
+        epochs=n_epochs,
         batch=batch,
         imgsz=imgsz,
-        patience=train_cfg.get("patience", 10),
+        patience=patience if patience is not None else train_cfg.get("patience", 10),
         device=device,
         workers=train_cfg.get("workers", 4),
         project=str(project),
-        name=name,
+        name=run_name,
         seed=train_cfg.get("seed", 42),
         exist_ok=True,
+        cache=train_cfg.get("cache", False),
+        plots=train_cfg.get("plots", True),
     )
 
     best_weights = Path(results.save_dir) / "weights" / "best.pt"
     summary = {
         "smoke_test": smoke_test,
-        "epochs": epochs,
+        "epochs": n_epochs,
         "batch": batch,
         "imgsz": imgsz,
         "device": str(device),
@@ -113,6 +120,9 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Fine-tune YOLO on CoC dataset (Ultralytics).")
     parser.add_argument("--config", type=Path, default=DEFAULT_CONFIG)
     parser.add_argument("--data", type=Path, default=None, help="Override dataset data.yaml")
+    parser.add_argument("--name", type=str, default=None, help="Override Ultralytics run name")
+    parser.add_argument("--epochs", type=int, default=None, help="Override training epochs")
+    parser.add_argument("--patience", type=int, default=None, help="Override early-stopping patience")
     parser.add_argument("--smoke-test", action="store_true", help="Run 1-3 epoch CPU-friendly smoke test")
     parser.add_argument("--resume", type=str, default=None, help="Resume from checkpoint .pt")
     parser.add_argument("-v", "--verbose", action="store_true")
@@ -126,6 +136,9 @@ def main(argv: list[str] | None = None) -> int:
             smoke_test=args.smoke_test,
             data_yaml=args.data,
             resume=args.resume,
+            name=args.name,
+            epochs=args.epochs,
+            patience=args.patience,
         )
     except FileNotFoundError as exc:
         logging.error("%s", exc)

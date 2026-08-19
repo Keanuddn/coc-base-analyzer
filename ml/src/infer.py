@@ -13,6 +13,11 @@ import yaml
 from model_utils import ML_ROOT, REPO_ROOT, model_class_names, load_keremberke_yolov5
 
 DEFAULT_CONFIG = ML_ROOT / "configs" / "train_config.yaml"
+# Ultralytics cv2 Annotator sets fontScale = line_width / 3 and ignores font_size.
+# On 2552×1356 screenshots that becomes ~68px labels that bury the village. PIL
+# lets us keep boxes thin while drawing small text independently.
+DEFAULT_OVERLAY_LINE_WIDTH = 1
+DEFAULT_OVERLAY_FONT_SIZE = 13
 
 
 def load_train_config(path: Path) -> dict:
@@ -53,7 +58,40 @@ def infer_keremberke(image_path: Path, *, conf: float, iou: float, imgsz: int) -
     }
 
 
-def infer_ultralytics(weights: Path, image_path: Path, *, conf: float, iou: float, max_det: int) -> dict:
+def save_detection_overlay(
+    result,
+    output_path: Path,
+    *,
+    line_width: int = DEFAULT_OVERLAY_LINE_WIDTH,
+    font_size: int = DEFAULT_OVERLAY_FONT_SIZE,
+) -> Path:
+    """Write a YOLO plot with small labels so dense CoC bases stay readable."""
+    output_path = Path(output_path)
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    result.plot(
+        conf=True,
+        labels=True,
+        boxes=True,
+        line_width=line_width,
+        font_size=font_size,
+        pil=True,
+        save=True,
+        filename=str(output_path),
+    )
+    return output_path
+
+
+def infer_ultralytics(
+    weights: Path,
+    image_path: Path,
+    *,
+    conf: float,
+    iou: float,
+    max_det: int,
+    overlay_path: Path | None = None,
+    overlay_line_width: int = DEFAULT_OVERLAY_LINE_WIDTH,
+    overlay_font_size: int = DEFAULT_OVERLAY_FONT_SIZE,
+) -> dict:
     from ultralytics import YOLO
 
     model = YOLO(str(weights))
@@ -83,6 +121,14 @@ def infer_ultralytics(weights: Path, image_path: Path, *, conf: float, iou: floa
                 }
             )
 
+    if overlay_path is not None and results:
+        save_detection_overlay(
+            results[0],
+            overlay_path,
+            line_width=overlay_line_width,
+            font_size=overlay_font_size,
+        )
+
     return {
         "image": str(image_path),
         "model": str(weights),
@@ -97,6 +143,7 @@ def run_inference(
     weights: Path | None = None,
     config_path: Path = DEFAULT_CONFIG,
     use_baseline: bool = False,
+    overlay_path: Path | None = None,
 ) -> dict:
     cfg = load_train_config(config_path)
     inf = cfg.get("inference", {})
@@ -104,6 +151,8 @@ def run_inference(
     iou = inf.get("iou", 0.45)
     max_det = inf.get("max_det", 1000)
     imgsz = cfg.get("training", {}).get("imgsz", 640)
+    overlay_line_width = inf.get("overlay_line_width", DEFAULT_OVERLAY_LINE_WIDTH)
+    overlay_font_size = inf.get("overlay_font_size", DEFAULT_OVERLAY_FONT_SIZE)
 
     if use_baseline or weights is None:
         resolved = find_latest_weights(REPO_ROOT / "ml" / "runs")
@@ -113,7 +162,16 @@ def run_inference(
 
     if not weights.is_file():
         raise FileNotFoundError(f"Weights not found: {weights}")
-    return infer_ultralytics(weights, image_path, conf=conf, iou=iou, max_det=max_det)
+    return infer_ultralytics(
+        weights,
+        image_path,
+        conf=conf,
+        iou=iou,
+        max_det=max_det,
+        overlay_path=overlay_path,
+        overlay_line_width=overlay_line_width,
+        overlay_font_size=overlay_font_size,
+    )
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -123,6 +181,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--baseline", action="store_true", help="Force keremberke YOLOv5 baseline")
     parser.add_argument("--config", type=Path, default=DEFAULT_CONFIG)
     parser.add_argument("-o", "--output", type=Path, default=None, help="Write JSON to file")
+    parser.add_argument("--overlay", type=Path, default=None, help="Write annotated JPEG overlay")
     args = parser.parse_args(argv)
 
     if not args.image.is_file():
@@ -135,6 +194,7 @@ def main(argv: list[str] | None = None) -> int:
             weights=args.weights,
             config_path=args.config,
             use_baseline=args.baseline,
+            overlay_path=args.overlay,
         )
     except FileNotFoundError as exc:
         print(exc, file=sys.stderr)
@@ -146,6 +206,8 @@ def main(argv: list[str] | None = None) -> int:
         print(f"Wrote {args.output}")
     else:
         print(payload)
+    if args.overlay:
+        print(f"Wrote overlay {args.overlay}")
     return 0
 
 

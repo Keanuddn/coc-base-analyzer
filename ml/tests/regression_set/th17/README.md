@@ -1,3 +1,5 @@
-# TH17 Regression Set — ausstehend
+# TH17 Regression Set
 
-**Status:** 0/2 — keine TH17-Layouts in der Nutzer-Batch (2026-08-10) visuell verifizierbar.
+**Status:** 2 Screenshots vorhanden, **0 Gold-Labels**. `th17_img_7306` und `th17_img_7307` bleiben unlabeled.
+
+`labels/_auto_draft/th17/*.txt` ist **kein** Gold.

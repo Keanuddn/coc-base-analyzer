@@ -35,6 +35,21 @@ Thumbs.db
 # Logs
 *.log
 
+# Local infer dump
+ml/out.json
+
+# Not gold — drafts, backups, rejected reviews
+ml/tests/regression_set/labels/_auto_draft/
+ml/tests/regression_set/labels_backup_*/
+ml/tests/regression_set/_rejected/
+
+# Generated eval / preview dumps (tracked: preview_bg_* and preview_th_strict_*)
+ml/notebooks/phase2_output/baseline_*
+ml/notebooks/phase2_output/ft_*
+ml/notebooks/phase2_output/example_*
+ml/notebooks/phase2_output/preview_th18era_*
+ml/notebooks/phase2_output/preview_th_capped_*
+
 # Phase 1c — downloaded CoC building sprites (Supercell IP; run download_clashking_sprites.sh)
 data-pipeline/src/renderer/sprites/clashking/
 data-pipeline/src/renderer/sprites/**/*.webp

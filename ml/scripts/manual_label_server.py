@@ -8,9 +8,11 @@ Run:
 
 from __future__ import annotations
 
+import argparse
 import io
 import logging
 import sys
+import time
 from contextlib import asynccontextmanager
 from pathlib import Path
 
@@ -23,6 +25,7 @@ ML_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ML_ROOT / "src"))
 
 from model_utils import (  # noqa: E402
+    active_class_names,
     deprecated_class_indices,
     load_keremberke_yolov5,
     model_class_names,
@@ -33,14 +36,26 @@ LABELS_DIR = REGRESSION_DIR / "labels"
 CLASSES_PATH = REGRESSION_DIR / "classes.txt"
 PORT = 8766
 MAX_DISPLAY_WIDTH = 1200
-PROPOSAL_CONF = 0.40
+PROPOSAL_CONF = 0.25
 PROPOSAL_COLOR = "#ff8800"
+V6_WEIGHTS = ML_ROOT / "runs" / "coc_yolo_v6" / "weights" / "best.pt"
+V5_WEIGHTS = ML_ROOT / "runs" / "coc_yolo_v5" / "weights" / "best.pt"
+V6_LAST = ML_ROOT / "runs" / "coc_yolo_v6" / "weights" / "last.pt"
 
 CORE_IMAGES = [
     REGRESSION_DIR / "th15" / "war_base_illyrian_god.png",
     REGRESSION_DIR / "th15" / "war_base_cocbase_wizztower_ring.png",
     REGRESSION_DIR / "th16" / "war_base_cocbase_volcanic_warmap.png",
     REGRESSION_DIR / "th16" / "war_base_cocbase_sakura_scenery.png",
+]
+
+# Five new unlabeled screenshots — do not mix with the already-labeled war bases.
+UNLABELED_QUEUE = [
+    REGRESSION_DIR / "th18" / "th18_vinsmoke_sanji.png",
+    REGRESSION_DIR / "th18" / "th18_lukas.png",
+    REGRESSION_DIR / "th18" / "th18_aggressor.png",
+    REGRESSION_DIR / "th17" / "th17_img_7307.png",
+    REGRESSION_DIR / "th17" / "th17_img_7306.png",
 ]
 
 BOX_COLORS = [
@@ -54,12 +69,37 @@ Box = tuple[int, float, float, float, float]
 
 
 def _load_class_names() -> list[str]:
+    """Dropdown: yaml active_classes (v5/v6 27+ plus TH14–18). classes.txt is the fallback."""
+    try:
+        names = active_class_names()
+        if names:
+            return names
+    except Exception as exc:  # noqa: BLE001
+        logging.warning("th_classes.yaml active_classes unavailable (%s); falling back to classes.txt", exc)
     if not CLASSES_PATH.is_file():
         raise FileNotFoundError(f"classes.txt fehlt: {CLASSES_PATH}")
     names = [line.strip() for line in CLASSES_PATH.read_text(encoding="utf-8").splitlines() if line.strip()]
     if not names:
         raise ValueError("classes.txt ist leer")
     return names
+
+
+def _v6_train_in_flight(max_age_s: float = 180.0) -> bool:
+    """True if coc_yolo_v6 last.pt was rewritten recently (train still running)."""
+    if not V6_LAST.is_file():
+        return False
+    return (time.time() - V6_LAST.stat().st_mtime) < max_age_s
+
+
+def proposal_weights_path() -> Path | None:
+    """Prefer v6 when idle; otherwise v5 so we do not fight an in-flight train."""
+    if V6_WEIGHTS.is_file() and not _v6_train_in_flight():
+        return V6_WEIGHTS
+    if V5_WEIGHTS.is_file():
+        return V5_WEIGHTS
+    if V6_WEIGHTS.is_file():
+        return V6_WEIGHTS
+    return None
 
 
 def _rel_image_path(image_path: Path) -> str:
@@ -148,27 +188,60 @@ def _box_from_display_rect(
 
 _proposal_model = None
 _proposal_model_error: str | None = None
+_proposal_backend: str | None = None
 
 
 def get_proposal_model():
-    """Load keremberke once; reuse for all proposal requests."""
-    global _proposal_model, _proposal_model_error
+    """Load fine-tuned Ultralytics weights on CPU; keremberke is the fallback."""
+    global _proposal_model, _proposal_model_error, _proposal_backend
     if _proposal_model is not None:
         return _proposal_model
     if _proposal_model_error is not None:
         raise RuntimeError(_proposal_model_error)
+    weights = proposal_weights_path()
     try:
+        if weights is not None:
+            from ultralytics import YOLO
+
+            _proposal_model = YOLO(str(weights))
+            _proposal_backend = f"ultralytics:{weights}"
+            logging.info("proposal model %s (CPU, conf=%.2f)", weights, PROPOSAL_CONF)
+            return _proposal_model
         _proposal_model = load_keremberke_yolov5(conf=PROPOSAL_CONF, iou=0.45)
+        _proposal_backend = "keremberke"
+        logging.info("proposal model keremberke (conf=%.2f)", PROPOSAL_CONF)
+        return _proposal_model
     except Exception as exc:  # noqa: BLE001 — surface load failures in the UI
         _proposal_model_error = str(exc)
         raise RuntimeError(_proposal_model_error) from exc
-    return _proposal_model
+
+
+def ultralytics_boxes(model, image_path: Path, conf: float) -> list[Box]:
+    results = model.predict(
+        source=str(image_path),
+        conf=conf,
+        iou=0.45,
+        device="cpu",
+        verbose=False,
+    )
+    lines: list[str] = []
+    for result in results:
+        boxes = result.boxes
+        if boxes is None:
+            continue
+        for box in boxes:
+            cls_id = int(box.cls.item())
+            cx, cy, bw, bh = box.xywhn[0].tolist()
+            lines.append(f"{cls_id} {cx:.6f} {cy:.6f} {bw:.6f} {bh:.6f}")
+    return yolo_lines_to_boxes(lines)
 
 
 def default_proposal_runner(image_path: Path, conf: float = PROPOSAL_CONF) -> list[Box]:
+    model = get_proposal_model()
+    if _proposal_backend and _proposal_backend.startswith("ultralytics:"):
+        return ultralytics_boxes(model, image_path, conf)
     from pseudo_label import pseudo_label_image
 
-    model = get_proposal_model()
     model.conf = conf
     lines, _, _ = pseudo_label_image(
         model,
@@ -194,7 +267,7 @@ class LabelSession:
         self.class_names = _load_class_names()
         self.images = images if images is not None else [p for p in CORE_IMAGES if p.is_file()]
         if not self.images:
-            raise FileNotFoundError("Keine Regression-Bilder in th15/ oder th16/ gefunden")
+            raise FileNotFoundError("Keine Queue-Bilder gefunden")
         self.index = 0
         self.box_cache: dict[str, list[Box]] = {}
         self.proposal_cache: dict[str, list[Box]] = {}
@@ -336,11 +409,7 @@ session = LabelSession()
 
 @asynccontextmanager
 async def lifespan(_app: FastAPI):
-    try:
-        get_proposal_model()
-        logging.info("keremberke proposal model loaded (conf=%.2f)", PROPOSAL_CONF)
-    except Exception as exc:  # noqa: BLE001
-        logging.warning("keremberke proposal model not loaded: %s", exc)
+    # Lazy-load proposals on first "Vorschläge laden" so we do not steal MPS from an in-flight train.
     yield
 
 
@@ -435,10 +504,10 @@ HTML_PAGE = """<!DOCTYPE html>
   <h1>Manuelles Labeling — Regression-Set</h1>
   <p class="intro">
     YOLO-Boxen per <strong>Mausziehen</strong> setzen. Optional
-    <strong>Vorschläge laden</strong> (keremberke, conf 0.40, ohne Hero-Pads) —
+    <strong>Vorschläge laden</strong> (fine-tuned YOLO auf CPU, conf 0.25, ohne Hero-Pads) —
     gestrichelte orange Boxen prüfen, <strong>Alle übernehmen</strong> oder
     einzelne per Klick + Entf löschen. Speichern schreibt nur bestätigte Boxen
-    nach <code>labels/th15/</code> bzw. <code>labels/th16/</code>.
+    nach <code>labels/th17/</code> bzw. <code>labels/th18/</code> (bzw. th15/th16).
   </p>
   <div class="legend" id="legend"></div>
 
@@ -872,11 +941,77 @@ def navigate(req: NavRequest) -> dict:
     return session.to_state()
 
 
+def resolve_image_queue(queue: str, extra_images: list[Path]) -> list[Path]:
+    if extra_images:
+        resolved = []
+        for path in extra_images:
+            path = path.expanduser().resolve()
+            if not path.is_file():
+                raise FileNotFoundError(f"Bild nicht gefunden: {path}")
+            resolved.append(path)
+        return resolved
+    source = UNLABELED_QUEUE if queue == "unlabeled" else CORE_IMAGES
+    found = [p for p in source if p.is_file()]
+    if not found:
+        raise FileNotFoundError(f"Keine Bilder für Queue {queue!r}")
+    return found
+
+
+def write_prefill_drafts(images: list[Path], conf: float = PROPOSAL_CONF) -> list[Path]:
+    """Write draft YOLO txts under labels/ only when no label file exists yet."""
+    written: list[Path] = []
+    pending: list[Path] = []
+    for image_path in images:
+        label_path = _label_path_for(image_path)
+        if label_path.is_file():
+            logging.info("prefill skip (exists): %s", label_path)
+            continue
+        pending.append(image_path)
+    if not pending:
+        return written
+    get_proposal_model()
+    for image_path in pending:
+        boxes = filter_proposal_boxes(default_proposal_runner(image_path, conf))
+        label_path = _label_path_for(image_path)
+        _write_yolo_boxes(label_path, boxes)
+        written.append(label_path)
+        logging.info("prefill %d boxes → %s", len(boxes), label_path)
+    return written
+
+
 def main() -> int:
     import uvicorn
 
     logging.basicConfig(level=logging.INFO, format="%(levelname)s %(message)s")
-    print(f"\nÖffne http://127.0.0.1:{PORT}\n")
+    parser = argparse.ArgumentParser(description="FastAPI canvas labeler for CoC regression screenshots.")
+    parser.add_argument(
+        "--queue",
+        choices=("core", "unlabeled"),
+        default="core",
+        help="core = 4 labeled war bases; unlabeled = 5 new TH17/TH18 screenshots",
+    )
+    parser.add_argument(
+        "images",
+        nargs="*",
+        type=Path,
+        help="Optional explicit image paths (overrides --queue)",
+    )
+    parser.add_argument(
+        "--prefill",
+        action="store_true",
+        help="Write draft YOLO labels from latest idle weights (skip files that already exist)",
+    )
+    args = parser.parse_args()
+    images = resolve_image_queue(args.queue, args.images)
+    if args.prefill:
+        write_prefill_drafts(images)
+
+    global session
+    session = LabelSession(images=images)
+    print(f"\nÖffne http://127.0.0.1:{PORT}")
+    print(f"Queue: {len(images)} Bilder — " + ", ".join(p.name for p in images))
+    print("Speichern / Speichern & Weiter schreibt nach labels/<th>/")
+    print("Tasten: Escape = Box abbrechen, Entf/Backspace = Auswahl löschen. Keine Zahlen-Shortcuts für Klassen.\n")
     uvicorn.run(app, host="127.0.0.1", port=PORT, log_level="info")
     return 0
 

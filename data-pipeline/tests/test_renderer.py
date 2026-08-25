@@ -179,12 +179,44 @@ class TestIsometricRenderer:
             "th16",
             "th17",
             "th18",
+            "goldstorage",
+            "elixirstorage",
+            "darkelixirstorage",
+            "goldmine",
+            "elixircollector",
+            "darkelixirdrill",
+            "armycamp",
+            "barracks",
+            "darkbarracks",
+            "laboratory",
+            "spellfactory",
+            "darkspellfactory",
+            "workshop",
+            "pethouse",
+            "blacksmith",
+            "herohall",
         )
         assert YOLO_CLASS_NAMES[12] == "th13"
         assert YOLO_CLASS_NAMES[26] == "builderhut"
         assert YOLO_CLASS_NAMES[27] == "th14"
         assert YOLO_CLASS_NAMES[31] == "th18"
-        assert len(YOLO_CLASS_NAMES) == 32
+        assert YOLO_CLASS_NAMES[32] == "goldstorage"
+        assert YOLO_CLASS_NAMES[33] == "elixirstorage"
+        assert YOLO_CLASS_NAMES[34] == "darkelixirstorage"
+        assert YOLO_CLASS_NAMES[35] == "goldmine"
+        assert YOLO_CLASS_NAMES[36] == "elixircollector"
+        assert YOLO_CLASS_NAMES[37] == "darkelixirdrill"
+        assert YOLO_CLASS_NAMES[38] == "armycamp"
+        assert YOLO_CLASS_NAMES[39] == "barracks"
+        assert YOLO_CLASS_NAMES[40] == "darkbarracks"
+        assert YOLO_CLASS_NAMES[41] == "laboratory"
+        assert YOLO_CLASS_NAMES[42] == "spellfactory"
+        assert YOLO_CLASS_NAMES[43] == "darkspellfactory"
+        assert YOLO_CLASS_NAMES[44] == "workshop"
+        assert YOLO_CLASS_NAMES[45] == "pethouse"
+        assert YOLO_CLASS_NAMES[46] == "blacksmith"
+        assert YOLO_CLASS_NAMES[47] == "herohall"
+        assert len(YOLO_CLASS_NAMES) == 48
 
     def test_th15_plus_defenses_get_dedicated_classes(
         self, renderer: IsometricRenderer

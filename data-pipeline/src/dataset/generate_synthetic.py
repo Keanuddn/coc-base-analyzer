@@ -119,6 +119,22 @@ SYNTHETIC_BUILDING_TYPES: tuple[str, ...] = (
     "ricochet_cannon",
     "multi-archer_tower",
     "super_wizard_tower",
+    "goldstorage",
+    "elixirstorage",
+    "darkelixirstorage",
+    "goldmine",
+    "elixircollector",
+    "darkelixirdrill",
+    "armycamp",
+    "barracks",
+    "darkbarracks",
+    "laboratory",
+    "spellfactory",
+    "darkspellfactory",
+    "workshop",
+    "pethouse",
+    "blacksmith",
+    "herohall",
 )
 
 # Placement types used after era merges (not in the logical SYNTHETIC list).
@@ -161,6 +177,24 @@ WIKI_COUNT_BY_TH: dict[str, dict[int, int]] = {
     "multi-gear_tower": {15: 0, 16: 0, 17: 1, 18: 1},
     "super_wizard_tower": {15: 0, 16: 0, 17: 0, 18: 2},
     "revenge_tower": {15: 0, 16: 0, 17: 0, 18: 1},
+    "goldstorage": {15: 4, 16: 4, 17: 4, 18: 4},
+    "elixirstorage": {15: 4, 16: 4, 17: 4, 18: 4},
+    "darkelixirstorage": {15: 1, 16: 1, 17: 1, 18: 1},
+    # Resource / army — wiki Town Hall Maximum Number of Buildings (TH15–18).
+    # Gold Mine Number Available 7 from TH9; TH18 still 7.
+    "goldmine": {15: 7, 16: 7, 17: 7, 18: 7},
+    "elixircollector": {15: 7, 16: 7, 17: 7, 18: 7},
+    "darkelixirdrill": {15: 3, 16: 3, 17: 3, 18: 3},
+    "armycamp": {15: 4, 16: 4, 17: 4, 18: 4},
+    "barracks": {15: 1, 16: 1, 17: 1, 18: 1},
+    "darkbarracks": {15: 1, 16: 1, 17: 1, 18: 1},
+    "laboratory": {15: 1, 16: 1, 17: 1, 18: 1},
+    "spellfactory": {15: 1, 16: 1, 17: 1, 18: 1},
+    "darkspellfactory": {15: 1, 16: 1, 17: 1, 18: 1},
+    "workshop": {15: 1, 16: 1, 17: 1, 18: 1},
+    "pethouse": {15: 1, 16: 1, 17: 1, 18: 1},
+    "blacksmith": {15: 1, 16: 1, 17: 1, 18: 1},
+    "herohall": {15: 1, 16: 1, 17: 1, 18: 1},
 }
 
 # Wiki: two *building* levels both require this TH (not "previous TH max").
@@ -207,6 +241,29 @@ PRIORITY_TYPES: tuple[str, ...] = (
     "ricochet_cannon",
     "multi-archer_tower",
     "super_wizard_tower",
+)
+
+# Placed after PRIORITY defenses, before collectors/army (wiki leftover).
+STORAGE_TYPES: tuple[str, ...] = (
+    "goldstorage",
+    "elixirstorage",
+    "darkelixirstorage",
+)
+
+RESOURCE_ARMY_TYPES: tuple[str, ...] = (
+    "goldmine",
+    "elixircollector",
+    "darkelixirdrill",
+    "armycamp",
+    "barracks",
+    "darkbarracks",
+    "laboratory",
+    "spellfactory",
+    "darkspellfactory",
+    "workshop",
+    "pethouse",
+    "blacksmith",
+    "herohall",
 )
 
 PREVIEW_SPECS: tuple[tuple[str, int, int], ...] = (
@@ -950,10 +1007,28 @@ def generate_random_layout(
     rest = [
         name
         for name in SYNTHETIC_BUILDING_TYPES
-        if name != "town_hall" and name not in PRIORITY_TYPES
+        if name != "town_hall"
+        and name not in PRIORITY_TYPES
+        and name not in STORAGE_TYPES
+        and name not in RESOURCE_ARMY_TYPES
     ]
     rng.shuffle(rest)
-    order = [name for name in PRIORITY_TYPES if name in SYNTHETIC_BUILDING_TYPES] + rest
+    # 5×5 camps (and 4×4 lab/workshop/pet/hero) after storages, before leftover
+    # 3×3 defenses/collectors. Resource/army copies may touch (pad=0).
+    resource_army = sorted(
+        [name for name in RESOURCE_ARMY_TYPES if name in SYNTHETIC_BUILDING_TYPES],
+        key=occupancy_tiles,
+        reverse=True,
+    )
+    large_army = [name for name in resource_army if occupancy_tiles(name) >= 4]
+    small_resource = [name for name in resource_army if occupancy_tiles(name) < 4]
+    order = (
+        [name for name in PRIORITY_TYPES if name in SYNTHETIC_BUILDING_TYPES]
+        + [name for name in STORAGE_TYPES if name in SYNTHETIC_BUILDING_TYPES]
+        + large_army
+        + rest
+        + small_resource
+    )
     for building_type in order:
         try:
             resolved = catalog.resolve_for_th(building_type, town_hall_level)
@@ -985,6 +1060,74 @@ def generate_random_layout(
                 rng,
                 sprite_w=sprite_w,
                 sprite_h=sprite_h,
+            )
+            # 5×5 camps need pad=0 immediately — leftover pad=0 after rest
+            # defenses have already filled contiguous holes.
+            if pos is None and (
+                building_type in RESOURCE_ARMY_TYPES
+                or place_type in RESOURCE_ARMY_TYPES
+            ):
+                pos = _try_place(
+                    occupied,
+                    size,
+                    rng,
+                    sprite_w=sprite_w,
+                    sprite_h=sprite_h,
+                    pad=0,
+                )
+            if pos is None:
+                continue
+            _mark(occupied, pos[0], pos[1], size)
+            placements.append(
+                BuildingPlacement(place_type, level=place_level, x=pos[0], y=pos[1])
+            )
+            placed_n += 1
+        if placed_n < count and place_type not in RESOURCE_ARMY_TYPES:
+            logging.warning(
+                "TH%s %s: placed %d/%d (occupancy)",
+                town_hall_level,
+                place_type,
+                placed_n,
+                count,
+            )
+
+    # Leftover resource/army copies: allow touching (pad=0) after pad=2/1 failed.
+    actual: dict[str, int] = {}
+    for placement in placements:
+        actual[placement.building_type] = actual.get(placement.building_type, 0) + 1
+    for building_type in resource_army:
+        try:
+            resolved = catalog.resolve_for_th(building_type, town_hall_level)
+        except KeyError:
+            continue
+        if resolved is None:
+            continue
+        place_type, level = resolved
+        count = catalog.count_for(building_type, town_hall_level)
+        have = actual.get(place_type, 0)
+        if have >= count:
+            continue
+        if catalog.uses_random_variants(building_type):
+            levels_to_place = catalog.cycled_variant_levels(
+                building_type, variant_cycle, count
+            )[have:]
+        elif catalog.mixes_sprite_levels(place_type, town_hall_level):
+            levels_to_place = catalog.mixed_levels_for_layout(
+                place_type, town_hall_level, count, rng
+            )[have:]
+        else:
+            levels_to_place = [level] * (count - have)
+        placed_n = have
+        for place_level in levels_to_place:
+            size = catalog.occupancy_size(place_type, place_level)
+            sprite_w, sprite_h = catalog.visual_sprite_size(place_type, place_level)
+            pos = _try_place(
+                occupied,
+                size,
+                rng,
+                sprite_w=sprite_w,
+                sprite_h=sprite_h,
+                pad=0,
             )
             if pos is None:
                 continue

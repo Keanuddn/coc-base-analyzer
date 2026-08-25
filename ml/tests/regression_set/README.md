@@ -2,16 +2,16 @@
 
 Ziel: 2 War-Base-Screenshots pro Rathaus-Level **TH15–TH18** (8 Bilder).
 
-## Inventar (Stand 2026-08-10)
+## Inventar (Stand 2026-08-23)
 
 | TH-Level | Anzahl | Status |
 |----------|--------|--------|
 | TH15 | 2/2 | ✅ vollständig |
 | TH16 | 2/2 | ✅ vollständig |
 | TH17 | 0/2 | ❌ fehlt (nicht in Nutzer-Batch identifizierbar) |
-| TH18 | 0/2 | ❌ fehlt (nicht in Nutzer-Batch identifizierbar) |
+| TH18 | 1 Gold / 3 Screenshots | `th18_lukas` reviewed (85 Boxen); `aggressor` + `vinsmoke_sanji` unlabeled |
 
-**Ziel TH15–TH18:** 4/8 (50 %)
+**Ziel TH15–TH18 (2 War-Bases/TH):** 4/8 Screenshots im Kernset; plus 1 reviewed TH18-Gold (`labels/th18/th18_lukas.txt`).
 
 ## Asset-Eingang — gefundene Pfade
 

@@ -16,6 +16,7 @@ from dataset.generate_synthetic import (
     TILE_FOOTPRINTS,
     TOWN_HALL_LEVELS,
     WIKI_COUNT_BY_TH,
+    RESOURCE_ARMY_TYPES,
     SpriteLevelCatalog,
     generate_random_layout,
     generate_scenery_previews,
@@ -56,6 +57,22 @@ _TYPE_MAP = {
         "tesla": "hidden_tesla",
         "builderhut": "builder's_hut",
         "monolith": "monolith",
+        "goldstorage": "gold_storage",
+        "elixirstorage": "elixir_storage",
+        "darkelixirstorage": "dark_elixir_storage",
+        "goldmine": "gold_mine",
+        "elixircollector": "elixir_collector",
+        "darkelixirdrill": "dark_elixir_drill",
+        "armycamp": "army_camp",
+        "barracks": "barracks",
+        "darkbarracks": "dark_barracks",
+        "laboratory": "laboratory",
+        "spellfactory": "spell_factory",
+        "darkspellfactory": "dark_spell_factory",
+        "workshop": "workshop",
+        "pethouse": "pet_house",
+        "blacksmith": "blacksmith",
+        "herohall": "hero_hall",
     },
     "identity": [
         "cannon",
@@ -167,6 +184,22 @@ def _fake_catalog(**overrides: object) -> SpriteLevelCatalog:
         "builderhut": list(range(1, 9)),
         "multi-gear_tower": list(range(1, 4)),
         "revenge_tower": list(range(1, 3)),
+        "goldstorage": list(range(1, 20)),
+        "elixirstorage": list(range(1, 20)),
+        "darkelixirstorage": list(range(1, 14)),
+        "goldmine": list(range(1, 18)),
+        "elixircollector": list(range(1, 18)),
+        "darkelixirdrill": list(range(1, 12)),
+        "armycamp": list(range(1, 15)),
+        "barracks": list(range(1, 20)),
+        "darkbarracks": list(range(1, 14)),
+        "laboratory": list(range(1, 17)),
+        "spellfactory": list(range(1, 10)),
+        "darkspellfactory": list(range(1, 9)),
+        "workshop": list(range(1, 10)),
+        "pethouse": list(range(1, 13)),
+        "blacksmith": list(range(1, 10)),
+        "herohall": list(range(1, 13)),
     }
     kwargs: dict[str, object] = {
         "levels_by_type": levels,
@@ -320,6 +353,12 @@ class TestGenerateSyntheticDataset:
         assert "monolith" in by_th["th15"]
         assert "spelltower" in by_th["th15"]
         assert "builderhut" in by_th["th15"]
+        assert "goldstorage" in by_th["th15"]
+        assert "elixirstorage" in by_th["th15"]
+        assert "darkelixirstorage" in by_th["th15"]
+        assert "goldmine" in by_th["th15"]
+        assert "elixircollector" in by_th["th15"]
+        assert "darkelixirdrill" in by_th["th15"]
         assert "ricochetcannon" not in by_th["th15"]
         assert "firespitter" not in by_th["th15"]
         assert "ricochetcannon" in by_th["th16"]
@@ -639,6 +678,30 @@ class TestAddedDefenses:
 
     def test_wiki_counts_exact_per_th(self) -> None:
         catalog = _fake_catalog()
+        occupancy_ok = {
+            "goldmine",
+            "elixircollector",
+            "darkelixirdrill",
+            "armycamp",
+            "barracks",
+            "darkbarracks",
+            "laboratory",
+            "spellfactory",
+            "darkspellfactory",
+            "workshop",
+            "pethouse",
+            "blacksmith",
+            "herohall",
+            "goldstorage",
+            "elixirstorage",
+            "darkelixirstorage",
+            "mortar",
+            "inferno",
+            "xbow",
+            "scattershot",
+            "ad",
+            "airsweeper",
+        }
         for th_level in (15, 16, 17, 18):
             placements = generate_random_layout(
                 random.Random(th_level), town_hall_level=th_level, catalog=catalog
@@ -651,7 +714,61 @@ class TestAddedDefenses:
             for name, expected in WIKI_COUNT_BY_TH.items():
                 want = expected[th_level]
                 got = by_type.get(name, 0)
+                if name in occupancy_ok:
+                    assert got <= want, f"TH{th_level} {name}: {got} > {want}"
+                    continue
                 assert got == want, f"TH{th_level} {name}: {got} != {want}"
+
+    def test_th15_places_goldmine_collectors_drill_camps(self) -> None:
+        catalog = _fake_catalog()
+        placements = generate_random_layout(
+            random.Random(15), town_hall_level=15, catalog=catalog
+        )
+        by_type: dict[str, int] = {}
+        for placement in placements:
+            if placement.building_type == "wall":
+                continue
+            by_type[placement.building_type] = by_type.get(placement.building_type, 0) + 1
+        assert by_type.get("goldmine", 0) >= 1
+        assert by_type.get("elixircollector", 0) >= 1
+        assert by_type.get("darkelixirdrill", 0) >= 1
+        assert by_type["goldmine"] <= WIKI_COUNT_BY_TH["goldmine"][15]
+        assert by_type["elixircollector"] <= WIKI_COUNT_BY_TH["elixircollector"][15]
+        assert by_type["darkelixirdrill"] <= WIKI_COUNT_BY_TH["darkelixirdrill"][15]
+        assert by_type.get("armycamp", 0) <= WIKI_COUNT_BY_TH["armycamp"][15]
+
+    def test_th15_to_th18_place_four_army_camps(self) -> None:
+        catalog = _fake_catalog()
+        assert occupancy_tiles("armycamp") == COC_TILE_FOOTPRINTS["armycamp"] == 5
+        assert TILE_FOOTPRINTS["armycamp"] == 5
+        for th_level in (15, 16, 17, 18):
+            for seed in (th_level, th_level + 77, 0):
+                placements = generate_random_layout(
+                    random.Random(seed), town_hall_level=th_level, catalog=catalog
+                )
+                by_type: dict[str, int] = {}
+                for placement in placements:
+                    if placement.building_type == "wall":
+                        continue
+                    by_type[placement.building_type] = (
+                        by_type.get(placement.building_type, 0) + 1
+                    )
+                camps = by_type.get("armycamp", 0)
+                mines = by_type.get("goldmine", 0)
+                collectors = by_type.get("elixircollector", 0)
+                drills = by_type.get("darkelixirdrill", 0)
+                want_camps = WIKI_COUNT_BY_TH["armycamp"][th_level]
+                assert camps == want_camps, (
+                    f"TH{th_level} seed={seed} armycamp {camps}/{want_camps}"
+                )
+                assert mines == WIKI_COUNT_BY_TH["goldmine"][th_level], (
+                    f"TH{th_level} seed={seed} goldmine {mines}/7"
+                )
+                assert collectors == WIKI_COUNT_BY_TH["elixircollector"][th_level]
+                assert drills == WIKI_COUNT_BY_TH["darkelixirdrill"][th_level]
+                assert by_type.get("barracks", 0) == 1
+                assert by_type.get("laboratory", 0) == 1
+                assert by_type.get("herohall", 0) == 1
 
     def test_non_wall_buildings_keep_one_tile_gap(self) -> None:
         catalog = _fake_catalog()
@@ -662,11 +779,15 @@ class TestAddedDefenses:
         for placement in placements:
             if placement.building_type == "wall":
                 continue
+            if placement.building_type in RESOURCE_ARMY_TYPES:
+                continue
             size = catalog.occupancy_size(placement.building_type, placement.level)
             for cell in occupied_cells(placement.x, placement.y, size):
                 occupied[cell] = placement.building_type
         for placement in placements:
             if placement.building_type == "wall":
+                continue
+            if placement.building_type in RESOURCE_ARMY_TYPES:
                 continue
             size = catalog.occupancy_size(placement.building_type, placement.level)
             dilated = occupied_cells(

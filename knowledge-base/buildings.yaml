@@ -1,0 +1,379 @@
+# Home Village building combat roles for detected YOLO classes.
+# Policy: targeting / range only from cited pages. No HP/DPS tables —
+# House of Clashers upgrade tables often stop at TH16 and can be stale.
+# Counts and unlocks live in data-pipeline/.../th_unlocks.yaml (wiki).
+#
+# Access date: 2026-08-20
+
+access_date: 2026-08-20
+policy: sourced-targeting-only
+count_source: data-pipeline/src/renderer/sprites/th_unlocks.yaml
+
+buildings:
+  ad:
+    wiki_name: Air Defense
+    category: defense
+    targets: [air]
+    damage_type: single
+    range_tiles: 10
+    notes: Cannot target ground.
+    sources:
+      - url: https://clashofclans.fandom.com/wiki/Air_Defense/Home_Village
+        accessed: 2026-08-20
+        summary: Range 10, single target, air only.
+
+  airsweeper:
+    wiki_name: Air Sweeper
+    category: defense
+    targets: [air]
+    damage_type: knockback
+    range_tiles_min: 1
+    range_tiles_max: 15
+    notes: No damage. 120° facing. Pushes air troops. 1-tile dead zone.
+    sources:
+      - url: https://houseofclashers.com/home-village/defenses/air-sweeper
+        accessed: 2026-08-20
+        summary: Air only, no damage, range 1–15 on a 120° blast, 1-tile dead zone.
+
+  bombtower:
+    wiki_name: Bomb Tower
+    category: defense
+    targets: [ground]
+    damage_type: splash
+    range_tiles: 6
+    notes: Death bomb is ground-only splash.
+    sources:
+      - url: https://houseofclashers.com/home-village/defenses/bomb-tower
+        accessed: 2026-08-20
+        summary: Splash on ground troops, range 6, death bomb ground-only.
+
+  canon:
+    wiki_name: Cannon
+    category: defense
+    targets: [ground]
+    damage_type: single
+    notes: Cannot shoot air. Geared burst mode exists; merge to Ricochet at TH16.
+    sources:
+      - url: https://clashofclans.fandom.com/wiki/Cannon/Home_Village
+        accessed: 2026-08-20
+        summary: Ground only; cannot shoot air units.
+
+  clancastle:
+    wiki_name: Clan Castle
+    category: army
+    targets: []
+    notes: Housing / defending CC troops, not a turret. Combat comes from garrisoned troops (not modeled here).
+    sources:
+      - url: https://clashofclans.fandom.com/wiki/Defensive_Buildings/Home_Village
+        accessed: 2026-08-20
+        summary: Listed under resource/army buildings, not as a turret.
+
+  eagle:
+    wiki_name: Eagle Artillery
+    category: defense
+    targets: [ground, air]
+    damage_type: splash
+    range_tiles_min: 7
+    range_tiles_max: 50
+    notes: Standalone only through TH16; merged into Inferno Artillery at TH17. 7-tile blind spot. Activates after housing space is deployed.
+    sources:
+      - url: https://www.clasher.us/clash-of-clans/unit/Eagle_Artillery
+        accessed: 2026-08-20
+        summary: Unit type targeted Ground & Air; range 7–50.
+      - url: https://houseofclashers.com/home-village/defenses/eagle-artillery
+        accessed: 2026-08-20
+        summary: Range 50 tiles, 7-tile blind spot; stats table lists air and ground targets.
+
+  inferno:
+    wiki_name: Inferno Tower
+    category: defense
+    targets: [ground, air]
+    damage_type: mode_dependent
+    notes: Single-target beam (range 9, ramping) or multi (range 10, 5 targets). Mode is visual, not in YOLO.
+    sources:
+      - url: https://www.clash.ninja/guides/the-inferno-tower
+        accessed: 2026-08-20
+        summary: Targets air and ground. Single 9 tiles ramping; multi 10 tiles, 5 targets.
+
+  mortar:
+    wiki_name: Mortar
+    category: defense
+    targets: [ground]
+    damage_type: splash
+    range_tiles_min: 4
+    range_tiles_max: 11
+    notes: Dead zone 4 tiles. Ground only.
+    sources:
+      - url: https://houseofclashers.com/home-village/defenses/mortar
+        accessed: 2026-08-20
+        summary: Ground splash only, range 4–11, 4-tile dead zone.
+
+  scattershot:
+    wiki_name: Scattershot
+    category: defense
+    targets: [ground, air]
+    damage_type: splash_cone
+    notes: Each shot damages ground or air, not both at once. Has a blind spot.
+    sources:
+      - url: https://cocmap.com/coc/unit/buildings/scattershot-home-village
+        accessed: 2026-08-20
+        summary: Unit Type Targeted Ground & Air; cone splash; cannot hit too-close units.
+
+  th13:
+    wiki_name: Town Hall (legacy YOLO name)
+    category: town_hall
+    targets: unknown
+    notes: Class 12 kept for keremberke labels. TH14–18 are separate classes. Hall weapon is part of the sprite.
+    sources:
+      - url: https://clashofclans.fandom.com/wiki/Town_Hall
+        accessed: 2026-08-17
+        summary: One Town Hall; Giga Inferno / Inferno Artillery / Guardians are hall weapons.
+
+  wizztower:
+    wiki_name: Wizard Tower
+    category: defense
+    targets: [ground, air]
+    damage_type: splash
+    range_tiles: 7
+    notes: No dead zone.
+    sources:
+      - url: https://houseofclashers.com/home-village/defenses/wizard-tower
+        accessed: 2026-08-20
+        summary: Splash, ground and air, radius 7, no dead zone.
+
+  xbow:
+    wiki_name: X-Bow
+    category: defense
+    targets: mode_dependent
+    damage_type: single
+    notes: Ground-only mode range 14; ground+air mode range 11. Mode is visual, not in YOLO.
+    sources:
+      - url: https://houseofclashers.com/home-village/defenses/x-bow
+        accessed: 2026-08-20
+        summary: Ground only (14 tiles) or ground and air (11 tiles).
+
+  archertower:
+    wiki_name: Archer Tower
+    category: defense
+    targets: [ground, air]
+    damage_type: single
+    range_tiles: 10
+    notes: Geared Fast Attack shortens range to 8.
+    sources:
+      - url: https://clashofclans.fandom.com/wiki/Archer_Tower/Home_Village
+        accessed: 2026-08-20
+        summary: Ground & air, range 10 (8 in Fast Attack).
+
+  tesla:
+    wiki_name: Hidden Tesla
+    category: defense
+    targets: [ground, air]
+    damage_type: single
+    range_tiles: 7
+    notes: Hidden until a troop is within 6-tile activation range or 51% destruction.
+    sources:
+      - url: https://houseofclashers.com/home-village/defenses/hidden-tesla
+        accessed: 2026-08-20
+        summary: Targets air and ground; attack range 7 tiles; activation range 6 tiles.
+
+  monolith:
+    wiki_name: Monolith
+    category: defense
+    targets: [ground, air]
+    damage_type: single
+    range_tiles: 11
+    notes: Unlock TH15. Extra damage scales with target strength (not tabulated here).
+    sources:
+      - url: https://houseofclashers.com/home-village/defenses/monolith
+        accessed: 2026-08-20
+        summary: Single target, ground and air, range 11 tiles.
+
+  spelltower:
+    wiki_name: Spell Tower
+    category: defense
+    targets: [ground, air]
+    damage_type: spell
+    range_tiles: 8
+    notes: Support turret, not conventional DPS. Casts Rage (lv1), Poison (lv2), Invisibility (lv3). Not a projectile turret.
+    sources:
+      - url: https://houseofclashers.com/home-village/defenses/spell-tower
+        accessed: 2026-08-20
+        summary: Targets ground and air by releasing a Spell; range 8 tiles; Rage / Poison / Invisibility by level.
+
+  ricochetcannon:
+    wiki_name: Ricochet Cannon
+    category: defense
+    targets: [ground]
+    damage_type: single
+    range_tiles: 9
+    notes: Merge of two Cannons at TH16. Shot can bounce to a second ground target. Cannot target air (SuperCell).
+    sources:
+      - url: https://supercell.com/en/games/clashofclans/blog/release-notes/full-patch-notes-th16/
+        accessed: 2026-08-20
+        summary: Range 9 tiles; damage type Single target; Targets Ground.
+      - url: https://houseofclashers.com/home-village/defenses/ricochet-cannon
+        accessed: 2026-08-20
+        summary: Range 9 tiles; targets a single ground unit then ricochets to a second.
+
+  multiarchertower:
+    wiki_name: Multi-Archer Tower
+    category: defense
+    targets: [ground, air]
+    damage_type: multiple
+    range_tiles: 10
+    notes: Merge of two Archer Towers at TH16. Up to 3 targets; extra arrows focus if fewer than 3.
+    sources:
+      - url: https://supercell.com/en/games/clashofclans/blog/release-notes/full-patch-notes-th16/
+        accessed: 2026-08-20
+        summary: Range 10 tiles; 3 targets; Targets Ground & Air.
+      - url: https://houseofclashers.com/home-village/defenses/multi-archer-tower
+        accessed: 2026-08-20
+        summary: Ground and air; range 10 tiles; up to three enemies.
+
+  firespitter:
+    wiki_name: Firespitter
+    category: defense
+    targets: [ground, air]
+    damage_type: piercing_cone
+    range_tiles: 16
+    notes: TH17. Aimed cone like Air Sweeper. SuperCell — projectiles may hit ground and air regardless of primary target. Tile range from cocmap, not SuperCell.
+    sources:
+      - url: https://supercell.com/en/games/clashofclans/blog/game-updates/the-town-hall-17-update-is-here-2/
+        accessed: 2026-08-20
+        summary: Aimed cone; projectiles may hit both ground and air Troops.
+      - url: https://cocmap.com/coc/unit/buildings/firespitter-home-village
+        accessed: 2026-08-20
+        summary: Unit Type Targeted Ground & Air; range 16 tiles; piercing bursts.
+
+  multigeartower:
+    wiki_name: Multi-Gear Tower
+    category: defense
+    targets: [ground, air]
+    damage_type: single
+    notes: TH17 merge of geared Cannon + Archer Tower. Long Range or Fast Attack (mode visual, not in YOLO). Tile range not stated on SuperCell notes.
+    sources:
+      - url: https://supercell.com/en/games/clashofclans/blog/news/get-geared-up-for-the-latest-update--3/
+        accessed: 2026-08-20
+        summary: Targets ground and air units; Long Range and Fast Attack modes; single units.
+      - url: https://www.clasher.us/clash-of-clans/unit/multi-gear-tower-home-village
+        accessed: 2026-08-20
+        summary: unit type_targeted Ground & Air; Fast Attack can target ground and air.
+
+  revengetower:
+    wiki_name: Revenge Tower
+    category: defense
+    targets: [ground, air]
+    damage_type: stage_dependent
+    notes: Unlock TH18. SuperCell — power/HP rise at 5/20/40 buildings destroyed. Tile range not stated on SuperCell notes.
+    sources:
+      - url: https://www.clasher.us/clash-of-clans/unit/revenge-tower-home-village
+        accessed: 2026-08-20
+        summary: unit type_targeted Ground & Air; stage 1 fires at ground and air; later stages ricochet.
+      - url: https://supercell.com/en/games/clashofclans/blog/release-notes/town-hall-18-crash-lands-update/
+        accessed: 2026-08-20
+        summary: Stronger at 5 / 20 / 40 buildings destroyed (no targeting line).
+
+  superwizztower:
+    wiki_name: Super Wizard Tower
+    category: defense
+    targets: [ground, air]
+    damage_type: chain
+    range_tiles: 8
+    notes: TH18 merge of two Wizard Towers. SuperCell — chain up to 15 nearby enemies. Targeting/range from clasher.us.
+    sources:
+      - url: https://www.clasher.us/clash-of-clans/unit/super-wizard-tower-home-village
+        accessed: 2026-08-20
+        summary: unit type_targeted Ground & Air; lightning from up to 8 tiles; chain up to 15 others.
+      - url: https://supercell.com/en/games/clashofclans/blog/release-notes/town-hall-18-crash-lands-update/
+        accessed: 2026-08-20
+        summary: Merge two Wizard Towers; chain up to 15 nearby enemies (no targeting line).
+
+  builderhut:
+    wiki_name: Builder's Hut
+    category: defense
+    targets: [ground, air]
+    damage_type: single
+    range_tiles: 6
+    notes: Weaponized from TH14 (hut level 2+). Level 1 has no turret. Builder repairs nearby defenses (HOC repair radius 4 tiles).
+    sources:
+      - url: https://supercell.com/en/games/clashofclans/blog/release-notes/full-patch-notes-th14-update/
+        accessed: 2026-08-20
+        summary: Weaponized turret range 6 tiles; single target; Targets Ground & Air.
+      - url: https://houseofclashers.com/home-village/defenses/battle-builder
+        accessed: 2026-08-20
+        summary: Mini X-Bow style; ground and air; attack range 6; repair up to 4 tiles.
+
+  th14:
+    wiki_name: Town Hall 14
+    category: town_hall
+    targets: [ground, air]
+    damage_type: multiple
+    notes: Giga Inferno is on the sprite, not a separate YOLO class. HOC stats list air and ground targets.
+    sources:
+      - url: https://houseofclashers.com/home-village/defenses/giga-inferno-town-hall-14
+        accessed: 2026-08-20
+        summary: Stats table Air Targets 1 and Ground Targets 1.
+      - url: https://www.clasher.us/clash-of-clans/unit/giga-inferno-th14-home-village
+        accessed: 2026-08-20
+        summary: unit type_targeted Ground & Air (TH14 Giga Inferno).
+
+  th15:
+    wiki_name: Town Hall 15
+    category: town_hall
+    targets: [ground, air]
+    damage_type: multiple
+    notes: Giga Inferno is on the sprite, not a separate YOLO class.
+    sources:
+      - url: https://houseofclashers.com/home-village/defenses/giga-inferno-town-hall-15
+        accessed: 2026-08-20
+        summary: Stats table Air Targets 1 and Ground Targets 1.
+
+  th16:
+    wiki_name: Town Hall 16
+    category: town_hall
+    targets: [ground, air]
+    damage_type: multiple
+    notes: Giga Inferno is on the sprite, not a separate YOLO class.
+    sources:
+      - url: https://supercell.com/en/games/clashofclans/blog/release-notes/full-patch-notes-th16/
+        accessed: 2026-08-20
+        summary: TH16 Giga Inferno Damage Type Multiple Targets; Targets Ground & Air.
+
+  th17:
+    wiki_name: Town Hall 17
+    category: town_hall
+    targets: [ground, air]
+    damage_type: multiple
+    notes: Inferno Artillery is on the sprite (Eagle merged). Always active. SuperCell states DoT hits ground and flying troops; projectile target list not named separately.
+    sources:
+      - url: https://supercell.com/en/games/clashofclans/blog/game-updates/the-town-hall-17-update-is-here-2/
+        accessed: 2026-08-20
+        summary: Four projectiles; area effect damages all ground and flying Troops.
+
+  th18:
+    wiki_name: Town Hall 18
+    category: town_hall
+    targets: [ground, air]
+    damage_type: splash
+    notes: No hall turret. Guardians (Smasher / Longshot) are the TH18 defense; one at a time. Weapon is not a separate YOLO class.
+    sources:
+      - url: https://supercell.com/en/games/clashofclans/blog/release-notes/town-hall-18-crash-lands-update/
+        accessed: 2026-08-20
+        summary: Smasher and Longshot both target ground & air enemies with splash damage.
+
+  goldstorage: { wiki_name: Gold Storage, category: resource, targets: [] }
+  elixirstorage: { wiki_name: Elixir Storage, category: resource, targets: [] }
+  darkelixirstorage: { wiki_name: Dark Elixir Storage, category: resource, targets: [] }
+  goldmine: { wiki_name: Gold Mine, category: resource, targets: [] }
+  elixircollector: { wiki_name: Elixir Collector, category: resource, targets: [] }
+  darkelixirdrill: { wiki_name: Dark Elixir Drill, category: resource, targets: [] }
+  armycamp: { wiki_name: Army Camp, category: army, targets: [] }
+  barracks: { wiki_name: Barracks, category: army, targets: [] }
+  darkbarracks: { wiki_name: Dark Barracks, category: army, targets: [] }
+  laboratory: { wiki_name: Laboratory, category: army, targets: [] }
+  spellfactory: { wiki_name: Spell Factory, category: army, targets: [] }
+  darkspellfactory: { wiki_name: Dark Spell Factory, category: army, targets: [] }
+  workshop: { wiki_name: Workshop, category: army, targets: [] }
+  pethouse: { wiki_name: Pet House, category: army, targets: [] }
+  blacksmith: { wiki_name: Blacksmith, category: army, targets: [] }
+  herohall: { wiki_name: Hero Hall, category: army, targets: [] }

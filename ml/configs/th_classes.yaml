@@ -38,6 +38,22 @@ model_classes:
   - th16
   - th17
   - th18
+  - goldstorage
+  - elixirstorage
+  - darkelixirstorage
+  - goldmine
+  - elixircollector
+  - darkelixirdrill
+  - armycamp
+  - barracks
+  - darkbarracks
+  - laboratory
+  - spellfactory
+  - darkspellfactory
+  - workshop
+  - pethouse
+  - blacksmith
+  - herohall
 
 # Classes still useful for detection on current TH15+ bases.
 # Hero pads stay in the head (unused) so real 16-class labels keep their IDs.
@@ -70,6 +86,22 @@ active_classes:
   - th16
   - th17
   - th18
+  - goldstorage
+  - elixirstorage
+  - darkelixirstorage
+  - goldmine
+  - elixircollector
+  - darkelixirdrill
+  - armycamp
+  - barracks
+  - darkbarracks
+  - laboratory
+  - spellfactory
+  - darkspellfactory
+  - workshop
+  - pethouse
+  - blacksmith
+  - herohall
 
 # Hero altar pads — removed from CoC; baseline model mislabels TH15/16 screenshots.
 deprecated_classes:
@@ -87,14 +119,22 @@ deprecated_notes: |
   IDs 7/9/10/13 stay reserved so the 4 user-labeled reals are not remapped.
 
 # Class 12 stays th13 so old real labels keep working. TH14–TH18 halls
-# are appended after builderhut (IDs 27–31).
+# are appended after builderhut (IDs 27–31). Storages are IDs 32–34.
+# Resource/army buildings are IDs 35–47.
 placeholders: []
 
 notes: |
   Indices 0–15 match keremberke/yolov5m-clash-of-clans. Do not shuffle them.
   Class 12 remains th13. Town Halls TH14–TH18 are classes 27–31.
-  Appended defenses (16–26) are trained from synthetic labels. Real GT for those
-  buildings is incomplete until screenshots are relabeled. Walls are never labeled.
+  Gold/Elixir/Dark Elixir storages are classes 32–34 so unlabeled storages
+  are less often forced into mortar/xbow. Resource/army buildings are
+  classes 35–47 (mines, collectors, drill, camps, barracks, lab, factories,
+  workshop, pet house, blacksmith, hero hall). Appended defenses (16–26) are
+  trained from synthetic labels. Walls are never labeled.
   ClashKing sprite folders: archer_tower, hidden_tesla, monolith, spell_tower,
   ricochet_cannon, multi-archer_tower, firespitter, multi-gear_tower,
-  revenge_tower, super_wizard_tower, builder's_hut.
+  revenge_tower, super_wizard_tower, builder's_hut, gold_storage,
+  elixir_storage, dark_elixir_storage, gold_mine, elixir_collector,
+  dark_elixir_drill, army_camp, barracks, dark_barracks, laboratory,
+  spell_factory, dark_spell_factory, workshop, pet_house, blacksmith,
+  hero_hall.

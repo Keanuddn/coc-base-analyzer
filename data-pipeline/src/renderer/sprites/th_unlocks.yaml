@@ -330,14 +330,222 @@ buildings:
       - url: https://supercell.com/en/games/clashofclans/blog/release-notes/town-hall-18-crash-lands-update/
         summary: Official — Revenge Tower unlocks at Town Hall 18.
 
+  goldstorage:
+    min_th: 1
+    max_th: 18
+    count_by_th: {15: 4, 16: 4, 17: 4, 18: 4}
+    max_level_by_th: {15: 16, 16: 17, 17: 18, 18: 19}
+    sources:
+      - url: https://clashofclans.fandom.com/wiki/Town_Hall
+        accessed: 2026-08-19
+        summary: "Maximum Number of Buildings: Gold & Elixir Storage 4 from TH9 through TH18."
+      - url: https://clashofclans.fandom.com/wiki/Gold_Storage/Home_Village
+        accessed: 2026-08-19
+        summary: Gold Storage Number Available 4 at high TH. Max level 16/17/18/19 at TH15–18.
+
+  elixirstorage:
+    min_th: 1
+    max_th: 18
+    count_by_th: {15: 4, 16: 4, 17: 4, 18: 4}
+    max_level_by_th: {15: 16, 16: 17, 17: 18, 18: 19}
+    sources:
+      - url: https://clashofclans.fandom.com/wiki/Town_Hall
+        accessed: 2026-08-19
+        summary: Elixir Storage shares the Gold Storage count column (4 at TH9–18).
+      - url: https://clashofclans.fandom.com/wiki/Elixir_Storage/Home_Village
+        accessed: 2026-08-19
+        summary: Same count as Gold Storage. Max level 16/17/18/19 at TH15–18.
+
+  darkelixirstorage:
+    min_th: 7
+    max_th: 18
+    count_by_th: {15: 1, 16: 1, 17: 1, 18: 1}
+    max_level_by_th: {15: 11, 16: 12, 17: 13, 18: 13}
+    sources:
+      - url: https://clashofclans.fandom.com/wiki/Town_Hall
+        accessed: 2026-08-19
+        summary: Dark Elixir Storage 1 from TH7 through TH18.
+      - url: https://clashofclans.fandom.com/wiki/Dark_Elixir_Storage
+        accessed: 2026-08-19
+        summary: One DE storage. Wiki TH18 max level 14; ClashKing only has level_13.webp so TH18 uses 13.
+
+  goldmine:
+    min_th: 9
+    max_th: 18
+    count_by_th: {15: 7, 16: 7, 17: 7, 18: 7}
+    max_level_by_th: {15: 16, 16: 17, 17: 17, 18: 17}
+    sources:
+      - url: https://clashofclans.fandom.com/wiki/Town_Hall
+        accessed: 2026-08-19
+        summary: "Maximum Number of Buildings: Gold Mine 7 from TH9 through TH17; TH18 still 7."
+      - url: https://clashofclans.fandom.com/wiki/Gold_Mine
+        accessed: 2026-08-19
+        summary: Number Available 7 from TH9. Wiki/Ninja max level 16/17/17/17 at TH15–18.
+
+  elixircollector:
+    min_th: 9
+    max_th: 18
+    count_by_th: {15: 7, 16: 7, 17: 7, 18: 7}
+    max_level_by_th: {15: 16, 16: 17, 17: 17, 18: 17}
+    sources:
+      - url: https://clashofclans.fandom.com/wiki/Town_Hall
+        accessed: 2026-08-19
+        summary: Elixir Collector shares the Gold Mine count column (7 at TH9–18).
+      - url: https://www.clash.ninja/guides/max-levels-for-each-th
+        accessed: 2026-08-19
+        summary: Same max-level curve as Gold Mine, 16/17/17/17 at TH15–18.
+
+  darkelixirdrill:
+    min_th: 8
+    max_th: 18
+    count_by_th: {15: 3, 16: 3, 17: 3, 18: 3}
+    max_level_by_th: {15: 10, 16: 11, 17: 11, 18: 11}
+    sources:
+      - url: https://clashofclans.fandom.com/wiki/Town_Hall
+        accessed: 2026-08-19
+        summary: Dark Elixir Drill 3 from TH8 through TH18.
+      - url: https://www.clash.ninja/guides/max-levels-for-each-th
+        accessed: 2026-08-19
+        summary: Drill max level 10/11/11/11 at TH15–18.
+
+  armycamp:
+    min_th: 7
+    max_th: 18
+    count_by_th: {15: 4, 16: 4, 17: 4, 18: 4}
+    max_level_by_th: {15: 12, 16: 12, 17: 13, 18: 14}
+    sources:
+      - url: https://clashofclans.fandom.com/wiki/Town_Hall
+        accessed: 2026-08-19
+        summary: Army Camp 4 from TH7 through TH18.
+      - url: https://www.clash.ninja/guides/max-levels-for-each-th
+        accessed: 2026-08-19
+        summary: Army Camp max 12/12/13/14 at TH15–18.
+
+  barracks:
+    min_th: 1
+    max_th: 18
+    count_by_th: {15: 1, 16: 1, 17: 1, 18: 1}
+    max_level_by_th: {15: 17, 16: 18, 17: 19, 18: 19}
+    sources:
+      - url: https://clashofclans.fandom.com/wiki/Town_Hall
+        accessed: 2026-08-19
+        summary: Barracks 1 at TH15–18.
+      - url: https://www.clash.ninja/guides/max-levels-for-each-th
+        accessed: 2026-08-19
+        summary: Barracks max 17/18/19/19 at TH15–18.
+
+  darkbarracks:
+    min_th: 1
+    max_th: 18
+    count_by_th: {15: 1, 16: 1, 17: 1, 18: 1}
+    max_level_by_th: {15: 12, 16: 13, 17: 13, 18: 13}
+    sources:
+      - url: https://clashofclans.fandom.com/wiki/Town_Hall
+        accessed: 2026-08-19
+        summary: Dark Barracks 1 at TH15–18.
+      - url: https://www.clash.ninja/guides/max-levels-for-each-th
+        accessed: 2026-08-19
+        summary: Dark Barracks max 12/13/13/13 at TH15–18.
+
+  laboratory:
+    min_th: 1
+    max_th: 18
+    count_by_th: {15: 1, 16: 1, 17: 1, 18: 1}
+    max_level_by_th: {15: 13, 16: 14, 17: 15, 18: 16}
+    sources:
+      - url: https://clashofclans.fandom.com/wiki/Town_Hall
+        accessed: 2026-08-19
+        summary: Laboratory 1 at TH15–18.
+      - url: https://www.clash.ninja/guides/max-levels-for-each-th
+        accessed: 2026-08-19
+        summary: Laboratory max 13/14/15/16 at TH15–18.
+
+  spellfactory:
+    min_th: 1
+    max_th: 18
+    count_by_th: {15: 1, 16: 1, 17: 1, 18: 1}
+    max_level_by_th: {15: 8, 16: 9, 17: 9, 18: 9}
+    sources:
+      - url: https://clashofclans.fandom.com/wiki/Town_Hall
+        accessed: 2026-08-19
+        summary: Spell Factory 1 at TH15–18.
+      - url: https://www.clash.ninja/guides/max-levels-for-each-th
+        accessed: 2026-08-19
+        summary: Spell Factory max 8/9/9/9 at TH15–18.
+
+  darkspellfactory:
+    min_th: 1
+    max_th: 18
+    count_by_th: {15: 1, 16: 1, 17: 1, 18: 1}
+    max_level_by_th: {15: 8, 16: 8, 17: 8, 18: 8}
+    sources:
+      - url: https://clashofclans.fandom.com/wiki/Town_Hall
+        accessed: 2026-08-19
+        summary: Dark Spell Factory 1 at TH15–18.
+      - url: https://www.clash.ninja/guides/max-levels-for-each-th
+        accessed: 2026-08-19
+        summary: Dark Spell Factory max 8 at TH15–18.
+
+  workshop:
+    min_th: 12
+    max_th: 18
+    count_by_th: {15: 1, 16: 1, 17: 1, 18: 1}
+    max_level_by_th: {15: 8, 16: 9, 17: 9, 18: 9}
+    sources:
+      - url: https://clashofclans.fandom.com/wiki/Town_Hall
+        accessed: 2026-08-19
+        summary: Workshop 1 at TH15–18. Unlocks at TH12.
+      - url: https://www.clash.ninja/guides/max-levels-for-each-th
+        accessed: 2026-08-19
+        summary: Workshop max ~8/9/9/9 at TH15–18.
+
+  pethouse:
+    min_th: 14
+    max_th: 18
+    count_by_th: {15: 1, 16: 1, 17: 1, 18: 1}
+    max_level_by_th: {15: 8, 16: 10, 17: 11, 18: 12}
+    sources:
+      - url: https://clashofclans.fandom.com/wiki/Town_Hall
+        accessed: 2026-08-19
+        summary: Pet House 1 at TH15–18. Unlocks at TH14.
+      - url: https://www.clash.ninja/guides/max-levels-for-each-th
+        accessed: 2026-08-19
+        summary: Pet House max 8/10/11/12 at TH15–18.
+
+  blacksmith:
+    min_th: 1
+    max_th: 18
+    count_by_th: {15: 1, 16: 1, 17: 1, 18: 1}
+    max_level_by_th: {15: 8, 16: 9, 17: 9, 18: 9}
+    sources:
+      - url: https://clashofclans.fandom.com/wiki/Town_Hall
+        accessed: 2026-08-19
+        summary: Blacksmith 1 at TH15–18.
+      - url: https://www.clash.ninja/guides/max-levels-for-each-th
+        accessed: 2026-08-19
+        summary: "Blacksmith wiki 8/9/10/10 at TH15–18; ClashKing only to level_9.webp so TH17–18 use 9."
+
+  herohall:
+    min_th: 15
+    max_th: 18
+    count_by_th: {15: 1, 16: 1, 17: 1, 18: 1}
+    max_level_by_th: {15: 9, 16: 10, 17: 11, 18: 12}
+    sources:
+      - url: https://clashofclans.fandom.com/wiki/Town_Hall
+        accessed: 2026-08-19
+        summary: Hero Hall 1 at TH15–18.
+      - url: https://www.clash.ninja/guides/max-levels-for-each-th
+        accessed: 2026-08-19
+        summary: Hero Hall max 9/10/11/12 at TH15–18.
+
 # Omitted on purpose (see SOURCES.md)
 todo_omit:
   - name: crafted_defenses
     reason: No ClashKing folders for Roaster / Air Bombs / Lava Launcher / Light Beam / Hero Bell / Bomb Hive.
   - name: hero_altars
     reason: SuperCell TH17 removed altars; no altar sprites; user asked not to label pads.
-  - name: resource_and_army
-    reason: Pet House, Barracks, collectors — not defenses.
+  - name: traps_decorations_helper_hut
+    reason: Traps, decorations, and Helper Hut (no ClashKing folder) stay omitted. Collectors and army buildings are now labeled.
   - name: inferno_artillery_guardians
     reason: Part of the Town Hall sprite, not a separate building.
   - name: crafting_station

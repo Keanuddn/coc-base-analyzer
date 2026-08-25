@@ -78,3 +78,19 @@ sprite_max_observed:
   multi-gear_tower: 3  # source: https://assets.clashk.ing/buildings/home-village/multi-gear_tower/level_3.webp
   revenge_tower: 2  # source: https://assets.clashk.ing/buildings/home-village/revenge_tower/level_2.webp
   "builder's_hut": 8  # source: https://assets.clashk.ing/buildings/home-village/builder's_hut/level_8.webp
+  gold_storage: 19  # source: https://assets.clashk.ing/buildings/home-village/gold_storage/level_19.webp
+  elixir_storage: 19  # source: https://assets.clashk.ing/buildings/home-village/elixir_storage/level_19.webp
+  dark_elixir_storage: 13  # source: https://assets.clashk.ing/buildings/home-village/dark_elixir_storage/level_13.webp
+  gold_mine: 17  # source: https://assets.clashk.ing/buildings/home-village/gold_mine/level_17.webp
+  elixir_collector: 17  # source: https://assets.clashk.ing/buildings/home-village/elixir_collector/level_17.webp
+  dark_elixir_drill: 11  # source: https://assets.clashk.ing/buildings/home-village/dark_elixir_drill/level_11.webp
+  army_camp: 14  # source: https://assets.clashk.ing/buildings/home-village/army_camp/level_14.webp
+  barracks: 19  # source: https://assets.clashk.ing/buildings/home-village/barracks/level_19.webp
+  dark_barracks: 13  # source: https://assets.clashk.ing/buildings/home-village/dark_barracks/level_13.webp
+  laboratory: 16  # source: https://assets.clashk.ing/buildings/home-village/laboratory/level_16.webp
+  spell_factory: 9  # source: https://assets.clashk.ing/buildings/home-village/spell_factory/level_9.webp
+  dark_spell_factory: 8  # source: https://assets.clashk.ing/buildings/home-village/dark_spell_factory/level_8.webp
+  workshop: 9  # source: https://assets.clashk.ing/buildings/home-village/workshop/level_9.webp
+  pet_house: 12  # source: https://assets.clashk.ing/buildings/home-village/pet_house/level_12.webp
+  blacksmith: 9  # source: https://assets.clashk.ing/buildings/home-village/blacksmith/level_9.webp
+  hero_hall: 12  # source: https://assets.clashk.ing/buildings/home-village/hero_hall/level_12.webp

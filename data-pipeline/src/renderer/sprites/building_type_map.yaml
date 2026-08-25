@@ -24,6 +24,22 @@ aliases:
   firespitter: firespitter
   tesla: hidden_tesla
   builderhut: "builder's_hut"
+  goldstorage: gold_storage
+  elixirstorage: elixir_storage
+  darkelixirstorage: dark_elixir_storage
+  goldmine: gold_mine
+  elixircollector: elixir_collector
+  darkelixirdrill: dark_elixir_drill
+  armycamp: army_camp
+  barracks: barracks
+  darkbarracks: dark_barracks
+  laboratory: laboratory
+  spellfactory: spell_factory
+  darkspellfactory: dark_spell_factory
+  workshop: workshop
+  pethouse: pet_house
+  blacksmith: blacksmith
+  herohall: hero_hall
 
 # Placement slugs that do not match the compact YOLO name (keremberke style:
 # no underscores). Indices 0–15 stay frozen; these names are IDs 16+.

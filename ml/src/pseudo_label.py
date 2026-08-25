@@ -24,11 +24,12 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 import yaml
-from PIL import Image
+from PIL import Image, ImageDraw, ImageFont
 
 from model_utils import (
     ML_ROOT,
     REPO_ROOT,
+    deprecated_class_indices,
     deprecated_class_names,
     filter_deprecated_yolo_lines,
     model_class_names,
@@ -41,6 +42,16 @@ DEFAULT_LABELS_DIR = DEFAULT_REGRESSION_DIR / "labels"
 DEFAULT_CONFIG = ML_ROOT / "configs" / "train_config.yaml"
 DEFAULT_CONF = 0.35
 IMAGE_SUFFIXES = {".png", ".jpg", ".jpeg", ".webp"}
+HALL_NAMES = {"th13", "th14", "th15", "th16", "th17", "th18"}
+V6_WEIGHTS = ML_ROOT / "runs" / "coc_yolo_v6" / "weights" / "best.pt"
+V5_WEIGHTS = ML_ROOT / "runs" / "coc_yolo_v5" / "weights" / "best.pt"
+NEW_TH17_TH18_QUEUE = [
+    DEFAULT_REGRESSION_DIR / "th18" / "th18_vinsmoke_sanji.png",
+    DEFAULT_REGRESSION_DIR / "th18" / "th18_lukas.png",
+    DEFAULT_REGRESSION_DIR / "th18" / "th18_aggressor.png",
+    DEFAULT_REGRESSION_DIR / "th17" / "th17_img_7307.png",
+    DEFAULT_REGRESSION_DIR / "th17" / "th17_img_7306.png",
+]
 
 
 def load_train_config(path: Path) -> dict:
@@ -62,6 +73,90 @@ def relative_to_regression(image_path: Path, regression_dir: Path) -> Path:
     return image_path.relative_to(regression_dir)
 
 
+def declared_th_from_path(image_path: Path) -> str | None:
+    folder = image_path.parent.name.lower()
+    return folder if folder in HALL_NAMES else None
+
+
+def _xyxy_to_yolo_line(
+    cls_id: int,
+    x1: float,
+    y1: float,
+    x2: float,
+    y2: float,
+    width: int,
+    height: int,
+) -> str:
+    cx = min(max(((x1 + x2) / 2) / width, 0.0), 1.0)
+    cy = min(max(((y1 + y2) / 2) / height, 0.0), 1.0)
+    w = min(max((x2 - x1) / width, 0.0), 1.0)
+    h = min(max((y2 - y1) / height, 0.0), 1.0)
+    return f"{cls_id} {cx:.6f} {cy:.6f} {w:.6f} {h:.6f}"
+
+
+def remap_hall_and_filter_lines(
+    detections: list[tuple[int, float, float, float, float, float]],
+    names: list[str],
+    width: int,
+    height: int,
+    *,
+    declared_th: str | None,
+    include_deprecated: bool,
+) -> list[str]:
+    """Keep one hall box remapped to the folder TH; drop pads; drop eagle on TH17/18."""
+    deprecated = set() if include_deprecated else deprecated_class_indices()
+    name_to_id = {name: idx for idx, name in enumerate(names)}
+    hall_ids = {name_to_id[n] for n in HALL_NAMES if n in name_to_id}
+    target_hall = name_to_id.get(declared_th) if declared_th else None
+    eagle_id = name_to_id.get("eagle")
+    drop_eagle = declared_th in {"th17", "th18"} and eagle_id is not None
+
+    kept: list[tuple[int, float, float, float, float]] = []
+    halls: list[tuple[int, float, float, float, float, float]] = []
+    for cls_id, x1, y1, x2, y2, conf in detections:
+        if cls_id in deprecated:
+            continue
+        if drop_eagle and cls_id == eagle_id:
+            continue
+        if cls_id in hall_ids:
+            halls.append((cls_id, x1, y1, x2, y2, conf))
+            continue
+        kept.append((cls_id, x1, y1, x2, y2))
+
+    if halls:
+        _, x1, y1, x2, y2, _conf = max(halls, key=lambda row: row[5])
+        cls_id = target_hall if target_hall is not None else halls[0][0]
+        kept.append((cls_id, x1, y1, x2, y2))
+
+    return [_xyxy_to_yolo_line(cls_id, x1, y1, x2, y2, width, height) for cls_id, x1, y1, x2, y2 in kept]
+
+
+def save_yolo_overlay(image_path: Path, lines: list[str], names: list[str], overlay_path: Path) -> None:
+    """Draw the saved (remapped) labels, not the raw detector overlay."""
+    overlay_path.parent.mkdir(parents=True, exist_ok=True)
+    with Image.open(image_path) as src:
+        img = src.convert("RGB")
+    draw = ImageDraw.Draw(img)
+    width, height = img.size
+    try:
+        font = ImageFont.truetype("/System/Library/Fonts/Helvetica.ttc", 13)
+    except OSError:
+        font = ImageFont.load_default()
+    for line in lines:
+        parts = line.split()
+        cls_id = int(parts[0])
+        cx, cy, w, h = map(float, parts[1:5])
+        x1 = (cx - w / 2) * width
+        y1 = (cy - h / 2) * height
+        x2 = (cx + w / 2) * width
+        y2 = (cy + h / 2) * height
+        color = "#22d3ee"
+        draw.rectangle([x1, y1, x2, y2], outline=color, width=1)
+        name = names[cls_id] if 0 <= cls_id < len(names) else str(cls_id)
+        draw.text((x1 + 2, max(y1 - 14, 0)), name, fill=color, font=font)
+    img.save(overlay_path, quality=90)
+
+
 def pseudo_label_image(
     model,
     image_path: Path,
@@ -77,6 +172,114 @@ def pseudo_label_image(
     raw_lines = yolov5_predictions_to_yolo_lines(predictions, class_names, width, height)
     lines, removed = filter_deprecated_yolo_lines(raw_lines, include_deprecated=include_deprecated)
     return lines, len(raw_lines), removed
+
+
+def write_finetune_labels(
+    images: list[Path],
+    labels_dir: Path,
+    *,
+    weights: Path,
+    conf: float,
+    iou: float,
+    include_deprecated: bool,
+    overlay_dir: Path | None,
+) -> dict:
+    """Pseudo-label with a fine-tuned Ultralytics checkpoint; remap hall from folder name."""
+    from ultralytics import YOLO
+
+    names = model_class_names()
+    model = YOLO(str(weights))
+    summary: dict = {"model": str(weights), "conf": conf, "images": []}
+
+    for image_path in images:
+        with Image.open(image_path) as img:
+            width, height = img.size
+        results = model.predict(
+            source=str(image_path),
+            conf=conf,
+            iou=iou,
+            max_det=1000,
+            verbose=False,
+        )
+        detections: list[tuple[int, float, float, float, float, float]] = []
+        for result in results:
+            boxes = result.boxes
+            if boxes is None:
+                continue
+            for box in boxes:
+                x1, y1, x2, y2 = box.xyxy[0].tolist()
+                detections.append(
+                    (
+                        int(box.cls.item()),
+                        float(x1),
+                        float(y1),
+                        float(x2),
+                        float(y2),
+                        float(box.conf.item()),
+                    )
+                )
+        declared = declared_th_from_path(image_path)
+        hall_ids = {idx for idx, name in enumerate(names) if name in HALL_NAMES}
+        if declared and not any(det[0] in hall_ids for det in detections):
+            hall_results = model.predict(
+                source=str(image_path),
+                conf=min(conf, 0.08),
+                iou=iou,
+                max_det=1000,
+                verbose=False,
+            )
+            for result in hall_results:
+                boxes = result.boxes
+                if boxes is None:
+                    continue
+                for box in boxes:
+                    cls_id = int(box.cls.item())
+                    if cls_id not in hall_ids:
+                        continue
+                    x1, y1, x2, y2 = box.xyxy[0].tolist()
+                    detections.append(
+                        (cls_id, float(x1), float(y1), float(x2), float(y2), float(box.conf.item()))
+                    )
+        lines = remap_hall_and_filter_lines(
+            detections,
+            names,
+            width,
+            height,
+            declared_th=declared,
+            include_deprecated=include_deprecated,
+        )
+        rel = relative_to_regression(image_path, DEFAULT_REGRESSION_DIR)
+        label_path = labels_dir / rel.with_suffix(".txt")
+        label_path.parent.mkdir(parents=True, exist_ok=True)
+        label_path.write_text("\n".join(lines) + ("\n" if lines else ""), encoding="utf-8")
+
+        overlay_path = None
+        if overlay_dir is not None:
+            overlay_path = overlay_dir / f"{image_path.stem}.jpg"
+            save_yolo_overlay(image_path, lines, names, overlay_path)
+
+        counts: dict[str, int] = {}
+        for line in lines:
+            name = names[int(line.split()[0])]
+            counts[name] = counts.get(name, 0) + 1
+        entry = {
+            "image": str(rel),
+            "label_file": str(label_path.relative_to(DEFAULT_REGRESSION_DIR)),
+            "declared_th": declared,
+            "boxes": len(lines),
+            "counts": counts,
+            "overlay": str(overlay_path) if overlay_path else None,
+        }
+        summary["images"].append(entry)
+        logging.info(
+            "%s → %d boxes declared=%s hall_saved=%s",
+            rel,
+            len(lines),
+            declared,
+            [n for n in counts if n in HALL_NAMES],
+        )
+
+    return summary
 
 
 def write_pseudo_labels(
@@ -165,7 +368,7 @@ def write_pseudo_labels(
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
-        description="Pseudo-label regression screenshots with keremberke YOLOv5."
+        description="Pseudo-label regression screenshots (keremberke YOLOv5 or a fine-tune)."
     )
     parser.add_argument(
         "--regression-dir",
@@ -191,6 +394,23 @@ def main(argv: list[str] | None = None) -> int:
     )
     parser.add_argument("--dry-run", action="store_true")
     parser.add_argument("-v", "--verbose", action="store_true")
+    parser.add_argument(
+        "--queue-new-th",
+        action="store_true",
+        help="Only the five new TH17/TH18 screenshots; use fine-tune weights and remap hall class from folder",
+    )
+    parser.add_argument(
+        "--weights",
+        type=Path,
+        default=None,
+        help="Fine-tuned Ultralytics .pt (default with --queue-new-th: v6 then v5)",
+    )
+    parser.add_argument(
+        "--overlay-dir",
+        type=Path,
+        default=None,
+        help="Write small-font detection overlays (default with --queue-new-th: ml/runs/auto_label/overlays)",
+    )
     args = parser.parse_args(argv)
 
     logging.basicConfig(level=logging.DEBUG if args.verbose else logging.INFO, format="%(levelname)s %(message)s")
@@ -201,6 +421,30 @@ def main(argv: list[str] | None = None) -> int:
     iou = args.iou if args.iou is not None else pl_cfg.get("iou", 0.45)
     imgsz = args.imgsz if args.imgsz is not None else pl_cfg.get("imgsz", 640)
     labels_dir = args.labels_dir or (args.regression_dir / "labels")
+
+    if args.queue_new_th:
+        weights = args.weights
+        if weights is None:
+            weights = V6_WEIGHTS if V6_WEIGHTS.is_file() else V5_WEIGHTS
+        overlay_dir = args.overlay_dir or (ML_ROOT / "runs" / "auto_label" / "overlays")
+        overlay_dir.mkdir(parents=True, exist_ok=True)
+        if args.conf is None:
+            conf = 0.25
+        print(
+            "\n⚠️  Auto-labels from the fine-tune. Hall class is taken from the folder "
+            "(th17/th18), not the detector. Spot-check overlays before training.\n"
+        )
+        summary = write_finetune_labels(
+            [p for p in NEW_TH17_TH18_QUEUE if p.is_file()],
+            labels_dir,
+            weights=weights,
+            conf=conf,
+            iou=iou,
+            include_deprecated=args.include_deprecated,
+            overlay_dir=overlay_dir,
+        )
+        print(json.dumps(summary, indent=2, ensure_ascii=False))
+        return 0
 
     filter_note = ""
     if not args.include_deprecated:

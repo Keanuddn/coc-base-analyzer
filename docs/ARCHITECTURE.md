@@ -163,8 +163,8 @@ Phase 0-Infrastruktur ist vollständig eingerichtet (Notebook, Smoke-Test-Skript
 | `ml/tests/regression_set/th15/` | 2 TH15 War Bases ✅ |
 | `ml/tests/regression_set/_extras/` | Reserve-Layouts (Progress Base + CocBase-Extras) |
 | `ml/tests/regression_set/th16/` | 2 TH16 War Bases ✅ |
-| `ml/tests/regression_set/th17/` | 0/2 — README mit fehlenden Slots |
-| `ml/tests/regression_set/th18/` | 0/2 — README mit fehlenden Slots |
+| `ml/tests/regression_set/th17/` | 2 Screenshots, 0 Gold |
+| `ml/tests/regression_set/th18/` | 3 Screenshots, 1 reviewed Gold (`th18_lukas`, 85 Boxen) |
 
 ### Regression-Set-Inventar (TH15–TH18, Stand 2026-08-10)
 
@@ -175,8 +175,8 @@ Nutzer-Ziel: je 2 Screenshots pro Rathaus-Level 15–18 (8 Bilder gesamt).
 | TH13 | 2/2 | `war_base_001.png`, `war_base_002.png` | TH13 (blue/ice theme) — Bonus-Baseline | ✅ |
 | TH15 | 2/2 | `war_base_001.png` (in-game), `war_base_002.png` (CocBase) | TH15 purple/gold Magic-Theme | ✅ |
 | TH16 | 2/2 | `war_base_001.png`, `war_base_002.png` | TH16 red/gold theme | ✅ |
-| TH17 | 0/2 | — | — | ❌ fehlt |
-| TH18 | 0/2 | — | — | ❌ fehlt |
+| TH17 | 2 Screenshots | `th17_img_7306.png`, `th17_img_7307.png` | unlabeled | ❌ kein Gold |
+| TH18 | 3 Screenshots / 1 Gold | `th18_lukas.png` (+ aggressor, vinsmoke unlabeled) | reviewed, 85 Boxen | ✅ |
 
 **Asset-Eingang 2026-08-10:** 8 Nutzer-Screenshots aus Cursor workspaceStorage importiert. 3× TH15, 2× TH16, 3× TH13 (falsch gelabelt). TH17/TH18 nicht enthalten.
 

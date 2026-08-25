@@ -164,7 +164,10 @@ class TestWriteDataYaml:
         assert payload["names"][29] == "th16"
         assert payload["names"][30] == "th17"
         assert payload["names"][31] == "th18"
-        assert payload["nc"] == 32
+        assert payload["names"][32] == "goldstorage"
+        assert payload["names"][35] == "goldmine"
+        assert payload["names"][47] == "herohall"
+        assert payload["nc"] == 48
 
 
 class TestManualLabels:

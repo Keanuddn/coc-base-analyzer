@@ -1,0 +1,26 @@
+# Hard-negative / confusion crops from th18_lukas.png (visual review 2026-08-21).
+# Background = no YOLO-class building in the crop (empty label).
+# Relabel = false class on a real building; write the correct class, not empty.
+# Do not add full-screenshot crops: unlabeled real buildings become negatives.
+
+source_image: ../th18/th18_lukas.png
+size: 96
+
+background:
+  - {id: ui_water_00, xyxy: [0, 0, 96, 96], reason: "HUD + water, top-left"}
+  - {id: ui_water_01, xyxy: [0, 48, 96, 144], reason: "HUD column"}
+  - {id: ui_water_02, xyxy: [0, 96, 96, 192], reason: "left water / ship rail"}
+  - {id: ui_water_03, xyxy: [0, 144, 96, 240], reason: "left ship rail"}
+  - {id: ui_water_04, xyxy: [0, 192, 96, 288], reason: "left ship hull"}
+  - {id: ui_water_05, xyxy: [0, 240, 96, 336], reason: "left ship hull"}
+  - {id: ui_water_06, xyxy: [0, 288, 96, 384], reason: "lower-left ship"}
+  - {id: ui_water_07, xyxy: [0, 336, 96, 432], reason: "lower-left ship + UI"}
+  - {id: water_br, xyxy: [912, 336, 1008, 432], reason: "map-edge water / foam"}
+  - {id: ui_name, xyxy: [48, 0, 144, 96], reason: "player HUD (Lukas)"}
+
+relabel:
+  - id: hut_as_sweeper
+    xyxy: [602, 385, 646, 420]
+    pad: 24
+    class: airsweeper
+    reason: "builderhut conf 0.27 on air sweeper"

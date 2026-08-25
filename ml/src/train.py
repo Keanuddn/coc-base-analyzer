@@ -98,6 +98,9 @@ def train(
         exist_ok=True,
         cache=train_cfg.get("cache", False),
         plots=train_cfg.get("plots", True),
+        save=True,
+        save_period=1,  # epochN.pt so a dropped connection can continue from last finished epoch
+        resume=False,  # --resume CLI loads weights as start; never Ultralytics resume=True
     )
 
     best_weights = Path(results.save_dir) / "weights" / "best.pt"

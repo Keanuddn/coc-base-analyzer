@@ -322,11 +322,15 @@ def collect_real_samples(config: BuildDatasetConfig) -> list[DatasetSample]:
             if image_path.suffix.lower() not in IMAGE_SUFFIXES:
                 continue
             if any(
-                part in {"_rejected", "_pseudo_backup"} or part.startswith("labels_backup")
+                part in {"_rejected", "_pseudo_backup", "_auto_draft"}
+                or part.startswith("labels_backup")
                 for part in image_path.parts
             ):
                 continue
             if "labels" in image_path.parts and image_path.parent.name == "labels":
+                continue
+            is_hard_negative = "hard_negatives" in image_path.parts
+            if is_hard_negative and not image_path.with_suffix(".txt").is_file():
                 continue
             if approved_paths is not None:
                 try:
@@ -343,6 +347,8 @@ def collect_real_samples(config: BuildDatasetConfig) -> list[DatasetSample]:
                 pseudo_labels_dir=config.regression_dir / "labels",
             )
             has_labels = label_path is not None
+            if is_hard_negative:
+                notes.append("hard_negative")
             if has_labels:
                 try:
                     rel_key = str(image_path.relative_to(config.regression_dir))
@@ -398,7 +404,11 @@ def assign_splits(
         raise ValueError("Use either --holdout-real-val or --real-val-holdout, not both")
 
     if real_val_holdout > 0:
-        labeled_real = [s for s in samples if s.has_labels and s.origin == "real"]
+        labeled_real = [
+            s
+            for s in samples
+            if s.has_labels and s.origin == "real" and "hard_negative" not in s.notes
+        ]
         if len(labeled_real) <= real_val_holdout:
             raise ValueError(
                 f"--real-val-holdout {real_val_holdout} requires more labeled reals than the "
@@ -415,7 +425,9 @@ def assign_splits(
                     sample.notes.append("included_unlabeled_for_inference_only")
                 continue
             if sample.origin == "real":
-                if id(sample) in val_ids:
+                if "hard_negative" in sample.notes:
+                    sample.split = "train"
+                elif id(sample) in val_ids:
                     sample.split = "val"
                     if "real_val_holdout" not in sample.notes:
                         sample.notes.append("real_val_holdout")
@@ -558,6 +570,9 @@ def oversample_labeled_real_train(
     expanded: list[DatasetSample] = []
     for sample in samples:
         if sample.origin == "real" and sample.has_labels and sample.split == "train":
+            if "hard_negative" in sample.notes:
+                expanded.append(sample)
+                continue
             for copy_idx in range(factor):
                 expanded.append(
                     DatasetSample(
@@ -864,6 +879,9 @@ def build_yolo_dataset(config: BuildDatasetConfig) -> BuildDatasetResult:
         real_val_holdout=config.real_val_holdout,
         synthetic_val_holdout=config.synthetic_val_holdout,
     )
+    for sample in samples:
+        if "hard_negative" in sample.notes:
+            sample.split = "train"
     samples = oversample_labeled_real_train(samples, config.oversample_real_train)
     samples = oversample_th17_th18_train(samples, config.oversample_th17_th18)
 

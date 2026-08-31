@@ -27,6 +27,14 @@ public struct PlannedSet: Equatable, Sendable, Identifiable {
     public var isWarmup: Bool { kind == .warmup }
     public var isSupersetFirst: Bool { supersetMember == 0 }
 
+    /// Anteil der Arbeitslast für die Empfehlung. `nil` bei Arbeitssätzen.
+    /// Explizites `0` (leere Stange) bleibt von einem fehlenden Wert getrennt.
+    public var resolvedWarmupLoadFraction: Double? {
+        guard isWarmup else { return nil }
+        if let loadFraction { return loadFraction }
+        return SetPrescription.inferredWarmupLoadFraction(from: intensityNote) ?? 0.5
+    }
+
     /// Läuft nach diesem Satz ein Pausen-Timer? Bei Warm-ups und bei der ersten
     /// Übung eines Supersets nicht.
     public var enforcesRest: Bool { pause.enforcesRest }

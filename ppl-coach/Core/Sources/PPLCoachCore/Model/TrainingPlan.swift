@@ -68,6 +68,60 @@ public struct SetPrescription: Equatable, Sendable, Codable {
             loadFraction: loadFraction
         )
     }
+
+    /// Schätzt den Lastanteil aus der Intensitätsnotiz, wenn im Plan kein
+    /// `loadFraction` steht (ältere gespeicherte Fassungen).
+    ///
+    /// "leer" / "locker" → 0. "~75–80 %" → 0,75. Unbekannt bleibt `nil`.
+    public static func inferredWarmupLoadFraction(from note: String?) -> Double? {
+        guard let note, !note.isEmpty else { return nil }
+        let folded = note.folding(
+            options: [.diacriticInsensitive, .caseInsensitive],
+            locale: Locale(identifier: "de_DE")
+        )
+        if folded.contains("leer") || folded.contains("locker") {
+            return 0
+        }
+        if folded.contains("75") {
+            return 0.75
+        }
+        if folded.contains("50-60") || folded.contains("50–60") {
+            return 0.55
+        }
+        if folded.contains("50") {
+            return 0.5
+        }
+        return nil
+    }
+
+    func withLoadFraction(_ fraction: Double?) -> SetPrescription {
+        SetPrescription(
+            kind: kind,
+            reps: reps,
+            pause: pause,
+            intensityNote: intensityNote,
+            isOptional: isOptional,
+            loadFraction: fraction
+        )
+    }
+
+    /// Übernimmt fehlende Warm-up-Anteile aus der kanonischen Vorgabe. Gesetzte
+    /// Werte — auch explizites `0` — bleiben unverändert.
+    static func mergingWarmupFractions(
+        _ sets: [SetPrescription],
+        canonical: [SetPrescription]
+    ) -> [SetPrescription] {
+        sets.enumerated().map { index, local in
+            guard local.kind == .warmup, local.loadFraction == nil else {
+                return local
+            }
+            let fromCanonical = index < canonical.count ? canonical[index].loadFraction : nil
+            let fraction = fromCanonical
+                ?? inferredWarmupLoadFraction(from: local.intensityNote)
+                ?? 0.5
+            return local.withLoadFraction(fraction)
+        }
+    }
 }
 
 /// Ein Abschnitt des Trainingstages: eine einzelne Übung oder ein Superset aus
@@ -101,6 +155,37 @@ public enum Block: Equatable, Sendable, Codable, Identifiable {
     public var isSuperset: Bool {
         if case .superset = self { return true }
         return false
+    }
+
+    fileprivate func fillingMissingWarmupLoadFractions(from canonical: Block?) -> Block {
+        switch self {
+        case let .single(id, exerciseID, sets):
+            let canonicalSets: [SetPrescription]
+            if case let .single(_, _, matched) = canonical {
+                canonicalSets = matched
+            } else {
+                canonicalSets = []
+            }
+            return .single(
+                id: id,
+                exerciseID: exerciseID,
+                sets: SetPrescription.mergingWarmupFractions(sets, canonical: canonicalSets)
+            )
+        case let .superset(id, firstID, firstSets, secondID, secondSets):
+            var canonicalFirst: [SetPrescription] = []
+            var canonicalSecond: [SetPrescription] = []
+            if case let .superset(_, _, first, _, second) = canonical {
+                canonicalFirst = first
+                canonicalSecond = second
+            }
+            return .superset(
+                id: id,
+                firstExerciseID: firstID,
+                firstSets: SetPrescription.mergingWarmupFractions(firstSets, canonical: canonicalFirst),
+                secondExerciseID: secondID,
+                secondSets: SetPrescription.mergingWarmupFractions(secondSets, canonical: canonicalSecond)
+            )
+        }
     }
 }
 
@@ -171,5 +256,31 @@ public struct PlanVersion: Equatable, Sendable, Codable, Identifiable {
 
     public func template(for day: TrainingDay) -> DayTemplate? {
         days.first { $0.day == day }
+    }
+
+    /// Füllt fehlende Warm-up-`loadFraction`-Werte aus dem kanonischen Plan.
+    ///
+    /// Gespeicherte Fassungen von vor dem Feld bleiben damit nutzbar, ohne
+    /// Gewichtsschritte oder Satzzahlen zu überschreiben. Explizites `0`
+    /// (leere Stange) wird nicht zu `nil` und nicht zu 0,5.
+    public func fillingMissingWarmupLoadFractions(
+        from canonical: PlanVersion = DefaultPlan.version()
+    ) -> PlanVersion {
+        let canonicalByDay = Dictionary(uniqueKeysWithValues: canonical.days.map { ($0.day, $0) })
+        let filledDays = days.map { day -> DayTemplate in
+            let canonicalBlocks = Dictionary(
+                uniqueKeysWithValues: (canonicalByDay[day.day]?.blocks ?? []).map { ($0.id, $0) }
+            )
+            let filledBlocks = day.blocks.map { block in
+                block.fillingMissingWarmupLoadFractions(from: canonicalBlocks[block.id])
+            }
+            return DayTemplate(day: day.day, blocks: filledBlocks)
+        }
+        return PlanVersion(
+            id: id,
+            createdAt: createdAt,
+            exercises: exercises,
+            days: filledDays
+        )
     }
 }

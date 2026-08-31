@@ -359,4 +359,42 @@ final class LoadRecommenderTests: XCTestCase {
         XCTAssertNil(result.repsGoal, "keine Kilogramm-Empfehlung aus 0 kg erfinden")
         XCTAssertEqual(result.reason, "Warm-up ohne Last")
     }
+
+    /// 10/8/9/9 bei 77,5 kg: halten. Warm-up 1 (leer) muss 0 kg sein, nicht 77,5.
+    func testEmptyWarmupOfHeldSeventySevenFiveIsZero() {
+        let history = [session(exerciseID: incline.id, reps: [10, 8, 9, 9], weight: 77.5)]
+        let empty = recommender.recommend(
+            exercise: incline,
+            target: target,
+            history: history,
+            warmupLoadFraction: 0
+        )
+        XCTAssertEqual(empty.weight, 0)
+        XCTAssertEqual(empty.displayText, "Empfehlung 0 kg")
+        XCTAssertEqual(empty.direction, .hold)
+
+        let half = recommender.recommend(
+            exercise: incline,
+            target: target,
+            history: history,
+            warmupLoadFraction: 0.5
+        )
+        XCTAssertEqual(half.weight, 37.5)
+
+        let threeQuarter = recommender.recommend(
+            exercise: incline,
+            target: target,
+            history: history,
+            warmupLoadFraction: 0.75
+        )
+        XCTAssertEqual(threeQuarter.weight, 57.5)
+
+        let work = recommender.recommend(
+            exercise: incline,
+            target: target,
+            history: history
+        )
+        XCTAssertEqual(work.weight, 77.5)
+        XCTAssertEqual(work.reason, "letztes Mal nicht alle Sätze am oberen Rand")
+    }
 }

@@ -209,6 +209,91 @@ final class SessionRuntimeTests: XCTestCase {
         XCTAssertEqual(decoded.kind, .warmup)
     }
 
+    func testStalePlanWithoutLoadFractionFillsInclineRamp() {
+        let stale = PlanVersion(
+            id: "stale",
+            createdAt: Date(timeIntervalSince1970: 0),
+            exercises: DefaultPlan.exercises,
+            days: [
+                DayTemplate(day: .push, blocks: [
+                    .single(id: "push-1-incline", exerciseID: DefaultPlan.ID.inclinePress, sets: [
+                        .warmup(reps: .range(min: 10, max: 12), note: "leer / leicht"),
+                        .warmup(reps: .range(min: 6, max: 8), note: "~50 %"),
+                        .warmup(reps: .range(min: 3, max: 4), note: "~75–80 %"),
+                        .work(reps: .range(min: 6, max: 10), pause: .range(min: 120, max: 150))
+                    ])
+                ])
+            ]
+        )
+        XCTAssertEqual(
+            SessionPlanFlattener.flatten(day: stale.days[0]).filter(\.isWarmup).map(\.loadFraction),
+            [nil, nil, nil] as [Double?]
+        )
+
+        let filled = stale.fillingMissingWarmupLoadFractions()
+        let sets = SessionPlanFlattener.flatten(day: filled.days[0])
+        XCTAssertEqual(
+            sets.filter(\.isWarmup).map(\.loadFraction),
+            [0, 0.5, 0.75] as [Double?]
+        )
+        XCTAssertNil(sets.first { !$0.isWarmup }?.loadFraction)
+    }
+
+    func testResolvedFractionTreatsExplicitZeroAsEmptyBar() {
+        let empty = SessionPlanFlattener.flatten(day: DefaultPlan.pushDay).first {
+            $0.exerciseID == DefaultPlan.ID.inclinePress && $0.isWarmup
+        }
+        XCTAssertEqual(empty?.loadFraction, 0)
+        XCTAssertEqual(empty?.resolvedWarmupLoadFraction, 0)
+
+        let work = SessionPlanFlattener.flatten(day: DefaultPlan.pushDay).first {
+            $0.exerciseID == DefaultPlan.ID.inclinePress && !$0.isWarmup
+        }
+        XCTAssertNil(work?.resolvedWarmupLoadFraction)
+    }
+
+    func testLeerNoteWithoutStoredFractionResolvesToZero() {
+        let day = DayTemplate(day: .push, blocks: [
+            .single(id: "custom", exerciseID: DefaultPlan.ID.inclinePress, sets: [
+                .warmup(reps: .range(min: 10, max: 12), note: "leer / leicht"),
+                .warmup(reps: .range(min: 6, max: 8), note: "~50 %"),
+                .warmup(reps: .range(min: 3, max: 4), note: "~75–80 %"),
+                .work(reps: .range(min: 6, max: 10), pause: .seconds(120))
+            ])
+        ])
+        let sets = SessionPlanFlattener.flatten(day: day).filter(\.isWarmup)
+        XCTAssertEqual(sets.map(\.loadFraction), [nil, nil, nil] as [Double?])
+        XCTAssertEqual(sets.map(\.resolvedWarmupLoadFraction), [0, 0.5, 0.75] as [Double?])
+    }
+
+    func testFillingDoesNotOverwriteExplicitZero() {
+        let stale = PlanVersion(
+            id: "custom",
+            createdAt: Date(timeIntervalSince1970: 0),
+            exercises: DefaultPlan.exercises,
+            days: [
+                DayTemplate(day: .legs, blocks: [
+                    .single(id: "unmatched", exerciseID: DefaultPlan.ID.legPress, sets: [
+                        .warmup(reps: .range(min: 10, max: 12), note: "leicht", loadFraction: 0)
+                    ])
+                ])
+            ]
+        )
+        let filled = stale.fillingMissingWarmupLoadFractions()
+        let warmup = SessionPlanFlattener.flatten(day: filled.days[0]).first
+        XCTAssertEqual(warmup?.loadFraction, 0)
+    }
+
+    func testInferredWarmupFractionsFromNotes() {
+        XCTAssertEqual(SetPrescription.inferredWarmupLoadFraction(from: "leer / leicht"), 0)
+        XCTAssertEqual(SetPrescription.inferredWarmupLoadFraction(from: "locker"), 0)
+        XCTAssertEqual(SetPrescription.inferredWarmupLoadFraction(from: "~50 %"), 0.5)
+        XCTAssertEqual(SetPrescription.inferredWarmupLoadFraction(from: "~75–80 %"), 0.75)
+        XCTAssertEqual(SetPrescription.inferredWarmupLoadFraction(from: "~50–60 %"), 0.55)
+        XCTAssertNil(SetPrescription.inferredWarmupLoadFraction(from: "leicht"))
+        XCTAssertNil(SetPrescription.inferredWarmupLoadFraction(from: nil))
+    }
+
     func testWarmupHasNoForcedRest() throws {
         let runtime = makeRuntime(day: .push)
         var now = start

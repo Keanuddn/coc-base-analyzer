@@ -82,17 +82,12 @@ struct SessionView: View {
                     }
                 }
 
-                // Immer eine Empfehlung -- nie ein leeres Feld.
+                // Immer eine Empfehlung -- nie ein leeres Feld. Den Grund
+                // (warum halten/steigern) nicht anzeigen: im Gym zählt die Zahl.
                 if let recommendation = controller.recommendation {
-                    VStack(spacing: 6) {
-                        Text(recommendation.displayText)
-                            .font(GymTheme.numberFont(size: 46))
-                            .foregroundStyle(GymTheme.primaryText)
-                        Text(recommendation.reason)
-                            .font(.system(size: 15))
-                            .foregroundStyle(GymTheme.secondaryText)
-                            .multilineTextAlignment(.center)
-                    }
+                    Text(recommendation.displayText)
+                        .font(GymTheme.numberFont(size: 46))
+                        .foregroundStyle(GymTheme.primaryText)
                 }
 
                 // Am oberen Rand stoppen, auch wenn mehr gehen.

@@ -29,9 +29,11 @@ final class Store: ObservableObject {
         let resolved = directory ?? Store.defaultDirectory()
         self.directory = resolved
         let loaded = Store.load(from: resolved)
-        self.planVersions = loaded.planVersions.isEmpty
+        let rawPlans = loaded.planVersions
+        let migratedPlans = (rawPlans.isEmpty
             ? [DefaultPlan.version(createdAt: Date())]
-            : loaded.planVersions
+            : rawPlans).map { $0.fillingMissingWarmupLoadFractions() }
+        self.planVersions = migratedPlans
         self.sessions = loaded.sessions
         self.dailyContexts = loaded.dailyContexts
         self.bodyweight = loaded.bodyweight
@@ -39,6 +41,9 @@ final class Store: ObservableObject {
         self.trials = loaded.trials
         self.openSnapshot = loaded.openSnapshot
         self.dampenedDetectorIDs = loaded.dampenedDetectorIDs
+        if !rawPlans.isEmpty, migratedPlans != rawPlans {
+            persist()
+        }
     }
 
     // MARK: - Ablageorte

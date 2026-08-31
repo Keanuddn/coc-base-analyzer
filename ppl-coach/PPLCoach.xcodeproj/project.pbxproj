@@ -1,0 +1,479 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 56;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		AA0000000000000000000031 /* PPLCoachApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA0000000000000000000030 /* PPLCoachApp.swift */; };
+		AA0000000000000000000033 /* Store.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA0000000000000000000032 /* Store.swift */; };
+		AA0000000000000000000035 /* SessionController.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA0000000000000000000034 /* SessionController.swift */; };
+		AA0000000000000000000037 /* Haptics.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA0000000000000000000036 /* Haptics.swift */; };
+		AA0000000000000000000039 /* GymTheme.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA0000000000000000000038 /* GymTheme.swift */; };
+		AA000000000000000000003B /* SessionView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000000000000000000003A /* SessionView.swift */; };
+		AA000000000000000000003D /* HomeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000000000000000000003C /* HomeView.swift */; };
+		AA000000000000000000003F /* PhotoViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000000000000000000003E /* PhotoViews.swift */; };
+		AA0000000000000000000041 /* HistoryAndInsightsViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA0000000000000000000040 /* HistoryAndInsightsViews.swift */; };
+		AA0000000000000000000043 /* MyPlanAndSettingsViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA0000000000000000000042 /* MyPlanAndSettingsViews.swift */; };
+		AA0000000000000000000045 /* WhoopAuth.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA0000000000000000000044 /* WhoopAuth.swift */; };
+		AA0000000000000000000047 /* WhoopSync.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA0000000000000000000046 /* WhoopSync.swift */; };
+		AA0000000000000000000016 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = AA0000000000000000000015 /* Assets.xcassets */; };
+		AA0000000000000000000019 /* Charts.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = AA0000000000000000000018 /* Charts.framework */; };
+		AA000000000000000000001B /* AuthenticationServices.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = AA000000000000000000001A /* AuthenticationServices.framework */; };
+		AA000000000000000000001C /* PPLCoachCore in Frameworks */ = {isa = PBXBuildFile; productRef = AA000000000000000000000E /* PPLCoachCore */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXFileReference section */
+		AA0000000000000000000006 /* PPLCoach.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = PPLCoach.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		AA0000000000000000000030 /* PPLCoachApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PPLCoachApp.swift; sourceTree = "<group>"; };
+		AA0000000000000000000032 /* Store.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Store.swift; sourceTree = "<group>"; };
+		AA0000000000000000000034 /* SessionController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionController.swift; sourceTree = "<group>"; };
+		AA0000000000000000000036 /* Haptics.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Haptics.swift; sourceTree = "<group>"; };
+		AA0000000000000000000038 /* GymTheme.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GymTheme.swift; sourceTree = "<group>"; };
+		AA000000000000000000003A /* SessionView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionView.swift; sourceTree = "<group>"; };
+		AA000000000000000000003C /* HomeView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HomeView.swift; sourceTree = "<group>"; };
+		AA000000000000000000003E /* PhotoViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PhotoViews.swift; sourceTree = "<group>"; };
+		AA0000000000000000000040 /* HistoryAndInsightsViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HistoryAndInsightsViews.swift; sourceTree = "<group>"; };
+		AA0000000000000000000042 /* MyPlanAndSettingsViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MyPlanAndSettingsViews.swift; sourceTree = "<group>"; };
+		AA0000000000000000000044 /* WhoopAuth.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WhoopAuth.swift; sourceTree = "<group>"; };
+		AA0000000000000000000046 /* WhoopSync.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WhoopSync.swift; sourceTree = "<group>"; };
+		AA0000000000000000000015 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+		AA0000000000000000000017 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
+		AA000000000000000000001D /* Debug.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Debug.xcconfig; sourceTree = "<group>"; };
+		AA000000000000000000001E /* Release.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Release.xcconfig; sourceTree = "<group>"; };
+		AA000000000000000000001F /* Shared.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Shared.xcconfig; sourceTree = "<group>"; };
+		AA0000000000000000000020 /* Secrets.example.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Secrets.example.xcconfig; sourceTree = "<group>"; };
+		AA0000000000000000000018 /* Charts.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Charts.framework; path = System/Library/Frameworks/Charts.framework; sourceTree = SDKROOT; };
+		AA000000000000000000001A /* AuthenticationServices.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = AuthenticationServices.framework; path = System/Library/Frameworks/AuthenticationServices.framework; sourceTree = SDKROOT; };
+/* End PBXFileReference section */
+
+/* Begin PBXFrameworksBuildPhase section */
+		AA0000000000000000000004 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				AA000000000000000000001C /* PPLCoachCore in Frameworks */,
+				AA0000000000000000000019 /* Charts.framework in Frameworks */,
+				AA000000000000000000001B /* AuthenticationServices.framework in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXFrameworksBuildPhase section */
+
+/* Begin PBXGroup section */
+		AA0000000000000000000007 = {
+			isa = PBXGroup;
+			children = (
+				AA0000000000000000000009 /* App */,
+				AA000000000000000000000C /* Frameworks */,
+				AA0000000000000000000008 /* Products */,
+			);
+			sourceTree = "<group>";
+		};
+		AA0000000000000000000008 /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				AA0000000000000000000006 /* PPLCoach.app */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+		AA0000000000000000000009 /* App */ = {
+			isa = PBXGroup;
+			children = (
+				AA000000000000000000000A /* Sources */,
+				AA000000000000000000000B /* Config */,
+				AA0000000000000000000015 /* Assets.xcassets */,
+				AA0000000000000000000017 /* Info.plist */,
+			);
+			path = App;
+			sourceTree = "<group>";
+		};
+		AA000000000000000000000A /* Sources */ = {
+			isa = PBXGroup;
+			children = (
+				AA0000000000000000000030 /* PPLCoachApp.swift */,
+				AA0000000000000000000021 /* Persistence */,
+				AA0000000000000000000022 /* Session */,
+				AA0000000000000000000023 /* Design */,
+				AA0000000000000000000024 /* Views */,
+				AA0000000000000000000025 /* Whoop */,
+			);
+			path = Sources;
+			sourceTree = "<group>";
+		};
+		AA0000000000000000000021 /* Persistence */ = {
+			isa = PBXGroup;
+			children = (
+				AA0000000000000000000032 /* Store.swift */,
+			);
+			path = Persistence;
+			sourceTree = "<group>";
+		};
+		AA0000000000000000000022 /* Session */ = {
+			isa = PBXGroup;
+			children = (
+				AA0000000000000000000034 /* SessionController.swift */,
+			);
+			path = Session;
+			sourceTree = "<group>";
+		};
+		AA0000000000000000000023 /* Design */ = {
+			isa = PBXGroup;
+			children = (
+				AA0000000000000000000036 /* Haptics.swift */,
+				AA0000000000000000000038 /* GymTheme.swift */,
+			);
+			path = Design;
+			sourceTree = "<group>";
+		};
+		AA0000000000000000000024 /* Views */ = {
+			isa = PBXGroup;
+			children = (
+				AA000000000000000000003A /* SessionView.swift */,
+				AA000000000000000000003C /* HomeView.swift */,
+				AA000000000000000000003E /* PhotoViews.swift */,
+				AA0000000000000000000040 /* HistoryAndInsightsViews.swift */,
+				AA0000000000000000000042 /* MyPlanAndSettingsViews.swift */,
+			);
+			path = Views;
+			sourceTree = "<group>";
+		};
+		AA0000000000000000000025 /* Whoop */ = {
+			isa = PBXGroup;
+			children = (
+				AA0000000000000000000044 /* WhoopAuth.swift */,
+				AA0000000000000000000046 /* WhoopSync.swift */,
+			);
+			path = Whoop;
+			sourceTree = "<group>";
+		};
+		AA000000000000000000000B /* Config */ = {
+			isa = PBXGroup;
+			children = (
+				AA000000000000000000001F /* Shared.xcconfig */,
+				AA000000000000000000001D /* Debug.xcconfig */,
+				AA000000000000000000001E /* Release.xcconfig */,
+				AA0000000000000000000020 /* Secrets.example.xcconfig */,
+			);
+			path = Config;
+			sourceTree = "<group>";
+		};
+		AA000000000000000000000C /* Frameworks */ = {
+			isa = PBXGroup;
+			children = (
+				AA0000000000000000000018 /* Charts.framework */,
+				AA000000000000000000001A /* AuthenticationServices.framework */,
+			);
+			name = Frameworks;
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		AA0000000000000000000002 /* PPLCoach */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = AA0000000000000000000014 /* Build configuration list for PBXNativeTarget "PPLCoach" */;
+			buildPhases = (
+				AA0000000000000000000003 /* Sources */,
+				AA0000000000000000000004 /* Frameworks */,
+				AA0000000000000000000005 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = PPLCoach;
+			packageProductDependencies = (
+				AA000000000000000000000E /* PPLCoachCore */,
+			);
+			productName = PPLCoach;
+			productReference = AA0000000000000000000006 /* PPLCoach.app */;
+			productType = "com.apple.product-type.application";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		AA0000000000000000000001 /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = 1;
+				LastSwiftUpdateCheck = 1600;
+				LastUpgradeCheck = 1600;
+				TargetAttributes = {
+					AA0000000000000000000002 = {
+						CreatedOnToolsVersion = 16.0;
+					};
+				};
+			};
+			buildConfigurationList = AA0000000000000000000013 /* Build configuration list for PBXProject "PPLCoach" */;
+			compatibilityVersion = "Xcode 14.0";
+			developmentRegion = de;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				en,
+				Base,
+				de,
+			);
+			mainGroup = AA0000000000000000000007;
+			packageReferences = (
+				AA000000000000000000000D /* XCLocalSwiftPackageReference "Core" */,
+			);
+			productRefGroup = AA0000000000000000000008 /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				AA0000000000000000000002 /* PPLCoach */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		AA0000000000000000000005 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				AA0000000000000000000016 /* Assets.xcassets in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
+
+/* Begin PBXSourcesBuildPhase section */
+		AA0000000000000000000003 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				AA0000000000000000000031 /* PPLCoachApp.swift in Sources */,
+				AA0000000000000000000033 /* Store.swift in Sources */,
+				AA0000000000000000000035 /* SessionController.swift in Sources */,
+				AA0000000000000000000037 /* Haptics.swift in Sources */,
+				AA0000000000000000000039 /* GymTheme.swift in Sources */,
+				AA000000000000000000003B /* SessionView.swift in Sources */,
+				AA000000000000000000003D /* HomeView.swift in Sources */,
+				AA000000000000000000003F /* PhotoViews.swift in Sources */,
+				AA0000000000000000000041 /* HistoryAndInsightsViews.swift in Sources */,
+				AA0000000000000000000043 /* MyPlanAndSettingsViews.swift in Sources */,
+				AA0000000000000000000045 /* WhoopAuth.swift in Sources */,
+				AA0000000000000000000047 /* WhoopSync.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin XCBuildConfiguration section */
+		AA000000000000000000000F /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu17;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
+				MTL_FAST_MATH = YES;
+				SDKROOT = iphoneos;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				ENABLE_TESTABILITY = YES;
+				GCC_DYNAMIC_NO_PIC = NO;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"DEBUG=1",
+					"$(inherited)",
+				);
+				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
+				ONLY_ACTIVE_ARCH = YES;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "DEBUG $(inherited)";
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+			};
+			name = Debug;
+		};
+		AA0000000000000000000010 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu17;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
+				MTL_FAST_MATH = YES;
+				SDKROOT = iphoneos;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				ENABLE_NS_ASSERTIONS = NO;
+				MTL_ENABLE_DEBUG_INFO = NO;
+				SWIFT_COMPILATION_MODE = wholemodule;
+				VALIDATE_PRODUCT = YES;
+			};
+			name = Release;
+		};
+		AA0000000000000000000011 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			baseConfigurationReference = AA000000000000000000001D /* Debug.xcconfig */;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_ASSET_PATHS = "";
+				ENABLE_PREVIEWS = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = App/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.keanu.pplcoach;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				SUPPORTS_MACCATALYST = NO;
+				SUPPORTS_MAC_DESIGNED_FOR_IPHONE_IPAD = NO;
+				SUPPORTS_XR_DESIGNED_FOR_IPHONE_IPAD = NO;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 1;
+			};
+			name = Debug;
+		};
+		AA0000000000000000000012 /* Release */ = {
+			isa = XCBuildConfiguration;
+			baseConfigurationReference = AA000000000000000000001E /* Release.xcconfig */;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_ASSET_PATHS = "";
+				ENABLE_PREVIEWS = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = App/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.keanu.pplcoach;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				SUPPORTS_MACCATALYST = NO;
+				SUPPORTS_MAC_DESIGNED_FOR_IPHONE_IPAD = NO;
+				SUPPORTS_XR_DESIGNED_FOR_IPHONE_IPAD = NO;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 1;
+			};
+			name = Release;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		AA0000000000000000000013 /* Build configuration list for PBXProject "PPLCoach" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				AA000000000000000000000F /* Debug */,
+				AA0000000000000000000010 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		AA0000000000000000000014 /* Build configuration list for PBXNativeTarget "PPLCoach" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				AA0000000000000000000011 /* Debug */,
+				AA0000000000000000000012 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+/* End XCConfigurationList section */
+
+/* Begin XCLocalSwiftPackageReference section */
+		AA000000000000000000000D /* XCLocalSwiftPackageReference "Core" */ = {
+			isa = XCLocalSwiftPackageReference;
+			relativePath = Core;
+		};
+/* End XCLocalSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		AA000000000000000000000E /* PPLCoachCore */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = AA000000000000000000000D /* XCLocalSwiftPackageReference "Core" */;
+			productName = PPLCoachCore;
+		};
+/* End XCSwiftPackageProductDependency section */
+	};
+	rootObject = AA0000000000000000000001 /* Project object */;
+}

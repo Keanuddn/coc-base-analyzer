@@ -1,17 +1,42 @@
-# App-Hülle (SwiftUI, macOS/Xcode)
+# App-Hülle (SwiftUI)
 
-Der Swift-Code für die App liegt fertig in `Sources/`. Was fehlt, ist das
-Xcode-Projekt selbst — das kann nur auf einem Mac erzeugt werden, weil SwiftUI
-weder auf Linux noch ohne Apple-Toolchain baubar ist.
+Xcode-Projekt liegt fertig in `ppl-coach/PPLCoach.xcodeproj`. Der Simulator
+läuft nur auf einem Mac — diese Linux-Umgebung kann die App nicht starten.
 
-## Projekt anlegen
+## Simulator starten
 
-1. Xcode, neues Projekt, **App**, Interface SwiftUI, Sprache Swift.
-2. Name `PPLCoach`, Ziel iOS 17 oder neuer, nur Portrait.
-3. Projekt in diesem Ordner (`App/`) ablegen.
-4. Den Ordner `Sources/` ins Projekt ziehen (*Create groups*, nicht kopieren).
-5. `Core` als lokales Package einbinden: *File → Add Package Dependencies → Add Local*, Ordner `../Core` wählen, dann `PPLCoachCore` beim App-Target als Framework hinzufügen.
-6. `PPLCoachApp.swift` enthält `@main` — die von Xcode erzeugte Vorlagendatei löschen.
+1. `ppl-coach/` auf den Mac holen (Clone oder den Ordner kopieren).
+2. `PPLCoach.xcodeproj` in Xcode öffnen — **nicht** ein neues Projekt anlegen.
+3. Schema **PPLCoach**, Destination ein iPhone (z. B. iPhone 16 / 16 Pro).
+4. Signing: unter *Signing & Capabilities* dein Team wählen. Für den Simulator
+   reicht die persönliche Apple-ID.
+5. ⌘R.
+
+Beim ersten Öffnen löst Xcode das lokale Package `Core` (`PPLCoachCore`) auf.
+Das kann eine Minute dauern.
+
+## Was im Simulator anders ist
+
+| Thema | Simulator | iPhone |
+| --- | --- | --- |
+| Kamera | Button heißt „Foto wählen“, nimmt die Mediathek | Livebild plus Schablone des Vorgängerfotos |
+| Haptik / Ton | oft still | Pausenende spürbar plus Ton |
+| iCloud | fällt auf lokalen App-Ordner zurück | gleiche Logik, Cloud wenn angemeldet |
+| Whoop | braucht `Secrets.xcconfig`, sonst deaktiviert | gleich |
+
+Debug-Builds haben unter *Mehr → Simulator* den Punkt **Beispieldaten laden**:
+acht synthetische Wochen, damit Verlauf und Erkenntnisse nicht leer sind.
+
+## Whoop (optional)
+
+```bash
+cp App/Config/Secrets.example.xcconfig App/Config/Secrets.xcconfig
+```
+
+Client-ID und Secret eintragen. `Secrets.xcconfig` ist gitignored. Ohne die
+Datei startet die App trotzdem — Whoop bleibt getrennt.
+
+URL-Schema `pplcoach` ist in der Info.plist eingetragen.
 
 ## Aufbau von `Sources/`
 
@@ -34,17 +59,6 @@ Ablauflogik, Metriken, Detektoren, Empfehlungs- und Probenregeln liegen bewusst
 **nicht** hier, sondern im `Core`-Package — dort sind sie ohne Simulator
 getestet.
 
-## Benötigte Einträge in der Info.plist
-
-| Zweck | Schlüssel |
-| --- | --- |
-| Fotos nach der Session | `NSCameraUsageDescription` |
-| Whoop-Rücksprung | URL-Schema `pplcoach` unter `CFBundleURLTypes` |
-| Whoop-Zugangsdaten | `WHOOP_CLIENT_ID`, `WHOOP_CLIENT_SECRET`, `WHOOP_REDIRECT_URI` (aus der xcconfig) |
-
-Capability: **iCloud** (Documents oder CloudKit) für die Sicherung von Datenbank
-und Fotos. Ein verlorenes iPhone darf nicht die ganze Historie kosten.
-
 ## Warum kein Hintergrund-Modus für die Timer
 
 Pause und Satzdauer werden aus Zeitstempeln der Wanduhr berechnet, nicht von
@@ -55,21 +69,3 @@ gerechnet. Der Timer in der Anzeige ist reine Darstellung.
 Während einer offenen Session bleibt der Bildschirm an
 (`isIdleTimerDisabled`), und das Pausenende wird haptisch plus mit kurzem Ton
 gemeldet — im Stumm-Modus zählt die Haptik.
-
-## Konfiguration
-
-```bash
-cp Config/Secrets.example.xcconfig Config/Secrets.xcconfig
-```
-
-Danach im Projekt als Configuration File hinterlegen und die Werte über
-*Info.plist* an die App durchreichen. `Secrets.xcconfig` ist per `.gitignore`
-ausgeschlossen — Whoops Nutzungsbedingungen untersagen Zugangsdaten in offenen
-Projekten.
-
-## Stand
-
-Der Code ist vollständig geschrieben, aber **nicht kompiliert** — dafür fehlt
-der Mac. Erwartbar sind beim ersten Build kleinere Anpassungen an Importen und
-API-Signaturen. Die Logik dahinter ist über die 115 Tests im `Core`-Package
-abgedeckt.

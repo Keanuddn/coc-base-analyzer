@@ -237,9 +237,16 @@ public struct LongPauseDetector: Detector {
             return .silent(.notEnoughData(have: candidates.count, need: minimumSampleSize))
         }
 
+        let longReps = long.map { Double($0.nextReps) }
+        let targetReps = onTarget.map { Double($0.nextReps) }
         let effect = targetMean - longMean
-        guard effect >= repThreshold else {
-            return .silent(.effectTooSmall(observed: effect, threshold: repThreshold))
+        let required = EffectGate.required(
+            minimum: repThreshold,
+            groupA: longReps,
+            groupB: targetReps
+        )
+        guard effect >= required else {
+            return .silent(.effectTooSmall(observed: effect, threshold: required))
         }
 
         let affected = Array(Set(long.map(\.exerciseID))).sorted()

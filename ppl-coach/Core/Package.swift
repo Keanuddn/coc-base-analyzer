@@ -1,10 +1,14 @@
 // swift-tools-version: 6.0
 import PackageDescription
 
-// Bewusst ohne Plattform-Einschränkung und ohne UI-Abhängigkeiten:
-// dieses Package muss auch ohne Xcode und Simulator baubar und testbar sein.
+// iOS 17, damit Xcode das lokale Package dem App-Target zuordnen kann.
+// Ohne UI-Abhängigkeiten: auf Linux bleibt `swift test` lauffähig.
 let package = Package(
     name: "PPLCoachCore",
+    platforms: [
+        .iOS(.v17),
+        .macOS(.v14)
+    ],
     products: [
         .library(name: "PPLCoachCore", targets: ["PPLCoachCore"])
     ],

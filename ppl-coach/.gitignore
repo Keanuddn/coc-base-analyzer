@@ -12,8 +12,7 @@ build/
 *.xcodeproj/project.xcworkspace/xcuserdata/
 
 # Zugangsdaten — Whoop Client ID/Secret niemals committen
-*.xcconfig
-!*.example.xcconfig
+Secrets.xcconfig
 Secrets.plist
 
 # macOS

@@ -67,10 +67,54 @@ struct HistoryView: View {
                         )
                     }
                 }
+
+                sessionList
             }
             .padding(16)
         }
         .navigationTitle("Verlauf")
+    }
+
+    /// Sessions zum Nachschauen -- und zum nachträglichen Markieren einer
+    /// Störung, wenn dir Tage später einfällt, dass eine Pause untypisch war.
+    private var sessionList: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("Sessions")
+                .font(.system(size: 17, weight: .semibold))
+                .foregroundStyle(GymTheme.primaryText)
+
+            ForEach(
+                store.sessions
+                    .filter { $0.status == .completed }
+                    .sorted { $0.startedAt > $1.startedAt }
+                    .prefix(20)
+            ) { session in
+                NavigationLink {
+                    SessionDetailView(session: session)
+                } label: {
+                    HStack {
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(session.day.displayName)
+                                .font(.system(size: 15, weight: .medium))
+                                .foregroundStyle(GymTheme.primaryText)
+                            Text(session.startedAt.formatted(date: .abbreviated, time: .shortened))
+                                .font(.system(size: 12))
+                                .foregroundStyle(GymTheme.secondaryText)
+                        }
+                        Spacer()
+                        Text("\(session.workSets.count) Sätze")
+                            .font(.system(size: 13).monospacedDigit())
+                            .foregroundStyle(GymTheme.secondaryText)
+                        Image(systemName: "chevron.right")
+                            .font(.system(size: 12))
+                            .foregroundStyle(GymTheme.secondaryText)
+                    }
+                    .padding(12)
+                    .background(GymTheme.surface, in: RoundedRectangle(cornerRadius: 12))
+                }
+                .buttonStyle(.plain)
+            }
+        }
     }
 
     private func chartSection(
@@ -122,11 +166,138 @@ struct HistoryView: View {
     }
 }
 
+/// Eine einzelne Session mit allen Sätzen.
+///
+/// Hier lässt sich eine Störung **nachträglich** markieren. Der Messwert bleibt
+/// unverändert -- nur die Interpretation ändert sich.
+struct SessionDetailView: View {
+    @EnvironmentObject private var store: Store
+    let session: SessionRecord
+
+    var body: some View {
+        List {
+            Section {
+                LabeledContent("Trainingstag", value: session.day.displayName)
+                LabeledContent(
+                    "Beginn",
+                    value: session.startedAt.formatted(date: .abbreviated, time: .shortened)
+                )
+                if let duration = session.duration {
+                    LabeledContent("Dauer", value: "\(Int(duration / 60)) min")
+                }
+                if let readiness = session.readiness {
+                    LabeledContent("Bereitschaft", value: readiness.displayName)
+                }
+                if let tag = session.tag {
+                    LabeledContent("Rückblick", value: tag.displayName)
+                }
+            }
+
+            Section("Sätze") {
+                ForEach(session.sets) { set in
+                    setRow(set)
+                }
+            }
+
+            let skipped = session.exercises.filter {
+                if case .performed = $0.outcome { return false }
+                return true
+            }
+            if !skipped.isEmpty {
+                Section("Übersprungen oder ersetzt") {
+                    ForEach(skipped, id: \.blockID) { record in
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(name(record.plannedExerciseID))
+                                .font(.system(size: 15, weight: .medium))
+                            Text(outcomeText(record.outcome))
+                                .font(.system(size: 13))
+                                .foregroundStyle(GymTheme.secondaryText)
+                        }
+                    }
+                }
+            }
+        }
+        .navigationTitle(session.startedAt.formatted(date: .abbreviated, time: .omitted))
+    }
+
+    private func setRow(_ set: SetRecord) -> some View {
+        VStack(alignment: .leading, spacing: 4) {
+            HStack {
+                Text(name(set.exerciseID))
+                    .font(.system(size: 15, weight: .medium))
+                if set.kind == .warmup {
+                    Text("Warm-up")
+                        .font(.system(size: 11, weight: .bold))
+                        .padding(.horizontal, 5)
+                        .padding(.vertical, 1)
+                        .background(GymTheme.stroke, in: Capsule())
+                }
+                Spacer()
+                Text("\(set.reps)× \(set.weight.kgText) kg")
+                    .font(.system(size: 15).monospacedDigit())
+            }
+
+            HStack(spacing: 10) {
+                Text(set.duration.map { "\(Int($0)) s Satz" } ?? "Dauer fehlt")
+                if let pause = set.actualPause {
+                    Text("·")
+                    Text("\(Int(pause)) s Pause")
+                }
+                if let deviation = set.pauseDeviation {
+                    Text("·")
+                    Text("\(deviation > 0 ? "+" : "")\(Int(deviation)) s")
+                }
+            }
+            .font(.system(size: 12).monospacedDigit())
+            .foregroundStyle(GymTheme.secondaryText)
+
+            if set.disturbances.isEmpty {
+                Menu("Nachträglich als nicht typisch markieren") {
+                    ForEach(DisturbanceReason.allCases, id: \.self) { reason in
+                        Button(reason.displayName) {
+                            store.markSet(
+                                sessionID: session.id,
+                                setID: set.id,
+                                marker: DisturbanceMarker(
+                                    scope: reason.category == .botchedSet ? .set : .pause,
+                                    reason: reason
+                                )
+                            )
+                        }
+                    }
+                }
+                .font(.system(size: 12))
+            } else {
+                Text("Markiert: \(set.disturbances.map(\.reason.displayName).joined(separator: ", "))")
+                    .font(.system(size: 12))
+                    .foregroundStyle(GymTheme.Mode.rest.accent)
+            }
+        }
+        .padding(.vertical, 2)
+    }
+
+    private func name(_ exerciseID: String) -> String {
+        store.currentPlan.exercise(id: exerciseID)?.name ?? exerciseID
+    }
+
+    private func outcomeText(_ outcome: ExerciseOutcome) -> String {
+        switch outcome {
+        case .performed:
+            return "ausgeführt"
+        case let .skipped(reason):
+            return "übersprungen (\(reason.displayName))"
+        case let .replaced(byExerciseID, reason):
+            return "ersetzt durch \(name(byExerciseID)) (\(reason.displayName))"
+        }
+    }
+}
+
 /// Erkenntnisse: eine Karte, ein Befund. Nicht zwölf auf einmal.
 struct InsightsView: View {
     @EnvironmentObject private var store: Store
     @State private var output: AnalysisEngine.Output?
     @State private var startedTrial: Trial?
+    @State private var trialResults: [TrialResult] = []
 
     var body: some View {
         ScrollView {
@@ -135,6 +306,15 @@ struct InsightsView: View {
                     calloutBox(
                         title: "Vor jeder Aussage zum Muskelaufbau",
                         text: note
+                    )
+                }
+
+                // Ergebnisse abgelaufener Proben -- eine Probe ohne Auswertung
+                // wäre nur ein guter Vorsatz.
+                ForEach(trialResults, id: \.trialID) { result in
+                    calloutBox(
+                        title: result.succeeded ? "Probe hat geholfen" : "Probe hat nichts gebracht",
+                        text: result.verdict
                     )
                 }
 
@@ -168,6 +348,7 @@ struct InsightsView: View {
     }
 
     private func runAnalysis() {
+        trialResults = store.evaluateRunningTrials()
         let engine = AnalysisEngine(
             ranker: InsightRanker(dampenedDetectorIDs: store.dampenedDetectorIDs)
         )

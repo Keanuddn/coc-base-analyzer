@@ -52,3 +52,16 @@ struct RootView: View {
         }
     }
 }
+
+#if DEBUG
+#Preview("Start") {
+    let store = Store(
+        directory: FileManager.default.temporaryDirectory
+            .appendingPathComponent("ppl-coach-preview", isDirectory: true)
+    )
+    let controller = SessionController(store: store)
+    return RootView(controller: controller)
+        .environmentObject(store)
+        .environmentObject(WhoopSync())
+}
+#endif

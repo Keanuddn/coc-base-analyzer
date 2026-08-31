@@ -32,14 +32,23 @@ swift build
 swift test
 ```
 
-Aktuell 115 Tests. Jeder Detektor hat zwei: einen, der einen eingebauten Effekt
+Aktuell 122 Tests. Jeder Detektor hat zwei: einen, der einen eingebauten Effekt
 in synthetischen Daten finden muss, und einen Null-Test mit vertauschten Pausen,
 in dem er **schweigen** muss. Ein Detektor, der auf Rauschen anspringt, ist
 kaputt — der Null-Test hat genau das einmal aufgedeckt.
 
-## App bauen
+## App bauen (Xcode / Simulator)
 
-Xcode-Projekt auf dem Mac anlegen, `Core` als lokales Package einbinden. Details und benötigte Capabilities in [App/README.md](App/README.md).
+Auf dem Mac:
+
+```text
+ppl-coach/PPLCoach.xcodeproj  →  Schema PPLCoach  →  iPhone-Simulator  →  ⌘R
+```
+
+Details, Signing und was im Simulator anders ist: [App/README.md](App/README.md).
+
+Whoop-Zugangsdaten gehören **nicht** ins Repository. Vorlage:
+`App/Config/Secrets.example.xcconfig` nach `Secrets.xcconfig` kopieren.
 
 ## Whoop
 
@@ -61,14 +70,14 @@ Zugangsdaten gehören **nicht** ins Repository. Vorlage: `App/Config/Secrets.exa
 - Whoop v2: Zyklus-Zuordnung, Baselines, Kontext erst vollständig wenn ausgewertet
 - Export als JSON und CSV
 
-**App (geschrieben, noch nicht kompiliert)**
+**App (Xcode-Projekt, auf dem Mac zu starten)**
 
 Alle Bildschirme, Persistenz, Whoop-OAuth und Haptik liegen in `App/Sources/`.
-Das Xcode-Projekt entsteht auf dem Mac, siehe [App/README.md](App/README.md).
+`PPLCoach.xcodeproj` ist bereit: auf dem Mac öffnen, iPhone-Simulator wählen, ⌘R.
 
 ## Was noch fehlt
 
-- Xcode-Projekt anlegen und den ersten Build durchziehen
+- Auf dem Mac einmal ⌘R im Simulator durchziehen und Signing setzen
 - Whoop-App im Developer-Dashboard registrieren, Zugangsdaten in die xcconfig
-- iCloud-Sicherung einrichten
+- iCloud-Sicherung auf dem Gerät prüfen
 - Danach: mehrere Wochen im Gym benutzen, bevor an der Analyse weitergebaut wird — sie braucht ohnehin erst Daten

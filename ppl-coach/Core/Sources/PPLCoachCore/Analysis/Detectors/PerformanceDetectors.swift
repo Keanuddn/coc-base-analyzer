@@ -42,7 +42,12 @@ public struct TempoDriftDetector: Detector {
                 continue
             }
             let effect = lateMean - earlyMean
-            guard effect >= secondsPerRepThreshold else { continue }
+            guard EffectGate.passes(
+                effect: effect,
+                minimum: secondsPerRepThreshold,
+                groupA: early,
+                groupB: late
+            ) else { continue }
 
             let name = input.planVersion.exercise(id: stratum.exerciseID)?.name ?? stratum.exerciseID
             let finding = Finding(
@@ -316,7 +321,12 @@ public struct PreFatigueDetector: Detector {
             }
 
             let effect = lowMean - highMean
-            guard effect >= repThreshold else { continue }
+            guard EffectGate.passes(
+                effect: effect,
+                minimum: repThreshold,
+                groupA: lowVolume,
+                groupB: highVolume
+            ) else { continue }
 
             let name = input.planVersion.exercise(id: exerciseID)?.name ?? exerciseID
             let finding = Finding(

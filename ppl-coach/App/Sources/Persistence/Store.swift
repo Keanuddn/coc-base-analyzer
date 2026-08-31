@@ -43,11 +43,44 @@ final class Store: ObservableObject {
 
     // MARK: - Ablageorte
 
+    /// Ablage möglichst in iCloud, sonst lokal.
+    ///
+    /// Ein verlorenes iPhone darf nicht die ganze Historie samt Fotos kosten.
+    /// Steht iCloud nicht bereit, arbeitet die App lokal weiter -- die
+    /// Sicherung ist wichtig, aber sie darf das Training nicht blockieren.
     static func defaultDirectory() -> URL {
-        let base = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
+        let manager = FileManager.default
+
+        if let container = manager.url(forUbiquityContainerIdentifier: nil) {
+            let directory = container
+                .appendingPathComponent("Documents", isDirectory: true)
+                .appendingPathComponent("PPLCoach", isDirectory: true)
+            do {
+                try manager.createDirectory(at: directory, withIntermediateDirectories: true)
+                return directory
+            } catch {
+                // Fällt auf den lokalen Ordner zurück.
+            }
+        }
+
+        let base = manager.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
         let directory = base.appendingPathComponent("PPLCoach", isDirectory: true)
-        try? FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        try? manager.createDirectory(at: directory, withIntermediateDirectories: true)
         return directory
+    }
+
+    /// Liegt die Ablage in iCloud? Wird in den Einstellungen angezeigt, damit
+    /// nicht stillschweigend ungesichert gearbeitet wird.
+    var isBackedUpToICloud: Bool {
+        directory.path.contains("Mobile Documents")
+            || directory.path.contains("CloudDocs")
+    }
+
+    /// Schiebt neu geschriebene Dateien aktiv in die Cloud, statt auf einen
+    /// günstigen Moment zu warten.
+    private func requestUpload(of url: URL) {
+        guard isBackedUpToICloud else { return }
+        try? fileManager.startDownloadingUbiquitousItem(at: url)
     }
 
     /// Fotos liegen im App-Container, nicht in der Foto-Bibliothek.
@@ -198,6 +231,45 @@ final class Store: ObservableObject {
         }
     }
 
+    /// Trägt eine Störung nachträglich an einem beliebigen Satz nach -- auch
+    /// Tage später im Verlauf, nicht nur während der Session.
+    func markSet(sessionID: UUID, setID: UUID, marker: DisturbanceMarker) {
+        guard let sessionIndex = sessions.firstIndex(where: { $0.id == sessionID }),
+              let setIndex = sessions[sessionIndex].sets.firstIndex(where: { $0.id == setID })
+        else { return }
+        sessions[sessionIndex].sets[setIndex].disturbances.append(marker)
+        persist()
+    }
+
+    /// Wertet alle laufenden Proben aus, deren Sessions vollständig sind.
+    func evaluateRunningTrials() -> [TrialResult] {
+        let planner = TrialPlanner()
+        var results: [TrialResult] = []
+
+        for trial in runningTrials {
+            var updated = trial
+            // Sessions, die während der Probe gelaufen sind, nachtragen.
+            updated.sessionIDs = sessions
+                .filter { $0.trialID == trial.id && $0.status == .completed }
+                .map(\.id)
+
+            guard let result = planner.evaluate(
+                trial: updated,
+                history: sessions,
+                planVersion: currentPlan
+            ) else {
+                save(updated)
+                continue
+            }
+
+            updated.status = .evaluated
+            save(updated)
+            results.append(result)
+        }
+
+        return results
+    }
+
     // MARK: - Rückmeldung zu Karten
 
     func recordFeedback(_ feedback: CardFeedback, detectorID: String) {
@@ -251,6 +323,40 @@ final class Store: ObservableObject {
         return url
     }
 
+    // MARK: - Simulator
+
+    /// Füllt den Speicher mit synthetischen Wochen, damit Verlauf und
+    /// Erkenntnisse im Simulator etwas zu zeigen haben. Echte Sessions bleiben
+    /// unangetastet, bis du das bewusst auslöst.
+    func loadSimulatorSample(weeks: Int = 8) {
+        var generator = SyntheticHistoryGenerator(
+            planVersion: currentPlan,
+            truth: SyntheticTruth(
+                repLossFromShortPause: 1.6,
+                shortPauseProbability: 0.22,
+                tempoDriftPerWeek: 0.05,
+                repLossPerSetIndex: 0.35,
+                progressesLoad: true
+            ),
+            seed: 7
+        )
+        let start = Date().addingTimeInterval(-Double(weeks) * 7 * 86_400)
+        sessions = generator.generate(weeks: weeks, startingAt: start)
+        dailyContexts = generator.dailyContexts(for: sessions)
+        persist()
+    }
+
+    /// Leert Sessions, Kontext, Fotos und Proben -- Planfassungen bleiben.
+    func resetLoggedData() {
+        sessions = []
+        dailyContexts = []
+        bodyweight = []
+        photos = []
+        trials = []
+        openSnapshot = nil
+        persist()
+    }
+
     // MARK: - Laden und Speichern
 
     private struct State: Codable {
@@ -294,6 +400,7 @@ final class Store: ObservableObject {
             // Atomar schreiben, damit ein Absturz mitten im Speichern die
             // Historie nicht zerstört.
             try data.write(to: stateURL, options: .atomic)
+            requestUpload(of: stateURL)
         } catch {
             assertionFailure("Speichern fehlgeschlagen: \(error)")
         }

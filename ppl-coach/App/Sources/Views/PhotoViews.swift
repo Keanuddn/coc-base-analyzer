@@ -96,7 +96,12 @@ struct PhotoStepView: View {
             Spacer()
 
             VStack(spacing: 12) {
-                PrimaryButton(title: "Kamera öffnen", mode: .entry) {
+                PrimaryButton(
+                    title: UIImagePickerController.isSourceTypeAvailable(.camera)
+                        ? "Kamera öffnen"
+                        : "Foto wählen",
+                    mode: .entry
+                ) {
                     showCamera = true
                 }
                 SecondaryButton(title: "Diesen Slot überspringen") { advance() }
@@ -182,10 +187,12 @@ struct CameraView: UIViewControllerRepresentable {
         if UIImagePickerController.isSourceTypeAvailable(.camera) {
             picker.sourceType = .camera
             picker.cameraDevice = .rear
+            // Schablone nur auf der echten Kamera -- im Simulator fällt die
+            // App auf die Mediathek zurück, und dort gibt es kein Overlay.
+            picker.cameraOverlayView = makeOverlay(size: UIScreen.main.bounds.size)
         } else {
             picker.sourceType = .photoLibrary
         }
-        picker.cameraOverlayView = makeOverlay(size: picker.view.bounds.size)
         return picker
     }
 

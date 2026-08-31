@@ -11,21 +11,24 @@ import AuthenticationServices
 /// `.gitignore` ausgeschlossen ist -- Whoops Nutzungsbedingungen untersagen
 /// Zugangsdaten in offenen Projekten.
 enum WhoopCredentials {
-    static var clientID: String {
-        Bundle.main.object(forInfoDictionaryKey: "WHOOP_CLIENT_ID") as? String ?? ""
-    }
-
-    static var clientSecret: String {
-        Bundle.main.object(forInfoDictionaryKey: "WHOOP_CLIENT_SECRET") as? String ?? ""
-    }
-
+    static var clientID: String { info("WHOOP_CLIENT_ID") }
+    static var clientSecret: String { info("WHOOP_CLIENT_SECRET") }
     static var redirectURI: String {
-        Bundle.main.object(forInfoDictionaryKey: "WHOOP_REDIRECT_URI") as? String
-            ?? "pplcoach://whoop/callback"
+        let value = info("WHOOP_REDIRECT_URI")
+        return value.isEmpty ? "pplcoach://whoop/callback" : value
     }
 
     static var isConfigured: Bool {
         !clientID.isEmpty && !clientSecret.isEmpty
+    }
+
+    /// Unaufgelöste `$(VAR)`-Platzhalter aus der Info.plist zählen als leer,
+    /// sonst wirkt Whoop konfiguriert, obwohl Secrets.xcconfig fehlt.
+    private static func info(_ key: String) -> String {
+        let raw = Bundle.main.object(forInfoDictionaryKey: key) as? String ?? ""
+        let trimmed = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+        if trimmed.hasPrefix("$(") { return "" }
+        return trimmed
     }
 }
 

@@ -170,11 +170,15 @@ struct SettingsView: View {
                     Button("Verbindung trennen", role: .destructive) {
                         whoop.disconnect()
                     }
-                } else {
+                } else if WhoopCredentials.isConfigured {
                     Button("Mit Whoop verbinden") {
                         Task { await whoop.connect(into: store) }
                     }
                     Text("Beim ersten Verbinden wird Historie nachgeladen, damit die Baselines für HRV und Recovery sofort stehen. Rohwerte allein sagen wenig.")
+                        .font(.system(size: 13))
+                        .foregroundStyle(GymTheme.secondaryText)
+                } else {
+                    Text("Whoop ist nicht konfiguriert. Auf dem Mac `App/Config/Secrets.example.xcconfig` nach `Secrets.xcconfig` kopieren und Client-ID/Secret eintragen.")
                         .font(.system(size: 13))
                         .foregroundStyle(GymTheme.secondaryText)
                 }
@@ -263,7 +267,30 @@ struct SettingsView: View {
                 LabeledContent("Sessions", value: "\(store.sessions.count)")
                 LabeledContent("Fotos", value: "\(store.photos.count)")
                 LabeledContent("Planfassungen", value: "\(store.planVersions.count)")
+                LabeledContent(
+                    "Sicherung",
+                    value: store.isBackedUpToICloud ? "iCloud" : "nur auf diesem Gerät"
+                )
+                if !store.isBackedUpToICloud {
+                    Text("iCloud ist nicht verfügbar. Ein verlorenes iPhone würde die ganze Historie samt Fotos kosten -- exportiere in der Zwischenzeit regelmäßig.")
+                        .font(.system(size: 13))
+                        .foregroundStyle(.orange)
+                }
             }
+
+            #if DEBUG
+            Section("Simulator") {
+                Text("Acht synthetische Wochen mit eingebautem Pausen-Effekt, damit Verlauf und Erkenntnisse etwas zeigen. Keine echten Trainingsdaten.")
+                    .font(.system(size: 13))
+                    .foregroundStyle(GymTheme.secondaryText)
+                Button("Beispieldaten laden") {
+                    store.loadSimulatorSample()
+                }
+                Button("Aufgezeichnete Daten leeren", role: .destructive) {
+                    store.resetLoggedData()
+                }
+            }
+            #endif
         }
         .navigationTitle("Einstellungen")
         .sheet(isPresented: $showShare) {

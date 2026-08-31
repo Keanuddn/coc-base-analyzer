@@ -6,7 +6,12 @@ import PPLCoachCore
 /// **Polling statt Webhooks:** Whoop-Webhooks brauchen eine öffentlich
 /// erreichbare Adresse, und die App ist bewusst serverlos. Bei 100 Anfragen pro
 /// Minute Limit ist Polling für einen Nutzer völlig unproblematisch.
-actor WhoopClient {
+///
+/// `WhoopAuth` ist Main-Actor (ASWebAuthenticationSession). Deshalb ist der
+/// Client bewusst keine `actor`, sondern ebenfalls Main-Actor -- sonst
+/// meckert Swift 6 über das Übergeben der Auth in eine andere Isolation.
+@MainActor
+final class WhoopClient {
     private let auth: WhoopAuth
     private var tokens: WhoopTokens?
 
@@ -149,7 +154,7 @@ final class WhoopSync: ObservableObject {
     }
 
     func disconnect() {
-        Task { await client.disconnect() }
+        client.disconnect()
         isConnected = false
         lastSync = nil
     }

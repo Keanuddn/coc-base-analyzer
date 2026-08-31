@@ -51,7 +51,13 @@ public struct TimeOfDayDetector: Detector {
                   let worst = averages.min(by: { $0.value < $1.value }) else { continue }
 
             let effect = best.value - worst.value
-            guard effect >= repThreshold, effect > bestEffect else { continue }
+            guard effect > bestEffect,
+                  EffectGate.passes(
+                      effect: effect,
+                      minimum: repThreshold,
+                      groupA: usable[best.key] ?? [],
+                      groupB: usable[worst.key] ?? []
+                  ) else { continue }
 
             let name = input.planVersion.exercise(id: exerciseID)?.name ?? exerciseID
             bestEffect = effect
@@ -134,8 +140,13 @@ public struct SessionDensityDetector: Detector {
         }
 
         let effect = shortMean - longMean
-        guard effect >= repThreshold else {
-            return .silent(.effectTooSmall(observed: effect, threshold: repThreshold))
+        let required = EffectGate.required(
+            minimum: repThreshold,
+            groupA: shortSessions,
+            groupB: longSessions
+        )
+        guard effect >= required else {
+            return .silent(.effectTooSmall(observed: effect, threshold: required))
         }
 
         let affected = Array(Set(sorted.map(\.exerciseID))).sorted()
@@ -215,8 +226,9 @@ public struct RecoveryPerformanceDetector: Detector {
         }
 
         let effect = highMean - lowMean
-        guard effect >= repThreshold else {
-            return .silent(.effectTooSmall(observed: effect, threshold: repThreshold))
+        let required = EffectGate.required(minimum: repThreshold, groupA: low, groupB: high)
+        guard effect >= required else {
+            return .silent(.effectTooSmall(observed: effect, threshold: required))
         }
 
         return .finding(

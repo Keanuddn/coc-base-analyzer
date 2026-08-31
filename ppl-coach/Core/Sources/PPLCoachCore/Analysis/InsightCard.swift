@@ -172,6 +172,7 @@ public struct AnalysisEngine {
     /// Zufallsfund garantiert.
     public static var defaultDetectors: [any Detector] {
         [
+            // Sofort belastbar: vergleicht innerhalb Session und Übung.
             TempoDriftDetector(),
             ShortPauseDetector(),
             LongPauseDetector(),
@@ -180,7 +181,13 @@ public struct AnalysisEngine {
             PreFatigueDetector(),
             PauseConsistencyDetector(),
             TimeOfDayDetector(),
+            WarmupQualityDetector(),
             SessionDensityDetector(),
+            // Zweite Welle: braucht mehr Sessions.
+            SupersetPriceDetector(),
+            LoadJumpDetector(),
+            RangeOfMotionDetector(),
+            FreshnessBarometerDetector(),
             RecoveryPerformanceDetector(),
             DisturbanceClusterDetector()
         ]

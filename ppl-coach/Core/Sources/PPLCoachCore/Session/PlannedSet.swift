@@ -15,6 +15,8 @@ public struct PlannedSet: Equatable, Sendable, Identifiable {
     public let pause: PauseTarget
     public let intensityNote: String?
     public let isOptional: Bool
+    /// Anteil der Arbeitslast; nur bei Warm-ups gesetzt. Siehe `SetPrescription`.
+    public let loadFraction: Double?
     public let supersetRound: Int?
     public let supersetMember: Int?
     /// Position der Übung in der Session, beginnend bei 1.
@@ -69,6 +71,7 @@ public enum SessionPlanFlattener {
                             pause: prescription.pause,
                             intensityNote: prescription.intensityNote,
                             isOptional: prescription.isOptional,
+                            loadFraction: prescription.loadFraction,
                             supersetRound: nil,
                             supersetMember: nil,
                             positionInSession: position,
@@ -97,6 +100,7 @@ public enum SessionPlanFlattener {
                                 pause: prescription.pause,
                                 intensityNote: prescription.intensityNote,
                                 isOptional: prescription.isOptional,
+                                loadFraction: prescription.loadFraction,
                                 supersetRound: round + 1,
                                 supersetMember: 0,
                                 positionInSession: position,
@@ -117,6 +121,7 @@ public enum SessionPlanFlattener {
                                 pause: prescription.pause,
                                 intensityNote: prescription.intensityNote,
                                 isOptional: prescription.isOptional,
+                                loadFraction: prescription.loadFraction,
                                 supersetRound: round + 1,
                                 supersetMember: 1,
                                 positionInSession: position,

@@ -288,4 +288,75 @@ final class LoadRecommenderTests: XCTestCase {
         let result = recommender.recommend(exercise: incline, target: target, history: history)
         XCTAssertEqual(result.displayText, "Empfehlung 82,5 kg")
     }
+
+    // MARK: - Warm-up als Anteil der Arbeitslast
+
+    func testWarmupFiftyPercentOfHeldWorkingWeight() {
+        let history = [session(exerciseID: incline.id, reps: [9, 8, 8], weight: 80)]
+        let result = recommender.recommend(
+            exercise: incline,
+            target: target,
+            history: history,
+            warmupLoadFraction: 0.5
+        )
+        XCTAssertEqual(result.direction, .hold)
+        XCTAssertEqual(result.weight, 40)
+        XCTAssertEqual(result.reason, "50 % der Arbeitslast (80 kg)")
+        XCTAssertEqual(result.displayText, "Empfehlung 40 kg")
+    }
+
+    func testWarmupZeroFractionMeansEmptyBar() {
+        let history = [session(exerciseID: incline.id, reps: [9, 8, 8], weight: 80)]
+        let result = recommender.recommend(
+            exercise: incline,
+            target: target,
+            history: history,
+            warmupLoadFraction: 0
+        )
+        XCTAssertEqual(result.direction, .hold)
+        XCTAssertEqual(result.weight, 0)
+        XCTAssertEqual(result.reason, "Warm-up ohne Last")
+    }
+
+    func testWarmupSeventyFivePercentOfEightyIsSixty() {
+        let history = [session(exerciseID: incline.id, reps: [9, 8, 8], weight: 80)]
+        let result = recommender.recommend(
+            exercise: incline,
+            target: target,
+            history: history,
+            warmupLoadFraction: 0.75
+        )
+        XCTAssertEqual(result.direction, .hold)
+        XCTAssertEqual(result.weight, 60)
+        XCTAssertEqual(result.reason, "75 % der Arbeitslast (80 kg)")
+    }
+
+    /// 8 / 8 / 8 liegt in 6--10, wäre aber unter 10--12. Die Warm-up-Spanne
+    /// darf die Arbeits-Empfehlung nicht nach unten ziehen.
+    func testWarmupFractionUsesWorkTargetNotWarmupRepRange() {
+        let history = [session(exerciseID: incline.id, reps: [8, 8, 8], weight: 80)]
+        let result = recommender.recommend(
+            exercise: incline,
+            target: target,
+            history: history,
+            warmupLoadFraction: 0.5
+        )
+        XCTAssertEqual(result.weight, 40, "halten bei 80, nicht reduzieren wegen Warm-up 10–12")
+        XCTAssertEqual(result.direction, .hold)
+    }
+
+    func testBodyweightWarmupWithZeroWorkWeightStaysZero() {
+        let history = [
+            session(exerciseID: pullUps.id, reps: [9, 8, 7, 7], weight: 0, target: .maximum)
+        ]
+        let result = recommender.recommend(
+            exercise: pullUps,
+            target: .maximum,
+            history: history,
+            warmupLoadFraction: 0
+        )
+        XCTAssertEqual(result.weight, 0)
+        XCTAssertNil(result.repsGoal, "keine Kilogramm-Empfehlung aus 0 kg erfinden")
+        XCTAssertEqual(result.reason, "Warm-up ohne Last")
+    }
 }

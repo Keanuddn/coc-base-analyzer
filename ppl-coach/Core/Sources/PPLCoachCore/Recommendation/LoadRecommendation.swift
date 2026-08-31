@@ -63,16 +63,68 @@ public struct LoadRecommender {
 
     /// - Parameters:
     ///   - exercise: Übung, für die empfohlen wird.
-    ///   - target: Wiederholungsvorgabe der Arbeitssätze.
+    ///   - target: Wiederholungsvorgabe der **Arbeitssätze** -- auch dann, wenn
+    ///     die Anzeige gerade ein Warm-up ist. Die Warm-up-Spanne darf die
+    ///     Steigerungsregel nicht verdrehen.
     ///   - history: Sessions, neueste zuerst oder beliebig -- wird sortiert.
     ///   - todaySets: Bereits in dieser Session geloggte Sätze dieser Übung.
     ///   - fallbackWeight: Startlast, wenn es noch keine Historie gibt.
+    ///   - warmupLoadFraction: Wenn gesetzt, ist das Ergebnis die gerundete
+    ///     Warm-up-Last als Anteil der Arbeits-Empfehlung. `0` heißt ohne Last.
     public func recommend(
         exercise: Exercise,
         target: RepTarget,
         history: [SessionRecord],
         todaySets: [SetRecord] = [],
-        fallbackWeight: Double? = nil
+        fallbackWeight: Double? = nil,
+        warmupLoadFraction: Double? = nil
+    ) -> LoadRecommendation {
+        let work = workRecommendation(
+            exercise: exercise,
+            target: target,
+            history: history,
+            todaySets: todaySets,
+            fallbackWeight: fallbackWeight
+        )
+        return applyWarmupFraction(work, fraction: warmupLoadFraction, step: exercise.weightStep)
+    }
+
+    private func applyWarmupFraction(
+        _ work: LoadRecommendation,
+        fraction: Double?,
+        step: WeightStep
+    ) -> LoadRecommendation {
+        guard let fraction else { return work }
+
+        if fraction == 0 || work.weight == 0 {
+            return LoadRecommendation(
+                exerciseID: work.exerciseID,
+                direction: .hold,
+                weight: 0,
+                reason: "Warm-up ohne Last",
+                repsGoal: nil,
+                stopAtReps: work.stopAtReps
+            )
+        }
+
+        let percent = Int((fraction * 100).rounded())
+        let workKg = LoadRecommendation.format(work.weight)
+        return LoadRecommendation(
+            exerciseID: work.exerciseID,
+            direction: .hold,
+            weight: step.snap(work.weight * fraction),
+            reason: "\(percent) % der Arbeitslast (\(workKg) kg)",
+            repsGoal: nil,
+            stopAtReps: work.stopAtReps
+        )
+    }
+
+    private func workRecommendation(
+        exercise: Exercise,
+        target: RepTarget,
+        history: [SessionRecord],
+        todaySets: [SetRecord],
+        fallbackWeight: Double?
     ) -> LoadRecommendation {
         let stopAt = target.stopAtUpperBound
 

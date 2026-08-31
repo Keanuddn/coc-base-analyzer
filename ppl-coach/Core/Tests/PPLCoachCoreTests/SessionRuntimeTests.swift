@@ -121,6 +121,28 @@ final class SessionRuntimeTests: XCTestCase {
         }
     }
 
+    func testRestRemainingGoesNegativeAfterTheTarget() throws {
+        let runtime = makeRuntime(day: .push)
+        try performSets(runtime, count: 3, from: start)
+
+        var now = start.addingTimeInterval(300)
+        try runtime.startSet(at: now)
+        now = now.addingTimeInterval(25)
+        try runtime.stopSet(at: now)
+        try runtime.submit(SetEntry(reps: 8, weight: 80), at: now.addingTimeInterval(10))
+
+        guard case let .resting(context) = runtime.phase else {
+            return XCTFail("erwartet resting")
+        }
+
+        let eightSecondsOver = context.restTargetEnd.addingTimeInterval(8)
+        XCTAssertEqual(context.remaining(at: eightSecondsOver), -8, accuracy: 0.001)
+        XCTAssertTrue(context.isOver(at: eightSecondsOver))
+        guard case .resting = runtime.phase else {
+            return XCTFail("Überziehung darf nicht automatisch zum nächsten Satz springen")
+        }
+    }
+
     func testRestFinishesIntoPreviewOfNextSet() throws {
         let runtime = makeRuntime(day: .push)
         try performSets(runtime, count: 3, from: start)
@@ -144,6 +166,48 @@ final class SessionRuntimeTests: XCTestCase {
     }
 
     // MARK: - Warm-up
+
+    func testInclineWarmupFractionsFollowTheRamp() {
+        let sets = SessionPlanFlattener.flatten(day: DefaultPlan.pushDay)
+        let warmups = sets.filter {
+            $0.exerciseID == DefaultPlan.ID.inclinePress && $0.isWarmup
+        }
+        XCTAssertEqual(warmups.map(\.loadFraction), [0, 0.5, 0.75])
+    }
+
+    func testLegPressAndRdlWarmupFractions() {
+        let sets = SessionPlanFlattener.flatten(day: DefaultPlan.legsDay)
+        let press = sets.filter {
+            $0.exerciseID == DefaultPlan.ID.legPress && $0.isWarmup
+        }
+        let rdl = sets.filter {
+            $0.exerciseID == DefaultPlan.ID.romanianDeadlift && $0.isWarmup
+        }
+        XCTAssertEqual(press.map(\.loadFraction), [0.4, 0.55])
+        XCTAssertEqual(rdl.map(\.loadFraction), [0.5])
+    }
+
+    func testPullUpLockerWarmupIsEmptyBar() {
+        let sets = SessionPlanFlattener.flatten(day: DefaultPlan.pullDay)
+        let warmup = sets.first {
+            $0.exerciseID == DefaultPlan.ID.pullUp && $0.isWarmup
+        }
+        XCTAssertEqual(warmup?.loadFraction, 0)
+    }
+
+    func testSetPrescriptionDecodesWithoutLoadFraction() throws {
+        let json = """
+        {
+          "kind": "warmup",
+          "reps": { "range": { "min": 6, "max": 8 } },
+          "pause": { "none": {} },
+          "intensityNote": "~50 %"
+        }
+        """.data(using: .utf8)!
+        let decoded = try JSONDecoder().decode(SetPrescription.self, from: json)
+        XCTAssertNil(decoded.loadFraction, "altes Plan-JSON ohne Feld bleibt ladbar")
+        XCTAssertEqual(decoded.kind, .warmup)
+    }
 
     func testWarmupHasNoForcedRest() throws {
         let runtime = makeRuntime(day: .push)
@@ -391,7 +455,7 @@ final class SessionRuntimeTests: XCTestCase {
         XCTAssertEqual(restored.session.sets.count, 4)
     }
 
-    func testRestoringAfterRestElapsedGivesZeroRemaining() throws {
+    func testRestoringAfterRestElapsedKeepsNegativeOvertime() throws {
         let runtime = makeRuntime(day: .push)
         try performSets(runtime, count: 3, from: start)
 
@@ -405,7 +469,8 @@ final class SessionRuntimeTests: XCTestCase {
         guard case let .resting(context) = restored.phase else {
             return XCTFail("erwartet resting")
         }
-        XCTAssertEqual(context.remaining(at: now.addingTimeInterval(600)), 0)
+        // Zielpause 120 s ab Satzstopp; 600 s später sind 480 s Überziehung.
+        XCTAssertEqual(context.remaining(at: now.addingTimeInterval(600)), -480, accuracy: 0.001)
         XCTAssertTrue(context.isOver(at: now.addingTimeInterval(600)))
     }
 

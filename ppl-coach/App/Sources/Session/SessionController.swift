@@ -210,12 +210,19 @@ final class SessionController: ObservableObject {
         }
 
         lastSets = store.lastSets(exerciseID: exercise.id)
+        // Die Steigerungsregel gilt immer gegen die Arbeits-Vorgabe, nie gegen
+        // die Warm-up-Spanne (sonst wirken 8er bei 6–10 wie ein Fehlversuch
+        // gegen 10–12).
+        let workTarget = runtime.plannedSets.first {
+            $0.exerciseID == set.exerciseID && $0.kind == .work
+        }?.reps ?? set.reps
         recommendation = recommender.recommend(
             exercise: exercise,
-            target: set.reps,
+            target: workTarget,
             history: store.sessions,
             todaySets: runtime.setsSoFar(exerciseID: exercise.id),
-            fallbackWeight: lastSets.first?.weight
+            fallbackWeight: lastSets.first?.weight,
+            warmupLoadFraction: set.isWarmup ? (set.loadFraction ?? 0.5) : nil
         )
     }
 

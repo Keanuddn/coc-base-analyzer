@@ -190,9 +190,9 @@ public enum DefaultPlan {
 
     static let pushDay = DayTemplate(day: .push, blocks: [
         .single(id: "push-1-incline", exerciseID: ID.inclinePress, sets: [
-            .warmup(reps: .range(min: 10, max: 12), note: "leer / leicht"),
-            .warmup(reps: .range(min: 6, max: 8), note: "~50 %"),
-            .warmup(reps: .range(min: 3, max: 4), note: "~75–80 %"),
+            .warmup(reps: .range(min: 10, max: 12), note: "leer / leicht", loadFraction: 0),
+            .warmup(reps: .range(min: 6, max: 8), note: "~50 %", loadFraction: 0.5),
+            .warmup(reps: .range(min: 3, max: 4), note: "~75–80 %", loadFraction: 0.75),
             .work(reps: .range(min: 6, max: 10), pause: .range(min: 120, max: 150)),
             .work(reps: .range(min: 6, max: 10), pause: .range(min: 120, max: 150)),
             .work(reps: .range(min: 6, max: 10), pause: .range(min: 120, max: 150)),
@@ -229,7 +229,7 @@ public enum DefaultPlan {
 
     static let pullDay = DayTemplate(day: .pull, blocks: [
         .single(id: "pull-1-pullups", exerciseID: ID.pullUp, sets: [
-            .warmup(reps: .range(min: 5, max: 8), note: "locker"),
+            .warmup(reps: .range(min: 5, max: 8), note: "locker", loadFraction: 0),
             .work(reps: .maximum, pause: .seconds(120)),
             .work(reps: .maximum, pause: .seconds(120)),
             .work(reps: .maximum, pause: .seconds(120)),
@@ -277,8 +277,8 @@ public enum DefaultPlan {
 
     static let legsDay = DayTemplate(day: .legs, blocks: [
         .single(id: "legs-1-legpress", exerciseID: ID.legPress, sets: [
-            .warmup(reps: .range(min: 10, max: 12), note: "leicht"),
-            .warmup(reps: .range(min: 6, max: 8), note: "~50–60 %"),
+            .warmup(reps: .range(min: 10, max: 12), note: "leicht", loadFraction: 0.4),
+            .warmup(reps: .range(min: 6, max: 8), note: "~50–60 %", loadFraction: 0.55),
             .work(reps: .range(min: 8, max: 12), pause: .seconds(150)),
             .work(reps: .range(min: 8, max: 12), pause: .seconds(150)),
             .work(reps: .range(min: 8, max: 12), pause: .seconds(150)),
@@ -286,7 +286,7 @@ public enum DefaultPlan {
         ]),
         // RDL-Warm-up steht direkt vor den RDLs, nicht am Tagesanfang.
         .single(id: "legs-2-rdl", exerciseID: ID.romanianDeadlift, sets: [
-            .warmup(reps: .range(min: 8, max: 10), note: "leicht"),
+            .warmup(reps: .range(min: 8, max: 10), note: "leicht", loadFraction: 0.5),
             .work(reps: .range(min: 8, max: 10), pause: .seconds(120)),
             .work(reps: .range(min: 8, max: 10), pause: .seconds(120)),
             .work(reps: .range(min: 8, max: 10), pause: .seconds(120))

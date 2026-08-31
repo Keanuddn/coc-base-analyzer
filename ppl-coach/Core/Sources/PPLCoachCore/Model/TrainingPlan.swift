@@ -10,19 +10,40 @@ public struct SetPrescription: Equatable, Sendable, Codable {
     /// Letzter Satz einer Übung, der bewusst weggelassen werden darf
     /// (Wadenheben: 3--4 Sätze).
     public let isOptional: Bool
+    /// Anteil der Arbeitslast für Warm-up-Sätze.
+    ///
+    /// `nil` fällt bei der Empfehlung auf 0,5. Explizites `0` heißt leer /
+    /// ohne Last und bleibt von `nil` getrennt.
+    public let loadFraction: Double?
+
+    enum CodingKeys: String, CodingKey {
+        case kind, reps, pause, intensityNote, isOptional, loadFraction
+    }
 
     public init(
         kind: SetKind,
         reps: RepTarget,
         pause: PauseTarget,
         intensityNote: String? = nil,
-        isOptional: Bool = false
+        isOptional: Bool = false,
+        loadFraction: Double? = nil
     ) {
         self.kind = kind
         self.reps = reps
         self.pause = pause
         self.intensityNote = intensityNote
         self.isOptional = isOptional
+        self.loadFraction = loadFraction
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        kind = try container.decode(SetKind.self, forKey: .kind)
+        reps = try container.decode(RepTarget.self, forKey: .reps)
+        pause = try container.decode(PauseTarget.self, forKey: .pause)
+        intensityNote = try container.decodeIfPresent(String.self, forKey: .intensityNote)
+        isOptional = try container.decodeIfPresent(Bool.self, forKey: .isOptional) ?? false
+        loadFraction = try container.decodeIfPresent(Double.self, forKey: .loadFraction)
     }
 
     public static func work(
@@ -35,10 +56,17 @@ public struct SetPrescription: Equatable, Sendable, Codable {
 
     public static func warmup(
         reps: RepTarget,
-        note: String? = nil
+        note: String? = nil,
+        loadFraction: Double? = nil
     ) -> SetPrescription {
         // Warm-ups haben nie eine Pflichtpause.
-        SetPrescription(kind: .warmup, reps: reps, pause: .none, intensityNote: note)
+        SetPrescription(
+            kind: .warmup,
+            reps: reps,
+            pause: .none,
+            intensityNote: note,
+            loadFraction: loadFraction
+        )
     }
 }
 

@@ -1,0 +1,20 @@
+# Swift / SwiftPM
+.build/
+.swiftpm/
+Package.resolved
+
+# Xcode
+DerivedData/
+build/
+*.xcuserstate
+*.xcworkspace/xcuserdata/
+*.xcodeproj/xcuserdata/
+*.xcodeproj/project.xcworkspace/xcuserdata/
+
+# Zugangsdaten — Whoop Client ID/Secret niemals committen
+*.xcconfig
+!*.example.xcconfig
+Secrets.plist
+
+# macOS
+.DS_Store

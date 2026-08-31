@@ -70,24 +70,21 @@ struct SessionView: View {
             Spacer()
 
             VStack(spacing: 22) {
-                if set.isWarmup {
-                    Text("WARM-UP")
-                        .font(.system(size: 14, weight: .bold))
-                        .tracking(2)
-                        .foregroundStyle(GymTheme.Mode.warmup.accent)
-                    if let note = set.intensityNote {
-                        Text(note)
-                            .font(.system(size: 20, weight: .medium))
-                            .foregroundStyle(GymTheme.secondaryText)
-                    }
-                }
-
-                // Immer eine Empfehlung -- nie ein leeres Feld. Den Grund
-                // (warum halten/steigern) nicht anzeigen: im Gym zählt die Zahl.
+                // Immer eine Empfehlung -- nie ein leeres Feld. Warm-up-Notizen
+                // wie „leer / leicht“ stehen nicht extra: Kilo und Wdh. reichen.
                 if let recommendation = controller.recommendation {
-                    Text(recommendation.displayText)
-                        .font(GymTheme.numberFont(size: 46))
-                        .foregroundStyle(GymTheme.primaryText)
+                    HStack(alignment: .firstTextBaseline, spacing: 12) {
+                        Text(recommendation.displayText)
+                        if recommendation.repsGoal == nil {
+                            Text("·")
+                                .foregroundStyle(GymTheme.secondaryText)
+                            Text(set.reps.displayText)
+                        }
+                    }
+                    .font(GymTheme.numberFont(size: 40))
+                    .foregroundStyle(GymTheme.primaryText)
+                    .minimumScaleFactor(0.55)
+                    .lineLimit(1)
                 }
 
                 // Am oberen Rand stoppen, auch wenn mehr gehen.

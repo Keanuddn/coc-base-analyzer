@@ -161,9 +161,12 @@ extension Double {
 }
 
 extension TimeInterval {
-    /// mm:ss für Timer.
+    /// `m:ss` für Timer. Überziehung nach der Zielpause ist vorzeichenbehaftet
+    /// (`-0:07`, `-1:05`) -- nicht als riesige unsigned Rest-Sekunde.
     var clockText: String {
         let total = Int(rounded())
-        return String(format: "%d:%02d", total / 60, total % 60)
+        let sign = total < 0 ? "-" : ""
+        let magnitude = abs(total)
+        return String(format: "%@%d:%02d", sign, magnitude / 60, magnitude % 60)
     }
 }

@@ -199,6 +199,7 @@ struct SessionView: View {
 
     private func restingScreen(_ context: SessionPhase.RestingContext) -> some View {
         let remaining = controller.restRemaining() ?? 0
+        // Nach dem Ziel weiterzählen (negativ). Nicht automatisch weitergehen.
         let isOver = remaining <= 0
 
         return VStack(spacing: 0) {

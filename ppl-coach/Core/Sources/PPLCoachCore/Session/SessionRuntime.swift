@@ -46,8 +46,9 @@ public enum SessionPhase: Equatable, Sendable {
         public let stoppedAt: Date
         public let restTargetEnd: Date
 
+        /// Restzeit bis zum Ziel. Nach Ablauf negativ (Überziehung), nicht auf 0 geklemmt.
         public func remaining(at now: Date) -> TimeInterval {
-            max(0, restTargetEnd.timeIntervalSince(now))
+            restTargetEnd.timeIntervalSince(now)
         }
 
         public func isOver(at now: Date) -> Bool {

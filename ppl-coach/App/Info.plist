@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>CFBundleURLTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleTypeRole</key>
+			<string>Editor</string>
+			<key>CFBundleURLName</key>
+			<string>com.keanu.pplcoach.whoop</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>pplcoach</string>
+			</array>
+		</dict>
+	</array>
+	<key>ITSAppUsesNonExemptEncryption</key>
+	<false/>
+	<key>NSCameraUsageDescription</key>
+	<string>Die App fotografiert vorgegebene Posen nach dem Training, damit Verlaufsfotos vergleichbar bleiben.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>Im Simulator ohne Kamera wählst du ein Foto aus der Mediathek, um den Foto-Ablauf zu testen. Auf dem iPhone speichert die App Verlaufsfotos in ihrem eigenen Ordner, nicht in der Mediathek.</string>
+	<key>WHOOP_CLIENT_ID</key>
+	<string>$(WHOOP_CLIENT_ID)</string>
+	<key>WHOOP_CLIENT_SECRET</key>
+	<string>$(WHOOP_CLIENT_SECRET)</string>
+	<key>WHOOP_REDIRECT_URI</key>
+	<string>$(WHOOP_REDIRECT_URI)</string>
+</dict>
+</plist>

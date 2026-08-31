@@ -32,6 +32,11 @@ swift build
 swift test
 ```
 
+Aktuell 115 Tests. Jeder Detektor hat zwei: einen, der einen eingebauten Effekt
+in synthetischen Daten finden muss, und einen Null-Test mit vertauschten Pausen,
+in dem er **schweigen** muss. Ein Detektor, der auf Rauschen anspringt, ist
+kaputt — der Null-Test hat genau das einmal aufgedeckt.
+
 ## App bauen
 
 Xcode-Projekt auf dem Mac anlegen, `Core` als lokales Package einbinden. Details und benötigte Capabilities in [App/README.md](App/README.md).
@@ -42,6 +47,28 @@ Ab der ersten Version dabei. Einrichtung, Scopes und die Eigenheiten der API (ph
 
 Zugangsdaten gehören **nicht** ins Repository. Vorlage: `App/Config/Secrets.example.xcconfig`.
 
-## Stand
+## Was drin ist
 
-Skelett. Als nächstes entsteht die Fachlogik im `Core`-Package mit Tests, beginnend bei der Ablauf-Zustandsmaschine und den Empfehlungsregeln.
+**Core (gebaut und getestet)**
+
+- Der PPL-Plan als versionierte Daten, inklusive der Positionsregel für Cable Flies und der Warm-ups direkt vor ihrer Arbeitsübung
+- Zustandsmaschine für den geführten Ablauf: Satz-Timer manuell, Pause läuft während der Eingabe weiter, Warm-ups ohne Pausenzwang, Supersets mit Pause erst nach der zweiten Übung
+- Fortsetzen nach Sperre und Absturz, Restpause aus Zeitstempeln
+- Last-Empfehlung nach dem schwächsten Arbeitssatz, Gewichtsschritte pro Übung
+- Störungs-Marker mit drei Kategorien; von außen verursachte Pausen gelten als saubere Dosis, eigene nicht
+- Metriken, elf Detektoren mit Gates und Schweigeregeln, Ranking und Karten aus Textbausteinen
+- Proben: Laufzeit und Erfolgsschwelle aus der eigenen Streuung, keine überlappenden Messungen
+- Whoop v2: Zyklus-Zuordnung, Baselines, Kontext erst vollständig wenn ausgewertet
+- Export als JSON und CSV
+
+**App (geschrieben, noch nicht kompiliert)**
+
+Alle Bildschirme, Persistenz, Whoop-OAuth und Haptik liegen in `App/Sources/`.
+Das Xcode-Projekt entsteht auf dem Mac, siehe [App/README.md](App/README.md).
+
+## Was noch fehlt
+
+- Xcode-Projekt anlegen und den ersten Build durchziehen
+- Whoop-App im Developer-Dashboard registrieren, Zugangsdaten in die xcconfig
+- iCloud-Sicherung einrichten
+- Danach: mehrere Wochen im Gym benutzen, bevor an der Analyse weitergebaut wird — sie braucht ohnehin erst Daten

@@ -6,7 +6,7 @@ import Foundation
 /// 1- oder 2-kg-Schritten vorliegen und Maschinen einem 5-kg-Raster folgen.
 /// Eine Empfehlung von 82,5 kg ist an einem 5-kg-Raster nicht einstellbar --
 /// deshalb wird jede Empfehlung auf eine erreichbare Stufe gerundet.
-public struct WeightStep: Equatable, Sendable {
+public struct WeightStep: Equatable, Sendable, Codable {
     public static let standard = WeightStep(kilograms: 2.5)
 
     public let kilograms: Double

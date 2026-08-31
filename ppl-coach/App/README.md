@@ -1,19 +1,41 @@
 # App-Hülle (SwiftUI)
 
-Xcode-Projekt liegt fertig in `ppl-coach/PPLCoach.xcodeproj`. Der Simulator
-läuft nur auf einem Mac — diese Linux-Umgebung kann die App nicht starten.
+Xcode-Projekt: `PPLCoach.xcodeproj` in diesem Ordner (`ppl-coach/`).
 
-## Simulator starten
+## Ohne Git auf den Mac (empfohlen)
 
-1. `ppl-coach/` auf den Mac holen (Clone oder den Ordner kopieren).
-2. `PPLCoach.xcodeproj` in Xcode öffnen — **nicht** ein neues Projekt anlegen.
-3. Schema **PPLCoach**, Destination ein iPhone (z. B. iPhone 16 / 16 Pro).
-4. Signing: unter *Signing & Capabilities* dein Team wählen. Für den Simulator
-   reicht die persönliche Apple-ID.
-5. ⌘R.
+Xcode zeigt Git-Status, sobald `ppl-coach` **innerhalb** von `coc-base-analyzer` liegt.
+Die App dann aus einem normalen Ordner starten — nicht aus dem Analyzer-Repo.
+
+Im Terminal:
+
+```bash
+cd ~/coc-base-analyzer
+git fetch origin
+git checkout cursor/scaffold-ppl-coach-dcd1
+git pull origin cursor/scaffold-ppl-coach-dcd1
+
+rm -rf ~/PPLCoach
+ditto ppl-coach ~/PPLCoach
+rm -rf ~/Library/Developer/Xcode/DerivedData/PPLCoach-*
+
+open ~/PPLCoach/PPLCoach.xcodeproj
+```
+
+Das alte Xcode-Fenster mit `coc-base-analyzer` schließen. In der neuen Instanz:
+*Product → Clean Build Folder*, dann ⌘R.
+
+`~/PPLCoach` hat **kein** Git. Signing-Team einmal setzen.
+
+## Simulator starten (falls das Projekt schon liegt)
+
+1. `PPLCoach.xcodeproj` öffnen — kein neues Projekt anlegen.
+2. Schema **PPLCoach**, Destination ein iPhone-Simulator.
+3. Signing: Team wählen. Für den Simulator reicht die persönliche Apple-ID.
+4. ⌘R.
 
 Beim ersten Öffnen löst Xcode das lokale Package `Core` (`PPLCoachCore`) auf.
-Das kann eine Minute dauern.
+
 
 ## Was im Simulator anders ist
 
